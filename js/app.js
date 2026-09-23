@@ -25,14 +25,36 @@ const API_BASE_URL =
     );
 
 
-    function loadPortal() {
+   function loadPortal() {
+  fetch(API_BASE_URL + '?action=portalData')
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(
+          'HTTP error: ' + response.status
+        );
+      }
 
-      google.script.run
-        .withSuccessHandler(renderPortal)
-        .withFailureHandler(showError)
-        .getPublicPortalData();
+      return response.json();
+    })
+    .then(result => {
+      if (!result.success) {
+        throw new Error(
+          result.error ||
+          'Unable to load portal data.'
+        );
+      }
 
-    }
+      renderPortal(result.data);
+    })
+    .catch(error => {
+      console.error(
+        'Portal data error:',
+        error
+      );
+
+      showError(error);
+    });
+}
 
 
     function renderPortal(data) {
