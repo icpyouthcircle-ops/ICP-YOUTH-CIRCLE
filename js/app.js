@@ -384,11 +384,38 @@ function loadResourcesByCategory(categoryName) {
   content.innerHTML =
     '<p>Loading resources...</p>';
 
-  google.script.run
-    .withSuccessHandler(renderResourceCards)
-    .withFailureHandler(showResourceError)
-    .getPublicResources(categoryName);
-}
+fetch(
+  API_BASE_URL +
+  '?action=resources&category=' +
+  encodeURIComponent(categoryName)
+)
+  .then(response => {
+    if (!response.ok) {
+      throw new Error(
+        'HTTP error: ' + response.status
+      );
+    }
+
+    return response.json();
+  })
+  .then(result => {
+    if (!result.success) {
+      throw new Error(
+        result.error ||
+        'Unable to load resources.'
+      );
+    }
+
+    renderResourceCards(result.data);
+  })
+  .catch(error => {
+    console.error(
+      'Resources error:',
+      error
+    );
+
+    showResourceError(error);
+  });
 function renderResourceCards(resources) {
 
   currentResources = resources || [];
@@ -739,11 +766,36 @@ function loadMCQs() {
   content.innerHTML =
     '<p>Loading MCQs...</p>';
 
-  google.script.run
-    .withSuccessHandler(renderMCQs)
-    .withFailureHandler(showMCQError)
-    .getPublicMCQs();
-}
+ fetch(
+  API_BASE_URL + '?action=mcqs'
+)
+  .then(response => {
+    if (!response.ok) {
+      throw new Error(
+        'HTTP error: ' + response.status
+      );
+    }
+
+    return response.json();
+  })
+  .then(result => {
+    if (!result.success) {
+      throw new Error(
+        result.error ||
+        'Unable to load MCQs.'
+      );
+    }
+
+    renderMCQs(result.data);
+  })
+  .catch(error => {
+    console.error(
+      'MCQ error:',
+      error
+    );
+
+    showMCQError(error);
+  });
 function renderMCQs(mcqs) {
 
   currentMCQs = mcqs || [];
@@ -1441,11 +1493,36 @@ function loadVideos() {
   content.innerHTML =
     '<p>Loading videos...</p>';
 
-  google.script.run
-    .withSuccessHandler(renderVideos)
-    .withFailureHandler(showVideoError)
-    .getPublicVideos();
-}
+fetch(
+  API_BASE_URL + '?action=videos'
+)
+  .then(response => {
+    if (!response.ok) {
+      throw new Error(
+        'HTTP error: ' + response.status
+      );
+    }
+
+    return response.json();
+  })
+  .then(result => {
+    if (!result.success) {
+      throw new Error(
+        result.error ||
+        'Unable to load videos.'
+      );
+    }
+
+    renderVideos(result.data);
+  })
+  .catch(error => {
+    console.error(
+      'Videos error:',
+      error
+    );
+
+    showVideoError(error);
+  });
 function renderVideos(videos) {
 
   currentVideos = videos || [];
@@ -1731,11 +1808,36 @@ function loadAdmissions() {
   content.innerHTML =
     '<p>Loading admissions...</p>';
 
-  google.script.run
-    .withSuccessHandler(renderAdmissions)
-    .withFailureHandler(showAdmissionsError)
-    .getPublicAdmissions();
-}
+fetch(
+  API_BASE_URL + '?action=admissions'
+)
+  .then(response => {
+    if (!response.ok) {
+      throw new Error(
+        'HTTP error: ' + response.status
+      );
+    }
+
+    return response.json();
+  })
+  .then(result => {
+    if (!result.success) {
+      throw new Error(
+        result.error ||
+        'Unable to load admissions.'
+      );
+    }
+
+    renderAdmissions(result.data);
+  })
+  .catch(error => {
+    console.error(
+      'Admissions error:',
+      error
+    );
+
+    showAdmissionsError(error);
+  });
 function loadScholarships() {
   const title =
     document.getElementById('dynamicPageTitle');
@@ -1754,11 +1856,36 @@ function loadScholarships() {
   content.innerHTML =
     '<p>Loading scholarships...</p>';
 
-  google.script.run
-    .withSuccessHandler(renderScholarships)
-    .withFailureHandler(showScholarshipsError)
-    .getPublicScholarships();
-}
+ fetch(
+  API_BASE_URL + '?action=scholarships'
+)
+  .then(response => {
+    if (!response.ok) {
+      throw new Error(
+        'HTTP error: ' + response.status
+      );
+    }
+
+    return response.json();
+  })
+  .then(result => {
+    if (!result.success) {
+      throw new Error(
+        result.error ||
+        'Unable to load scholarships.'
+      );
+    }
+
+    renderScholarships(result.data);
+  })
+  .catch(error => {
+    console.error(
+      'Scholarships error:',
+      error
+    );
+
+    showScholarshipsError(error);
+  });
 function loadOpportunities() {
   const title =
     document.getElementById('dynamicPageTitle');
@@ -1777,11 +1904,36 @@ function loadOpportunities() {
   content.innerHTML =
     '<p>Loading opportunities...</p>';
 
-  google.script.run
-    .withSuccessHandler(renderOpportunities)
-    .withFailureHandler(showOpportunitiesError)
-    .getPublicOpportunities();
-}
+ fetch(
+  API_BASE_URL + '?action=opportunities'
+)
+  .then(response => {
+    if (!response.ok) {
+      throw new Error(
+        'HTTP error: ' + response.status
+      );
+    }
+
+    return response.json();
+  })
+  .then(result => {
+    if (!result.success) {
+      throw new Error(
+        result.error ||
+        'Unable to load opportunities.'
+      );
+    }
+
+    renderOpportunities(result.data);
+  })
+  .catch(error => {
+    console.error(
+      'Opportunities error:',
+      error
+    );
+
+    showOpportunitiesError(error);
+  });
 function loadAnnouncements() {
   const title =
     document.getElementById('dynamicPageTitle');
@@ -1801,11 +1953,36 @@ function loadAnnouncements() {
   content.innerHTML =
     '<p>Loading announcements...</p>';
 
-  google.script.run
-    .withSuccessHandler(renderAnnouncements)
-    .withFailureHandler(showAnnouncementsError)
-    .getPublicAnnouncements();
-}
+ fetch(
+  API_BASE_URL + '?action=announcements'
+)
+  .then(response => {
+    if (!response.ok) {
+      throw new Error(
+        'HTTP error: ' + response.status
+      );
+    }
+
+    return response.json();
+  })
+  .then(result => {
+    if (!result.success) {
+      throw new Error(
+        result.error ||
+        'Unable to load announcements.'
+      );
+    }
+
+    renderAnnouncements(result.data);
+  })
+  .catch(error => {
+    console.error(
+      'Announcements error:',
+      error
+    );
+
+    showAnnouncementsError(error);
+  });
 function loadAITools() {
   const title =
     document.getElementById('dynamicPageTitle');
@@ -1825,11 +2002,36 @@ function loadAITools() {
   content.innerHTML =
     '<p>Loading AI tools...</p>';
 
-  google.script.run
-    .withSuccessHandler(renderAITools)
-    .withFailureHandler(showAIToolsError)
-    .getPublicAITools();
-}
+ fetch(
+  API_BASE_URL + '?action=aiTools'
+)
+  .then(response => {
+    if (!response.ok) {
+      throw new Error(
+        'HTTP error: ' + response.status
+      );
+    }
+
+    return response.json();
+  })
+  .then(result => {
+    if (!result.success) {
+      throw new Error(
+        result.error ||
+        'Unable to load AI tools.'
+      );
+    }
+
+    renderAITools(result.data);
+  })
+  .catch(error => {
+    console.error(
+      'AI Tools error:',
+      error
+    );
+
+    showAIToolsError(error);
+  });
 function renderAITools(tools) {
   currentAITools =
     tools || [];
