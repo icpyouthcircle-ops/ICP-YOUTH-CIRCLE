@@ -10,6 +10,7 @@ const API_BASE_URL =
     let currentAITools = [];
     let currentIslamicContent = [];
     let currentBlogPosts = [];
+    let currentEntryTests = [];
 
     let mcqScore = 0;
     let mcqAnswered = 0;
@@ -338,6 +339,17 @@ if (
 }
 if (item.Slug === 'blog') {
   loadBlog();
+}
+if (
+  item.Slug === 'entry-tests' ||
+  item.Slug === 'mdcat' ||
+  item.Slug === 'nums' ||
+  item.Slug === 'etea' ||
+  item.Slug === 'ecat' ||
+  item.Slug === 'nust-net' ||
+  item.Slug === 'other-tests'
+) {
+  loadEntryTests(item.Slug);
 }
 
   document.getElementById(
@@ -2364,6 +2376,309 @@ function showIslamicContentError(error) {
 
   console.error(
     'Islamic Content error:',
+    error
+  );
+}
+
+function loadEntryTests(slug) {
+  const title =
+    document.getElementById('dynamicPageTitle');
+
+  const content =
+    document.getElementById('dynamicPageContent');
+
+  const filters =
+    document.getElementById('resourceFilters');
+
+  const pageTitles = {
+    'entry-tests': 'Entry Tests',
+    'mdcat': 'MDCAT',
+    'nums': 'NUMS',
+    'etea': 'ETEA',
+    'ecat': 'ECAT',
+    'nust-net': 'NUST NET',
+    'other-tests': 'Other Tests'
+  };
+
+  title.textContent =
+    pageTitles[slug] || 'Entry Tests';
+
+  filters.innerHTML = '';
+  filters.style.display = 'none';
+
+  content.innerHTML =
+    '<p>Loading entry tests...</p>';
+
+  fetch(
+    API_BASE_URL + '?action=entryTests'
+  )
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(
+          'HTTP error: ' + response.status
+        );
+      }
+
+      return response.json();
+    })
+    .then(result => {
+      if (!result.success) {
+        throw new Error(
+          result.error ||
+          'Unable to load entry tests.'
+        );
+      }
+
+      renderEntryTests(
+        result.data,
+        slug
+      );
+    })
+    .catch(error => {
+      console.error(
+        'Entry Tests error:',
+        error
+      );
+
+      showEntryTestsError(error);
+    });
+}
+
+function renderEntryTests(items, slug) {
+  currentEntryTests =
+    items || [];
+
+  if (slug && slug !== 'entry-tests') {
+    currentEntryTests =
+      currentEntryTests.filter(item =>
+        String(item.Slug || '')
+          .trim()
+          .toLowerCase() ===
+        String(slug)
+          .trim()
+          .toLowerCase()
+      );
+  }
+
+  buildEntryTestFilters(
+    currentEntryTests
+  );
+
+  displayFilteredEntryTests();
+}
+
+function buildEntryTestFilters(items) {
+  const filters =
+    document.getElementById('resourceFilters');
+
+  if (!items || items.length === 0) {
+    filters.innerHTML = '';
+    filters.style.display = 'none';
+    return;
+  }
+
+  filters.style.display = 'grid';
+
+  const organizations =
+    getUniqueValues(
+      items,
+      'Organization'
+    );
+
+  filters.innerHTML = `
+    ${createFilterSelect(
+      'entryTestOrganization',
+      'All Organizations',
+      organizations
+    )}
+  `;
+
+  filters
+    .querySelectorAll('select')
+    .forEach(select => {
+      select.addEventListener(
+        'change',
+        displayFilteredEntryTests
+      );
+    });
+}
+
+function displayFilteredEntryTests() {
+  const organization =
+    document.getElementById(
+      'entryTestOrganization'
+    )?.value || '';
+
+  const filtered =
+    currentEntryTests.filter(item =>
+      !organization ||
+      item.Organization === organization
+    );
+
+  drawEntryTestCards(filtered);
+}
+
+function drawEntryTestCards(items) {
+  const content =
+    document.getElementById(
+      'dynamicPageContent'
+    );
+
+  content.innerHTML = '';
+
+  if (!items || items.length === 0) {
+    content.innerHTML =
+      '<p>No matching entry tests found.</p>';
+    return;
+  }
+
+  items.forEach(item => {
+    const card =
+      document.createElement('div');
+
+    card.className =
+      'card resource-card';
+
+    const body =
+      document.createElement('div');
+
+    body.className =
+      'resource-card-body';
+
+    const title =
+      document.createElement('h4');
+
+    title.textContent =
+      item.Name || 'Entry Test';
+
+    body.appendChild(title);
+
+    if (item.Organization) {
+      const organization =
+        document.createElement('p');
+
+      organization.textContent =
+        item.Organization;
+
+      organization.style.fontWeight =
+        'bold';
+
+      body.appendChild(organization);
+    }
+
+    if (item.Description) {
+      const description =
+        document.createElement('p');
+
+      description.textContent =
+        item.Description;
+
+      description.style.marginTop =
+        '10px';
+
+      body.appendChild(description);
+    }
+
+    if (item.Eligibility) {
+      const eligibility =
+        document.createElement('p');
+
+      eligibility.textContent =
+        'Eligibility: ' +
+        item.Eligibility;
+
+      eligibility.style.marginTop =
+        '10px';
+
+      body.appendChild(eligibility);
+    }
+
+    if (item.RegistrationStart) {
+      const opening =
+        document.createElement('p');
+
+      opening.textContent =
+        'Registration opens: ' +
+        formatPortalDate(
+          item.RegistrationStart
+        );
+
+      opening.style.marginTop =
+        '10px';
+
+      body.appendChild(opening);
+    }
+
+    if (item.RegistrationDeadline) {
+      const deadline =
+        document.createElement('p');
+
+      deadline.textContent =
+        'Registration deadline: ' +
+        formatPortalDate(
+          item.RegistrationDeadline
+        );
+
+      deadline.style.marginTop =
+        '10px';
+
+      body.appendChild(deadline);
+    }
+
+    if (item.TestDate) {
+      const testDate =
+        document.createElement('p');
+
+      testDate.textContent =
+        'Test date: ' +
+        formatPortalDate(
+          item.TestDate
+        );
+
+      testDate.style.marginTop =
+        '10px';
+
+      body.appendChild(testDate);
+    }
+
+    if (item.OfficialURL) {
+      const link =
+        document.createElement('a');
+
+      link.href =
+        item.OfficialURL;
+
+      link.target =
+        '_blank';
+
+      link.rel =
+        'noopener noreferrer';
+
+      link.textContent =
+        'Official Details';
+
+      link.className =
+        'resource-button';
+
+      body.appendChild(link);
+    }
+
+    card.appendChild(body);
+    content.appendChild(card);
+  });
+}
+
+function showEntryTestsError(error) {
+  const content =
+    document.getElementById(
+      'dynamicPageContent'
+    );
+
+  content.innerHTML =
+    '<p>Unable to load entry tests right now.</p>';
+
+  console.error(
+    'Entry Tests error:',
     error
   );
 }
