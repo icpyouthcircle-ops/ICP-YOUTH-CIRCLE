@@ -9,6 +9,7 @@ const API_BASE_URL =
     let currentAnnouncements = [];
     let currentAITools = [];
     let currentIslamicContent = [];
+    let currentBlogPosts = [];
 
     let mcqScore = 0;
     let mcqAnswered = 0;
@@ -334,6 +335,9 @@ if (
   item.Slug === 'duas-motivation'
 ) {
   loadIslamicContent(item.Slug);
+}
+if (item.Slug === 'blog') {
+  loadBlog();
 }
 
   document.getElementById(
@@ -2360,6 +2364,332 @@ function showIslamicContentError(error) {
 
   console.error(
     'Islamic Content error:',
+    error
+  );
+}
+
+function loadBlog() {
+  const title =
+    document.getElementById('dynamicPageTitle');
+
+  const content =
+    document.getElementById('dynamicPageContent');
+
+  const filters =
+    document.getElementById('resourceFilters');
+
+  title.textContent = 'Blog';
+
+  filters.innerHTML = '';
+  filters.style.display = 'none';
+
+  content.innerHTML =
+    '<p>Loading blog posts...</p>';
+
+  fetch(
+    API_BASE_URL + '?action=blog'
+  )
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(
+          'HTTP error: ' + response.status
+        );
+      }
+
+      return response.json();
+    })
+    .then(result => {
+      if (!result.success) {
+        throw new Error(
+          result.error ||
+          'Unable to load blog posts.'
+        );
+      }
+
+      renderBlog(result.data);
+    })
+    .catch(error => {
+      console.error(
+        'Blog error:',
+        error
+      );
+
+      showBlogError(error);
+    });
+}
+
+function renderBlog(posts) {
+  currentBlogPosts =
+    posts || [];
+
+  buildBlogFilters(
+    currentBlogPosts
+  );
+
+  displayFilteredBlog();
+}
+
+function buildBlogFilters(posts) {
+  const filters =
+    document.getElementById('resourceFilters');
+
+  if (!posts || posts.length === 0) {
+    filters.innerHTML = '';
+    filters.style.display = 'none';
+    return;
+  }
+
+  filters.style.display = 'grid';
+
+  const categories =
+    getUniqueValues(
+      posts,
+      'Category'
+    );
+
+  const authors =
+    getUniqueValues(
+      posts,
+      'Author'
+    );
+
+  filters.innerHTML = `
+    ${createFilterSelect(
+      'blogCategory',
+      'All Categories',
+      categories
+    )}
+
+    ${createFilterSelect(
+      'blogAuthor',
+      'All Authors',
+      authors
+    )}
+  `;
+
+  filters
+    .querySelectorAll('select')
+    .forEach(select => {
+      select.addEventListener(
+        'change',
+        displayFilteredBlog
+      );
+    });
+}
+
+function displayFilteredBlog() {
+  const category =
+    document.getElementById(
+      'blogCategory'
+    )?.value || '';
+
+  const author =
+    document.getElementById(
+      'blogAuthor'
+    )?.value || '';
+
+  const filtered =
+    currentBlogPosts.filter(item => {
+      return (
+        (!category ||
+          item.Category === category) &&
+        (!author ||
+          item.Author === author)
+      );
+    });
+
+  drawBlogCards(filtered);
+}
+
+function drawBlogCards(posts) {
+  const content =
+    document.getElementById(
+      'dynamicPageContent'
+    );
+
+  content.innerHTML = '';
+
+  if (!posts || posts.length === 0) {
+    content.innerHTML =
+      '<p>No matching blog posts found.</p>';
+    return;
+  }
+
+  posts.forEach(item => {
+    const card =
+      document.createElement('article');
+
+    card.className =
+      'card resource-card';
+
+    if (item.ThumbnailURL) {
+      const image =
+        document.createElement('img');
+
+      image.src = item.ThumbnailURL;
+      image.alt =
+        item.Title || 'Blog post';
+
+      image.className =
+        'resource-thumbnail';
+
+      card.appendChild(image);
+    }
+
+    const body =
+      document.createElement('div');
+
+    body.className =
+      'resource-card-body';
+
+    const badges =
+      document.createElement('div');
+
+    badges.className =
+      'resource-badges';
+
+    if (item.Category) {
+      const categoryBadge =
+        document.createElement('span');
+
+      categoryBadge.className =
+        'resource-badge';
+
+      categoryBadge.textContent =
+        item.Category;
+
+      badges.appendChild(
+        categoryBadge
+      );
+    }
+
+    if (
+      String(item.Featured || '')
+        .toLowerCase() === 'yes'
+    ) {
+      const featuredBadge =
+        document.createElement('span');
+
+      featuredBadge.className =
+        'resource-badge featured-badge';
+
+      featuredBadge.textContent =
+        'Featured';
+
+      badges.appendChild(
+        featuredBadge
+      );
+    }
+
+    if (badges.children.length > 0) {
+      body.appendChild(badges);
+    }
+
+    const title =
+      document.createElement('h4');
+
+    title.textContent =
+      item.Title || 'Blog Post';
+
+    body.appendChild(title);
+
+    const metaParts = [];
+
+    if (item.Author) {
+      metaParts.push(
+        'By ' + item.Author
+      );
+    }
+
+    if (item.PublishDate) {
+      metaParts.push(
+        formatPortalDate(
+          item.PublishDate
+        )
+      );
+    }
+
+    if (metaParts.length > 0) {
+      const meta =
+        document.createElement('div');
+
+      meta.className =
+        'resource-meta';
+
+      meta.textContent =
+        metaParts.join(' • ');
+
+      body.appendChild(meta);
+    }
+
+    if (item.Summary) {
+      const summary =
+        document.createElement('p');
+
+      summary.textContent =
+        item.Summary;
+
+      summary.style.marginTop =
+        '10px';
+
+      body.appendChild(summary);
+    }
+
+    if (item.Content) {
+      const details =
+        document.createElement('details');
+
+      details.style.marginTop =
+        '12px';
+
+      const summaryToggle =
+        document.createElement('summary');
+
+      summaryToggle.textContent =
+        'Read Article';
+
+      summaryToggle.style.cursor =
+        'pointer';
+
+      summaryToggle.style.fontWeight =
+        'bold';
+
+      const articleText =
+        document.createElement('p');
+
+      articleText.textContent =
+        item.Content;
+
+      articleText.style.marginTop =
+        '12px';
+
+      details.appendChild(
+        summaryToggle
+      );
+
+      details.appendChild(
+        articleText
+      );
+
+      body.appendChild(details);
+    }
+
+    card.appendChild(body);
+    content.appendChild(card);
+  });
+}
+
+function showBlogError(error) {
+  const content =
+    document.getElementById(
+      'dynamicPageContent'
+    );
+
+  content.innerHTML =
+    '<p>Unable to load blog posts right now.</p>';
+
+  console.error(
+    'Blog error:',
     error
   );
 }
