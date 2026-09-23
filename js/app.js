@@ -1,3 +1,5 @@
+const API_BASE_URL =
+  'https://script.google.com/macros/s/AKfycbwfIALyzy8rVPAyIyTj-RkFdjX5f92uaVpESOGHrBIsnsFQLH14uoYeAdggXKNEhQUo/exec';
     let portalData = null;
     let currentResources = [];
     let currentVideos = [];
