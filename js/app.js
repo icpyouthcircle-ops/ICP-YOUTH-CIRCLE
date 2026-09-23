@@ -414,8 +414,10 @@ fetch(
       error
     );
 
-    showResourceError(error);
+  showResourceError(error);
   });
+  }
+
 function renderResourceCards(resources) {
 
   currentResources = resources || [];
@@ -794,8 +796,10 @@ function loadMCQs() {
       error
     );
 
-    showMCQError(error);
+  showMCQError(error);
   });
+  }
+
 function renderMCQs(mcqs) {
 
   currentMCQs = mcqs || [];
@@ -1836,8 +1840,10 @@ fetch(
       error
     );
 
-    showAdmissionsError(error);
+  showAdmissionsError(error);
   });
+  }
+  
 function loadScholarships() {
   const title =
     document.getElementById('dynamicPageTitle');
@@ -1884,8 +1890,10 @@ function loadScholarships() {
       error
     );
 
-    showScholarshipsError(error);
+  showScholarshipsError(error);
   });
+  }
+  
 function loadOpportunities() {
   const title =
     document.getElementById('dynamicPageTitle');
@@ -1932,8 +1940,10 @@ function loadOpportunities() {
       error
     );
 
-    showOpportunitiesError(error);
+  showOpportunitiesError(error);
   });
+  }
+  
 function loadAnnouncements() {
   const title =
     document.getElementById('dynamicPageTitle');
@@ -1981,8 +1991,10 @@ function loadAnnouncements() {
       error
     );
 
-    showAnnouncementsError(error);
+  showAnnouncementsError(error);
   });
+  }
+  
 function loadAITools() {
   const title =
     document.getElementById('dynamicPageTitle');
@@ -2030,8 +2042,10 @@ function loadAITools() {
       error
     );
 
-    showAIToolsError(error);
+  showAIToolsError(error);
   });
+  }
+  
 function renderAITools(tools) {
   currentAITools =
     tools || [];
