@@ -310,25 +310,21 @@ if (item.Slug === 'admissions') {
 }
 if (item.Slug === 'scholarships') {
   loadScholarships();
-  return;
 }
 if (item.Slug === 'career') {
   loadOpportunities();
-  return;
 }
 if (
   item.Slug === 'updates' ||
   item.Slug === 'announcements'
 ) {
   loadAnnouncements();
-  return;
 }
 if (
   item.Slug === 'ai-smart-tools' ||
   item.Slug === 'ai-tools'
 ) {
   loadAITools();
-  return;
 }
 
   document.getElementById(
