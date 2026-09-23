@@ -1525,8 +1525,10 @@ fetch(
       error
     );
 
-    showVideoError(error);
+  showVideoError(error);
   });
+  }
+
 function renderVideos(videos) {
 
   currentVideos = videos || [];
