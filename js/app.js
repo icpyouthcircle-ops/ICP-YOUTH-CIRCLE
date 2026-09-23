@@ -8,6 +8,7 @@ const API_BASE_URL =
     let currentOpportunities = [];
     let currentAnnouncements = [];
     let currentAITools = [];
+    let currentIslamicContent = [];
 
     let mcqScore = 0;
     let mcqAnswered = 0;
@@ -325,6 +326,14 @@ if (
   item.Slug === 'ai-tools'
 ) {
   loadAITools();
+}
+if (
+  item.Slug === 'islamic' ||
+  item.Slug === 'hadith' ||
+  item.Slug === 'islamic-reminders' ||
+  item.Slug === 'duas-motivation'
+) {
+  loadIslamicContent(item.Slug);
 }
 
   document.getElementById(
@@ -2044,6 +2053,317 @@ function loadAITools() {
   });
   }
   
+function loadIslamicContent(slug) {
+  const title =
+    document.getElementById('dynamicPageTitle');
+
+  const content =
+    document.getElementById('dynamicPageContent');
+
+  const filters =
+    document.getElementById('resourceFilters');
+
+  const pageTitles = {
+    'islamic': 'Islamic',
+    'hadith': 'Hadith',
+    'islamic-reminders': 'Islamic Reminders',
+    'duas-motivation': 'Duas / Motivation'
+  };
+
+  title.textContent =
+    pageTitles[slug] || 'Islamic Content';
+
+  filters.innerHTML = '';
+  filters.style.display = 'none';
+
+  content.innerHTML =
+    '<p>Loading Islamic content...</p>';
+
+  fetch(
+    API_BASE_URL + '?action=islamicContent'
+  )
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(
+          'HTTP error: ' + response.status
+        );
+      }
+
+      return response.json();
+    })
+    .then(result => {
+      if (!result.success) {
+        throw new Error(
+          result.error ||
+          'Unable to load Islamic content.'
+        );
+      }
+
+      renderIslamicContent(
+        result.data,
+        slug
+      );
+    })
+    .catch(error => {
+      console.error(
+        'Islamic Content error:',
+        error
+      );
+
+      showIslamicContentError(error);
+    });
+}
+
+function renderIslamicContent(items, slug) {
+  currentIslamicContent =
+    items || [];
+
+  const typeBySlug = {
+    'hadith': 'hadith',
+    'islamic-reminders': 'islamic reminder',
+    'duas-motivation': 'dua / motivation'
+  };
+
+  const requiredType =
+    typeBySlug[slug] || '';
+
+  if (requiredType) {
+    currentIslamicContent =
+      currentIslamicContent.filter(item =>
+        String(item.Type || '')
+          .trim()
+          .toLowerCase() === requiredType
+      );
+  }
+
+  buildIslamicFilters(
+    currentIslamicContent
+  );
+
+  displayFilteredIslamicContent();
+}
+
+function buildIslamicFilters(items) {
+  const filters =
+    document.getElementById('resourceFilters');
+
+  if (!items || items.length === 0) {
+    filters.innerHTML = '';
+    filters.style.display = 'none';
+    return;
+  }
+
+  filters.style.display = 'grid';
+
+  const types =
+    getUniqueValues(items, 'Type');
+
+  filters.innerHTML = `
+    ${createFilterSelect(
+      'islamicType',
+      'All Types',
+      types
+    )}
+  `;
+
+  filters
+    .querySelectorAll('select')
+    .forEach(select => {
+      select.addEventListener(
+        'change',
+        displayFilteredIslamicContent
+      );
+    });
+}
+
+function displayFilteredIslamicContent() {
+  const type =
+    document.getElementById(
+      'islamicType'
+    )?.value || '';
+
+  const filtered =
+    currentIslamicContent.filter(item =>
+      !type || item.Type === type
+    );
+
+  drawIslamicCards(filtered);
+}
+
+function drawIslamicCards(items) {
+  const content =
+    document.getElementById(
+      'dynamicPageContent'
+    );
+
+  content.innerHTML = '';
+
+  if (!items || items.length === 0) {
+    content.innerHTML =
+      '<p>No matching Islamic content found.</p>';
+    return;
+  }
+
+  items.forEach(item => {
+    const card =
+      document.createElement('div');
+
+    card.className =
+      'card resource-card';
+
+    const body =
+      document.createElement('div');
+
+    body.className =
+      'resource-card-body';
+
+    const badges =
+      document.createElement('div');
+
+    badges.className =
+      'resource-badges';
+
+    if (item.Type) {
+      const typeBadge =
+        document.createElement('span');
+
+      typeBadge.className =
+        'resource-badge';
+
+      typeBadge.textContent =
+        item.Type;
+
+      badges.appendChild(typeBadge);
+    }
+
+    if (
+      String(item.Featured || '')
+        .toLowerCase() === 'yes'
+    ) {
+      const featuredBadge =
+        document.createElement('span');
+
+      featuredBadge.className =
+        'resource-badge featured-badge';
+
+      featuredBadge.textContent =
+        'Featured';
+
+      badges.appendChild(featuredBadge);
+    }
+
+    if (badges.children.length > 0) {
+      body.appendChild(badges);
+    }
+
+    const title =
+      document.createElement('h4');
+
+    title.textContent =
+      item.Title || 'Islamic Content';
+
+    body.appendChild(title);
+
+    if (item.ArabicText) {
+      const arabic =
+        document.createElement('p');
+
+      arabic.textContent =
+        item.ArabicText;
+
+      arabic.dir = 'rtl';
+      arabic.style.textAlign = 'right';
+      arabic.style.fontSize = '1.25rem';
+      arabic.style.lineHeight = '2';
+      arabic.style.marginTop = '14px';
+
+      body.appendChild(arabic);
+    }
+
+    if (item.UrduTranslation) {
+      const urdu =
+        document.createElement('p');
+
+      urdu.textContent =
+        item.UrduTranslation;
+
+      urdu.dir = 'rtl';
+      urdu.style.textAlign = 'right';
+      urdu.style.marginTop = '12px';
+
+      body.appendChild(urdu);
+    }
+
+    if (item.EnglishTranslation) {
+      const english =
+        document.createElement('p');
+
+      english.textContent =
+        item.EnglishTranslation;
+
+      english.style.marginTop = '12px';
+
+      body.appendChild(english);
+    }
+
+    if (item.Reference) {
+      const reference =
+        document.createElement('p');
+
+      reference.textContent =
+        'Reference: ' + item.Reference;
+
+      reference.style.fontWeight = 'bold';
+      reference.style.marginTop = '12px';
+
+      body.appendChild(reference);
+    }
+
+    if (item.Description) {
+      const description =
+        document.createElement('p');
+
+      description.textContent =
+        item.Description;
+
+      description.style.marginTop = '10px';
+
+      body.appendChild(description);
+    }
+
+    if (item.SourceURL) {
+      const link =
+        document.createElement('a');
+
+      link.href = item.SourceURL;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = 'View Source';
+      link.className = 'resource-button';
+
+      body.appendChild(link);
+    }
+
+    card.appendChild(body);
+    content.appendChild(card);
+  });
+}
+
+function showIslamicContentError(error) {
+  const content =
+    document.getElementById(
+      'dynamicPageContent'
+    );
+
+  content.innerHTML =
+    '<p>Unable to load Islamic content right now.</p>';
+
+  console.error(
+    'Islamic Content error:',
+    error
+  );
+}
+
 function renderAITools(tools) {
   currentAITools =
     tools || [];
