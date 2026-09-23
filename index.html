@@ -1,1 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
 
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <title>ICP YOUTH CIRCLE</title>
+
+  <link
+    rel="stylesheet"
+    href="css/style.css"
+  >
+</head>
+
+<body>
+
+    <div id="loading" class="loading">
+    Loading ICP YOUTH CIRCLE...
+  </div>
+
+  <div id="app" style="display:none;">
+
+    <header>
+      <div class="header-inner">
+
+        <div class="brand">
+          <h1 id="siteName">ICP YOUTH CIRCLE</h1>
+          <p id="tagline">LEARN • CONNECT • GROW</p>
+        </div>
+
+        <nav id="mainNavigation"></nav>
+
+      </div>
+    </header>
+
+    <main>
+
+    <section class="hero" id="homeHero">
+        <div class="hero-inner">
+
+          <h2 id="heroTitle">
+            ICP YOUTH CIRCLE
+          </h2>
+
+          <div
+            id="heroTagline"
+            class="hero-tagline">
+            Learn • Connect • Grow
+          </div>
+
+          <p
+            id="heroDescription"
+            class="hero-description">
+          </p>
+
+          <div class="search-box">
+            <input
+              id="searchInput"
+              type="text"
+              placeholder="Search resources, notes, past papers..."
+            >
+
+            <button onclick="portalSearch()">
+              Search
+            </button>
+          </div>
+
+        </div>
+      </section>
+
+
+      <section id="homeExplore">
+        <div class="container">
+
+          <div class="section-title">
+            <h3>Explore ICP YOUTH CIRCLE</h3>
+            <p>
+              Resources, opportunities and guidance
+              for students.
+            </p>
+          </div>
+
+          <div
+            id="categoryGrid"
+            class="grid">
+          </div>
+
+        </div>
+      </section>
+<section id="dynamicPage" style="display:none;">
+  <div class="container">
+
+    <button
+      onclick="showHome()"
+      style="
+        border:none;
+        background:none;
+        cursor:pointer;
+        margin-bottom:20px;
+        font-size:14px;
+      ">
+      ← Back to Home
+    </button>
+
+    <div class="section-title">
+      <h3 id="dynamicPageTitle"></h3>
+      <p id="dynamicPageDescription"></p>
+    </div>
+
+    <div
+  id="resourceFilters"
+  class="resource-filters"
+  style="display:none;">
+</div>
+
+<div id="dynamicPageContent" class="grid"></div>
+
+  </div>
+</section>
+
+    </main>
+
+    <footer>
+      <p id="footerText">
+        ICP YOUTH CIRCLE
+      </p>
+
+      <p>
+        Learn • Connect • Grow
+      </p>
+    </footer>
+
+  </div>
+
+  <script src="js/app.js"></script>
+
+</body>
+</html>
