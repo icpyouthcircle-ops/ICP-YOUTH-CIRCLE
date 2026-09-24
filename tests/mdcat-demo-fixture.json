@@ -1,0 +1,462 @@
+{
+  "MDCAT_Subjects": [
+    {
+      "Status": "Active",
+      "CreatedAt": "",
+      "UpdatedAt": "",
+      "ID": "MDS-001",
+      "Name": "Biology",
+      "Slug": "biology",
+      "Description": "MDCAT Biology subject directory.",
+      "Icon": "",
+      "DisplayOrder": 1
+    },
+    {
+      "Status": "Active",
+      "CreatedAt": "",
+      "UpdatedAt": "",
+      "ID": "MDS-002",
+      "Name": "Chemistry",
+      "Slug": "chemistry",
+      "Description": "MDCAT Chemistry subject directory.",
+      "Icon": "",
+      "DisplayOrder": 2
+    },
+    {
+      "Status": "Active",
+      "CreatedAt": "",
+      "UpdatedAt": "",
+      "ID": "MDS-003",
+      "Name": "Physics",
+      "Slug": "physics",
+      "Description": "MDCAT Physics subject directory.",
+      "Icon": "",
+      "DisplayOrder": 3
+    },
+    {
+      "Status": "Active",
+      "CreatedAt": "",
+      "UpdatedAt": "",
+      "ID": "MDS-004",
+      "Name": "English",
+      "Slug": "english",
+      "Description": "MDCAT English subject directory.",
+      "Icon": "",
+      "DisplayOrder": 4
+    },
+    {
+      "Status": "Active",
+      "CreatedAt": "",
+      "UpdatedAt": "",
+      "ID": "MDS-005",
+      "Name": "Logical Reasoning",
+      "Slug": "logical-reasoning",
+      "Description": "MDCAT Logical Reasoning subject directory.",
+      "Icon": "",
+      "DisplayOrder": 5
+    }
+  ],
+  "MDCAT_Units": [
+    {
+      "Status": "Active",
+      "CreatedAt": "",
+      "UpdatedAt": "",
+      "ID": "MDU-DEMO-001",
+      "SubjectID": "MDS-001",
+      "Name": "Demo Biology Unit",
+      "Slug": "demo-biology-unit",
+      "Description": "Demo navigation content only - not official MDCAT syllabus or exam material.",
+      "DisplayOrder": 1
+    },
+    {
+      "Status": "Active",
+      "CreatedAt": "",
+      "UpdatedAt": "",
+      "ID": "MDU-DEMO-002",
+      "SubjectID": "MDS-002",
+      "Name": "Demo Chemistry Unit",
+      "Slug": "demo-chemistry-unit",
+      "Description": "Demo navigation content only - not official MDCAT syllabus or exam material.",
+      "DisplayOrder": 1
+    },
+    {
+      "Status": "Active",
+      "CreatedAt": "",
+      "UpdatedAt": "",
+      "ID": "MDU-DEMO-003",
+      "SubjectID": "MDS-003",
+      "Name": "Demo Physics Unit",
+      "Slug": "demo-physics-unit",
+      "Description": "Demo navigation content only - not official MDCAT syllabus or exam material.",
+      "DisplayOrder": 1
+    },
+    {
+      "Status": "Active",
+      "CreatedAt": "",
+      "UpdatedAt": "",
+      "ID": "MDU-DEMO-004",
+      "SubjectID": "MDS-004",
+      "Name": "Demo English Unit",
+      "Slug": "demo-english-unit",
+      "Description": "Demo navigation content only - not official MDCAT syllabus or exam material.",
+      "DisplayOrder": 1
+    },
+    {
+      "Status": "Active",
+      "CreatedAt": "",
+      "UpdatedAt": "",
+      "ID": "MDU-DEMO-005",
+      "SubjectID": "MDS-005",
+      "Name": "Demo Logical Reasoning Unit",
+      "Slug": "demo-logical-reasoning-unit",
+      "Description": "Demo navigation content only - not official MDCAT syllabus or exam material.",
+      "DisplayOrder": 1
+    }
+  ],
+  "MDCAT_Chapters": [
+    {
+      "Status": "Active",
+      "CreatedAt": "",
+      "UpdatedAt": "",
+      "ID": "MDC-DEMO-001",
+      "UnitID": "MDU-DEMO-001",
+      "SubjectID": "MDS-001",
+      "Name": "Demo Biology Chapter",
+      "Slug": "demo-biology-chapter",
+      "Description": "Demo navigation content only - not official MDCAT syllabus or exam material.",
+      "DisplayOrder": 1
+    },
+    {
+      "Status": "Active",
+      "CreatedAt": "",
+      "UpdatedAt": "",
+      "ID": "MDC-DEMO-002",
+      "UnitID": "MDU-DEMO-002",
+      "SubjectID": "MDS-002",
+      "Name": "Demo Chemistry Chapter",
+      "Slug": "demo-chemistry-chapter",
+      "Description": "Demo navigation content only - not official MDCAT syllabus or exam material.",
+      "DisplayOrder": 1
+    },
+    {
+      "Status": "Active",
+      "CreatedAt": "",
+      "UpdatedAt": "",
+      "ID": "MDC-DEMO-003",
+      "UnitID": "MDU-DEMO-003",
+      "SubjectID": "MDS-003",
+      "Name": "Demo Physics Chapter",
+      "Slug": "demo-physics-chapter",
+      "Description": "Demo navigation content only - not official MDCAT syllabus or exam material.",
+      "DisplayOrder": 1
+    },
+    {
+      "Status": "Active",
+      "CreatedAt": "",
+      "UpdatedAt": "",
+      "ID": "MDC-DEMO-004",
+      "UnitID": "MDU-DEMO-004",
+      "SubjectID": "MDS-004",
+      "Name": "Demo English Chapter",
+      "Slug": "demo-english-chapter",
+      "Description": "Demo navigation content only - not official MDCAT syllabus or exam material.",
+      "DisplayOrder": 1
+    },
+    {
+      "Status": "Active",
+      "CreatedAt": "",
+      "UpdatedAt": "",
+      "ID": "MDC-DEMO-005",
+      "UnitID": "MDU-DEMO-005",
+      "SubjectID": "MDS-005",
+      "Name": "Demo Logical Reasoning Chapter",
+      "Slug": "demo-logical-reasoning-chapter",
+      "Description": "Demo navigation content only - not official MDCAT syllabus or exam material.",
+      "DisplayOrder": 1
+    }
+  ],
+  "MDCAT_Topics": [
+    {
+      "Status": "Active",
+      "CreatedAt": "",
+      "UpdatedAt": "",
+      "ID": "MDT-DEMO-001",
+      "ChapterID": "MDC-DEMO-001",
+      "UnitID": "MDU-DEMO-001",
+      "SubjectID": "MDS-001",
+      "Name": "Demo Biology Topic",
+      "Slug": "demo-biology-topic",
+      "Description": "Demo navigation content only - not official MDCAT syllabus or exam material.",
+      "DisplayOrder": 1
+    },
+    {
+      "Status": "Active",
+      "CreatedAt": "",
+      "UpdatedAt": "",
+      "ID": "MDT-DEMO-002",
+      "ChapterID": "MDC-DEMO-002",
+      "UnitID": "MDU-DEMO-002",
+      "SubjectID": "MDS-002",
+      "Name": "Demo Chemistry Topic",
+      "Slug": "demo-chemistry-topic",
+      "Description": "Demo navigation content only - not official MDCAT syllabus or exam material.",
+      "DisplayOrder": 1
+    },
+    {
+      "Status": "Active",
+      "CreatedAt": "",
+      "UpdatedAt": "",
+      "ID": "MDT-DEMO-003",
+      "ChapterID": "MDC-DEMO-003",
+      "UnitID": "MDU-DEMO-003",
+      "SubjectID": "MDS-003",
+      "Name": "Demo Physics Topic",
+      "Slug": "demo-physics-topic",
+      "Description": "Demo navigation content only - not official MDCAT syllabus or exam material.",
+      "DisplayOrder": 1
+    },
+    {
+      "Status": "Active",
+      "CreatedAt": "",
+      "UpdatedAt": "",
+      "ID": "MDT-DEMO-004",
+      "ChapterID": "MDC-DEMO-004",
+      "UnitID": "MDU-DEMO-004",
+      "SubjectID": "MDS-004",
+      "Name": "Demo English Topic",
+      "Slug": "demo-english-topic",
+      "Description": "Demo navigation content only - not official MDCAT syllabus or exam material.",
+      "DisplayOrder": 1
+    },
+    {
+      "Status": "Active",
+      "CreatedAt": "",
+      "UpdatedAt": "",
+      "ID": "MDT-DEMO-005",
+      "ChapterID": "MDC-DEMO-005",
+      "UnitID": "MDU-DEMO-005",
+      "SubjectID": "MDS-005",
+      "Name": "Demo Logical Reasoning Topic",
+      "Slug": "demo-logical-reasoning-topic",
+      "Description": "Demo navigation content only - not official MDCAT syllabus or exam material.",
+      "DisplayOrder": 1
+    }
+  ],
+  "MDCAT_Question_Bank": [
+    {
+      "Status": "Active",
+      "CreatedAt": "",
+      "UpdatedAt": "",
+      "ID": "MDQ-DEMO-001",
+      "SubjectID": "MDS-001",
+      "UnitID": "MDU-DEMO-001",
+      "ChapterID": "MDC-DEMO-001",
+      "TopicID": "MDT-DEMO-001",
+      "Question": "Interface demo: select the option labelled B.",
+      "OptionA": "This is option A",
+      "OptionB": "This is option B",
+      "OptionC": "This is option C",
+      "OptionD": "This is option D",
+      "Difficulty": "Easy",
+      "QuestionType": "Practice",
+      "Source": "Original interface demo - not official exam content"
+    },
+    {
+      "Status": "Active",
+      "CreatedAt": "",
+      "UpdatedAt": "",
+      "ID": "MDQ-DEMO-002",
+      "SubjectID": "MDS-002",
+      "UnitID": "MDU-DEMO-002",
+      "ChapterID": "MDC-DEMO-002",
+      "TopicID": "MDT-DEMO-002",
+      "Question": "Interface demo: select the option labelled B.",
+      "OptionA": "This is option A",
+      "OptionB": "This is option B",
+      "OptionC": "This is option C",
+      "OptionD": "This is option D",
+      "Difficulty": "Easy",
+      "QuestionType": "Practice",
+      "Source": "Original interface demo - not official exam content"
+    },
+    {
+      "Status": "Active",
+      "CreatedAt": "",
+      "UpdatedAt": "",
+      "ID": "MDQ-DEMO-003",
+      "SubjectID": "MDS-003",
+      "UnitID": "MDU-DEMO-003",
+      "ChapterID": "MDC-DEMO-003",
+      "TopicID": "MDT-DEMO-003",
+      "Question": "Interface demo: select the option labelled B.",
+      "OptionA": "This is option A",
+      "OptionB": "This is option B",
+      "OptionC": "This is option C",
+      "OptionD": "This is option D",
+      "Difficulty": "Easy",
+      "QuestionType": "Practice",
+      "Source": "Original interface demo - not official exam content"
+    },
+    {
+      "Status": "Active",
+      "CreatedAt": "",
+      "UpdatedAt": "",
+      "ID": "MDQ-DEMO-004",
+      "SubjectID": "MDS-004",
+      "UnitID": "MDU-DEMO-004",
+      "ChapterID": "MDC-DEMO-004",
+      "TopicID": "MDT-DEMO-004",
+      "Question": "Interface demo: select the option labelled B.",
+      "OptionA": "This is option A",
+      "OptionB": "This is option B",
+      "OptionC": "This is option C",
+      "OptionD": "This is option D",
+      "Difficulty": "Easy",
+      "QuestionType": "Practice",
+      "Source": "Original interface demo - not official exam content"
+    },
+    {
+      "Status": "Active",
+      "CreatedAt": "",
+      "UpdatedAt": "",
+      "ID": "MDQ-DEMO-005",
+      "SubjectID": "MDS-005",
+      "UnitID": "MDU-DEMO-005",
+      "ChapterID": "MDC-DEMO-005",
+      "TopicID": "MDT-DEMO-005",
+      "Question": "Interface demo: select the option labelled B.",
+      "OptionA": "This is option A",
+      "OptionB": "This is option B",
+      "OptionC": "This is option C",
+      "OptionD": "This is option D",
+      "Difficulty": "Easy",
+      "QuestionType": "Practice",
+      "Source": "Original interface demo - not official exam content"
+    },
+    {
+      "Status": "Active",
+      "CreatedAt": "",
+      "UpdatedAt": "",
+      "ID": "MDQ-DEMO-006",
+      "SubjectID": "MDS-001",
+      "UnitID": "MDU-DEMO-001",
+      "ChapterID": "MDC-DEMO-001",
+      "TopicID": "MDT-DEMO-001",
+      "Question": "Interface demo: select the option labelled D.",
+      "OptionA": "This is option A",
+      "OptionB": "This is option B",
+      "OptionC": "This is option C",
+      "OptionD": "This is option D",
+      "Difficulty": "Easy",
+      "QuestionType": "Practice",
+      "Source": "Original interface demo - not official exam content"
+    }
+  ],
+  "MDCAT_Tests": [
+    {
+      "ID": "MDTEST-DEMO-001",
+      "Title": "Demo full practice set - ungraded",
+      "Slug": "demo-full-practice",
+      "TestType": "Full Mock",
+      "Description": "Demo navigation content only - not official MDCAT syllabus or exam material.",
+      "TotalQuestions": 6,
+      "DurationMinutes": 5,
+      "PassingPercentage": 50,
+      "RandomizeQuestions": "Yes",
+      "RandomizeOptions": "Yes",
+      "Status": "Active",
+      "Featured": "Yes"
+    }
+  ],
+  "MDCAT_Test_Questions": [
+    {
+      "ID": "MDTQ-DEMO-001",
+      "TestID": "MDTEST-DEMO-001",
+      "QuestionID": "MDQ-DEMO-001",
+      "DisplayOrder": 1,
+      "Marks": 1,
+      "NegativeMarks": 0,
+      "Status": "Active"
+    },
+    {
+      "ID": "MDTQ-DEMO-002",
+      "TestID": "MDTEST-DEMO-001",
+      "QuestionID": "MDQ-DEMO-002",
+      "DisplayOrder": 2,
+      "Marks": 1,
+      "NegativeMarks": 0,
+      "Status": "Active"
+    },
+    {
+      "ID": "MDTQ-DEMO-003",
+      "TestID": "MDTEST-DEMO-001",
+      "QuestionID": "MDQ-DEMO-003",
+      "DisplayOrder": 3,
+      "Marks": 1,
+      "NegativeMarks": 0,
+      "Status": "Active"
+    },
+    {
+      "ID": "MDTQ-DEMO-004",
+      "TestID": "MDTEST-DEMO-001",
+      "QuestionID": "MDQ-DEMO-004",
+      "DisplayOrder": 4,
+      "Marks": 1,
+      "NegativeMarks": 0,
+      "Status": "Active"
+    },
+    {
+      "ID": "MDTQ-DEMO-005",
+      "TestID": "MDTEST-DEMO-001",
+      "QuestionID": "MDQ-DEMO-005",
+      "DisplayOrder": 5,
+      "Marks": 1,
+      "NegativeMarks": 0,
+      "Status": "Active"
+    },
+    {
+      "ID": "MDTQ-DEMO-006",
+      "TestID": "MDTEST-DEMO-001",
+      "QuestionID": "MDQ-DEMO-006",
+      "DisplayOrder": 6,
+      "Marks": 1,
+      "NegativeMarks": 0,
+      "Status": "Active"
+    }
+  ],
+  "MDCAT_Daily_Practice": [
+    {
+      "ID": "MDDP-DEMO-001",
+      "Date": "2026-09-24",
+      "Title": "Demo Biology daily practice",
+      "Description": "Demo navigation content only - not official MDCAT syllabus or exam material.",
+      "SubjectID": "MDS-001",
+      "UnitID": "MDU-DEMO-001",
+      "ChapterID": "MDC-DEMO-001",
+      "TopicID": "MDT-DEMO-001",
+      "QuestionCount": 2,
+      "DurationMinutes": 2,
+      "Difficulty": "Easy",
+      "Status": "Active",
+      "Featured": "Yes"
+    }
+  ],
+  "MDCAT_Updates": [
+    {
+      "ID": "MDUP-DEMO-001",
+      "Title": "Demo portal notice",
+      "Category": "Demo",
+      "Summary": "Testing the updates screen only.",
+      "Content": "This is not an official registration, syllabus or examination notice.",
+      "PublishDate": "2026-09-24",
+      "Priority": "Normal",
+      "Status": "Active",
+      "Featured": "No"
+    }
+  ],
+  "MDCAT_Test_Attempts": [],
+  "MDCAT_Attempt_Answers": [],
+  "MDCAT_Progress": [],
+  "MDCAT_Revision": [],
+  "MDCAT_Study_Plan": []
+}

@@ -1,4 +1,23 @@
 /* MDCAT additions are scoped to preserve the existing portal modules. */
+.mdcat-tools { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 20px; }
+.mdcat-tools button { border: 1px solid #dbe0e6; background: white; padding: 10px 14px; border-radius: 8px; color: #991b2f; font: inherit; cursor: pointer; }
+#mdcatHub button:focus-visible { outline: 3px solid #991b2f; outline-offset: 3px; }
+#mdcatHub button:disabled { cursor: default; opacity: .65; }
+.mdcat-wide { grid-column: 1 / -1; min-width: 0; }
+.mdcat-study-card { cursor: default; min-width: 0; overflow-wrap: anywhere; }
+.mdcat-study-card h3 { margin-top: 0; }
+.mdcat-study-card p { white-space: pre-wrap; margin: 12px 0; }
+#mdcatHub .resource-button { border: 0; cursor: pointer; margin-right: 10px; }
+.mdcat-question { min-width: 0; margin: 20px 0; padding: 20px; border: 1px solid #dbe0e6; border-radius: 12px; background: white; }
+.mdcat-question legend { max-width: 100%; font-weight: bold; overflow-wrap: anywhere; }
+.mdcat-option { display: flex; align-items: flex-start; gap: 10px; padding: 12px; cursor: pointer; }
+.mdcat-option span { overflow-wrap: anywhere; min-width: 0; }
+.mdcat-clock { font-weight: bold; font-variant-numeric: tabular-nums; }
+.mdcat-result { background: #fceef0; border-radius: 12px; padding: 20px; margin-top: 20px; }
+.mdcat-plan-form { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; }
+.mdcat-plan-form label { display: flex; flex-direction: column; gap: 8px; max-width: 100%; }
+.mdcat-plan-form input { padding: 12px; font: inherit; border: 1px solid #dbe0e6; border-radius: 8px; max-width: 100%; }
+#mdcatHubTitle { overflow-wrap: anywhere; }
 .mdcat-actions {
   display: flex;
   flex-wrap: wrap;

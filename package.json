@@ -1,0 +1,11 @@
+{
+  "name": "icp-youth-circle-portal",
+  "private": true,
+  "scripts": {
+    "check": "node --check js/app.js && node --check js/mdcat.js && node --check js/mdcat-study.js",
+    "test": "npm run check && node tests/mdcat-navigation.cjs && node tests/mdcat-complete.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}

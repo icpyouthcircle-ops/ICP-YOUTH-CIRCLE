@@ -1,7 +1,8 @@
-// Read public MDCAT subjects, units and chapters; other modules stay separate.
+// Read the public MDCAT hierarchy; other portal modules stay separate.
 let mdcatRequest = null;
 
 function closeMDCATHub() {
+  resetMDCATStudy();
   if (mdcatRequest) mdcatRequest.abort();
   mdcatRequest = null;
   document.getElementById('mdcatHub').hidden = true;
@@ -34,18 +35,27 @@ function openMDCATChapters(subject, unit) {
   return loadMDCATDirectory(subject, unit);
 }
 
-async function loadMDCATDirectory(subject = null, unit = null) {
+function openMDCATTopics(subject, unit, chapter) {
+  document.getElementById('mdcatHubTitle').focus({preventScroll: true});
+  window.scrollTo({top: 0, behavior: 'smooth'});
+  return loadMDCATDirectory(subject, unit, chapter);
+}
+
+async function loadMDCATDirectory(subject = null, unit = null, chapter = null) {
+  resetMDCATStudy();
   if (mdcatRequest) mdcatRequest.abort();
   const controller = new AbortController();
   mdcatRequest = controller;
   const grid = document.getElementById('mdcatSubjects');
   const status = document.getElementById('mdcatStatus');
   const retry = document.getElementById('mdcatRetry');
-  const noun = unit ? 'chapters' : subject ? 'units' : 'subjects';
-  document.getElementById('mdcatHubTitle').textContent = unit
+  const noun = chapter ? 'topics' : unit ? 'chapters' : subject ? 'units' : 'subjects';
+  document.getElementById('mdcatHubTitle').textContent = chapter
+    ? chapter.Name + ' — Topics' : unit
     ? unit.Name + ' — Chapters' : subject
     ? subject.Name + ' — Units' : 'MDCAT 2027';
-  document.getElementById('mdcatHubDescription').textContent = unit
+  document.getElementById('mdcatHubDescription').textContent = chapter
+    ? 'Browse topics in ' + chapter.Name + '.' : unit
     ? subject.Name + ' · Browse the published chapters for ' + unit.Name + '.' : subject
     ? 'Browse the published units for ' + subject.Name + '.'
     : 'Explore the subjects for your MDCAT preparation.';
@@ -54,17 +64,22 @@ async function loadMDCATDirectory(subject = null, unit = null) {
   backToUnits.hidden = !unit;
   backToUnits.textContent = unit ? '← ' + subject.Name + ' units' : '← Units';
   backToUnits.onclick = unit ? () => openMDCATUnits(subject) : null;
-  grid.setAttribute('aria-label', unit ? unit.Name + ' chapters' : subject ? subject.Name + ' units' : 'MDCAT subjects');
+  const backToChapters = document.getElementById('mdcatBackToChapters');
+  backToChapters.hidden = !chapter;
+  backToChapters.onclick = chapter ? () => openMDCATChapters(subject, unit) : null;
+  grid.setAttribute('aria-label', chapter ? chapter.Name + ' topics' : unit ? unit.Name + ' chapters' : subject ? subject.Name + ' units' : 'MDCAT subjects');
   grid.replaceChildren();
   grid.setAttribute('aria-busy', 'true');
   status.textContent = 'Loading ' + noun + '…';
   retry.hidden = true;
-  retry.onclick = () => loadMDCATDirectory(subject, unit);
+  retry.onclick = () => loadMDCATDirectory(subject, unit, chapter);
 
   // A slow/unavailable deployment must not leave an endless loading state.
   const timeout = setTimeout(() => controller.abort(), 20000);
   try {
-    const query = unit
+    const query = chapter
+      ? '?action=mdcatTopics&subjectId=' + encodeURIComponent(subject.ID) +
+        '&unitId=' + encodeURIComponent(unit.ID) + '&chapterId=' + encodeURIComponent(chapter.ID) : unit
       ? '?action=mdcatChapters&subjectId=' + encodeURIComponent(subject.ID) +
         '&unitId=' + encodeURIComponent(unit.ID) : subject
       ? '?action=mdcatUnits&subjectId=' + encodeURIComponent(subject.ID)
@@ -83,7 +98,8 @@ async function loadMDCATDirectory(subject = null, unit = null) {
     if (records.some(item => !item || typeof item.Name !== 'string' || !item.Name.trim() ||
       (!unit && (item.ID == null || !String(item.ID).trim())) ||
       (subject && String(item.SubjectID) !== String(subject.ID)) ||
-      (unit && String(item.UnitID) !== String(unit.ID)))) {
+      (unit && String(item.UnitID) !== String(unit.ID)) ||
+      (chapter && String(item.ChapterID) !== String(chapter.ID)))) {
       throw new Error('Invalid MDCAT directory record');
     }
     const order = subject => {
@@ -93,8 +109,10 @@ async function loadMDCATDirectory(subject = null, unit = null) {
     records.slice().sort((a, b) => order(a) - order(b)).forEach(item => {
       const card = document.createElement('article');
       card.className = 'card mdcat-subject-card';
-      // Chapters are display-only here; do not invent an ID if the API omits it.
-      if (unit) {
+      // Never invent an ID when the API omits it; such records remain display-only.
+      if (chapter) {
+        if (item.ID != null) card.dataset.topicId = String(item.ID);
+      } else if (unit) {
         if (item.ID != null) card.dataset.chapterId = String(item.ID);
       } else if (subject) card.dataset.unitId = String(item.ID);
       else card.dataset.subjectId = String(item.ID);
@@ -107,31 +125,41 @@ async function loadMDCATDirectory(subject = null, unit = null) {
       const heading = document.createElement('h3');
       heading.textContent = item.Name;
       const description = document.createElement('p');
-      description.textContent = item.Description || (unit
+      description.textContent = item.Description || (chapter
+        ? 'Open practice questions for this topic.' : unit
         ? 'Learning materials for this chapter will be added here.' : subject
         ? 'Explore the available chapters for this unit.'
         : 'Explore the available units for this subject.');
       card.append(icon, heading, description);
-      if (/^MD[UC]-DEMO-/i.test(String(item.ID)) || (unit && /^MDU-DEMO-/i.test(String(unit.ID)))) {
+      if (/^MD[UCT]-DEMO-/i.test(String(item.ID)) || (unit && /^MDU-DEMO-/i.test(String(unit.ID)))) {
         const demo = document.createElement('p');
         demo.className = 'mdcat-demo';
         demo.textContent = 'Demo content — navigation test only, not official syllabus content.';
         card.appendChild(demo);
       }
-      if (!unit) {
+      if (item.ID != null && String(item.ID).trim()) {
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'resource-button mdcat-open-units';
-        button.textContent = subject ? 'View chapters' : 'View units';
-        button.setAttribute('aria-label', 'View ' + item.Name + (subject ? ' chapters' : ' units'));
-        button.onclick = subject ? () => openMDCATChapters(subject, item) : () => openMDCATUnits(item);
+        const destination = chapter ? 'practice questions' : unit ? 'topics' : subject ? 'chapters' : 'units';
+        button.textContent = 'View ' + destination;
+        button.setAttribute('aria-label', 'View ' + item.Name + ' ' + destination);
+        button.onclick = chapter
+          ? () => openMDCATPractice({SubjectID: subject.ID, UnitID: unit.ID, ChapterID: chapter.ID, TopicID: item.ID}, item.Name,
+            () => openMDCATTopics(subject, unit, chapter))
+          : unit ? () => openMDCATTopics(subject, unit, item)
+          : subject ? () => openMDCATChapters(subject, item) : () => openMDCATUnits(item);
         card.appendChild(button);
+      } else {
+        const unavailable = document.createElement('p');
+        unavailable.textContent = 'Content is awaiting setup. Please check back later.';
+        card.appendChild(unavailable);
       }
       grid.appendChild(card);
     });
     status.textContent = records.length
       ? records.length + ' ' + (records.length === 1 ? noun.slice(0, -1) : noun) + ' available.'
-      : 'No ' + noun + ' are published' + (unit ? ' for ' + unit.Name : subject ? ' for ' + subject.Name : '') + ' yet. Please check again later.';
+      : 'No ' + noun + ' are published' + (chapter ? ' for ' + chapter.Name : unit ? ' for ' + unit.Name : subject ? ' for ' + subject.Name : '') + ' yet. Please check again later.';
   } catch (error) {
     // Navigation or a newer request owns the screen now.
     if (mdcatRequest !== controller) return;
