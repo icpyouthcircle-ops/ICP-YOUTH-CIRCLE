@@ -131,6 +131,7 @@
         <div class="container">
           <div class="mdcat-actions">
             <button id="mdcatBackToSubjects" class="mdcat-back" type="button" hidden onclick="openMDCATHub()">← All subjects</button>
+            <button id="mdcatBackToUnits" class="mdcat-back" type="button" hidden>← Units</button>
             <a href="#entry-tests" onclick="event.preventDefault(); handleNavigation({Slug: 'entry-tests', Label: 'Entry Tests'});">← Entry Tests</a>
             <a href="#mdcat-info" onclick="event.preventDefault(); handleNavigation({Slug: 'mdcat-info', Label: 'MDCAT'});">MDCAT test information</a>
           </div>
@@ -138,7 +139,7 @@
             <h2 id="mdcatHubTitle" tabindex="-1">MDCAT 2027</h2>
             <p id="mdcatHubDescription">Explore the subjects for your MDCAT preparation.</p>
           </div>
-          <p class="mdcat-note">Subject and unit directory · Lessons, questions and practice tests will be added in later updates.</p>
+          <p class="mdcat-note">Subject, unit and chapter directory · Lessons, questions and practice tests will be added in later updates.</p>
           <p id="mdcatStatus" role="status" aria-live="polite"></p>
           <button id="mdcatRetry" class="resource-button" type="button" hidden>Try again</button>
           <div id="mdcatSubjects" class="grid" aria-label="MDCAT subjects"></div>
