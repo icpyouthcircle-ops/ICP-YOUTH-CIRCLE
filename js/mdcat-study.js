@@ -105,6 +105,14 @@ function mdcatDemo(card, row) {
   if (/-DEMO-/i.test(String(row.ID))) card.appendChild(mdcatElement('p', 'Demo content — not official syllabus or exam material.', 'mdcat-demo'));
 }
 
+// Date-only sheet cells serialize as midnight in Pakistan, which is the prior UTC day.
+function mdcatCalendarDate(value) {
+  if (!value) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) return String(value);
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('en-CA', {timeZone:'Asia/Karachi'});
+}
+
 async function openMDCATCollection(kind) {
   const configs = {
     tests: ['Tests', 'mdcatTests'], daily: ['Daily practice', 'mdcatDailyPractice'], updates: ['MDCAT updates', 'mdcatUpdates']
@@ -119,10 +127,10 @@ async function openMDCATCollection(kind) {
     const rows = await mdcatFetch(config[1], {}, controller);
     if (mdcatRequest !== controller) return;
     if (rows.some(row => !row.Title)) throw new Error('Missing title');
-    const today = new Date().toLocaleDateString('en-CA');
+    const today = mdcatCalendarDate(new Date());
     const visible = rows.filter(row => {
       if (kind !== 'updates') return true;
-      const date = value => /^\d{4}-\d{2}-\d{2}/.test(String(value || '')) ? String(value).slice(0,10) : '';
+      const date = mdcatCalendarDate;
       return (!date(row.PublishDate) || date(row.PublishDate) <= today) && (!date(row.ExpiryDate) || date(row.ExpiryDate) >= today);
     });
     for (const row of visible) {
@@ -131,7 +139,7 @@ async function openMDCATCollection(kind) {
       mdcatDemo(card, row);
       if (kind === 'updates') {
         if (row.Category) card.appendChild(mdcatElement('p', row.Category));
-        if (row.PublishDate) card.appendChild(mdcatElement('p', 'Published: ' + String(row.PublishDate).slice(0,10)));
+        if (mdcatCalendarDate(row.PublishDate)) card.appendChild(mdcatElement('p', 'Published: ' + mdcatCalendarDate(row.PublishDate)));
         if (row.Summary) card.appendChild(mdcatElement('p', row.Summary));
         if (row.Content) {
           const details = document.createElement('details');
@@ -150,7 +158,7 @@ async function openMDCATCollection(kind) {
         } catch (_) { /* No valid source link was supplied. */ }
       } else {
         if (row.Description) card.appendChild(mdcatElement('p', row.Description));
-        if (row.Date) card.appendChild(mdcatElement('p', 'Scheduled date: ' + String(row.Date).slice(0,10)));
+        if (mdcatCalendarDate(row.Date)) card.appendChild(mdcatElement('p', 'Scheduled date: ' + mdcatCalendarDate(row.Date)));
         const count = kind === 'tests' ? row.TotalQuestions : row.QuestionCount;
         if (count) card.appendChild(mdcatElement('p', count + ' questions'));
         if (Number(row.DurationMinutes) > 0) card.appendChild(mdcatElement('p', row.DurationMinutes + ' minutes'));

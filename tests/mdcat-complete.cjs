@@ -36,13 +36,18 @@ fs.mkdirSync(path.join(__dirname,'../test-results'),{recursive:true});
       if(action==='mdcatTestQuestions' && failure==='wrong-test') rows[0].TestID='another';
       if(action==='mdcatTopics' && failure==='wrong-chapter') rows[0].ChapterID='another';
       if(action==='mdcatUpdates') {
+        rows[0].PublishDate='2026-09-23T19:00:00Z';
         rows.push({Title:'Future update',PublishDate:'2999-01-01'},{Title:'Expired update',ExpiryDate:'2000-01-01'});
         rows[0].OfficialURL='javascript:alert(1)'; rows[0].Content='<img src=x onerror=alert(1)>';
       }
+      if(action==='mdcatDailyPractice') rows[0].Date='2026-09-23T19:00:00Z';
       await route.fulfill({json:{success:true,data:rows}});
     });
     await page.goto(pathToFileURL(path.join(__dirname,'../index.html')).href);
     await page.locator('#app').waitFor({state:'visible'});
+    assert.equal(await page.evaluate(()=>mdcatCalendarDate('2026-09-23T19:00:00Z')),'2026-09-24');
+    assert.equal(await page.evaluate(()=>mdcatCalendarDate('2026-09-24')),'2026-09-24');
+    assert.equal(await page.evaluate(()=>mdcatCalendarDate('invalid')),'');
     await page.evaluate(()=>handleNavigation({Slug:'mdcat',Label:'MDCAT'}));
     const tool=name=>page.getByRole('navigation',{name:'MDCAT tools'}).getByRole('button',{name,exact:true});
     for(const name of ['Biology','Chemistry','Physics','English','Logical Reasoning']) {
@@ -95,6 +100,7 @@ fs.mkdirSync(path.join(__dirname,'../test-results'),{recursive:true});
     assert.match(await page.locator('.mdcat-result').textContent(),/0 answered · 6 unanswered/);
     assert.equal(await page.evaluate(()=>mdcatTimer),null);
     await tool('Daily practice').click();
+    await page.getByText('Scheduled date: 2026-09-24',{exact:true}).waitFor();
     await page.getByRole('button',{name:'Open practice set',exact:true}).click();
     await page.getByRole('button',{name:'Start practice',exact:true}).click();
     assert.equal(await page.locator('.mdcat-question').count(),2);
@@ -105,6 +111,7 @@ fs.mkdirSync(path.join(__dirname,'../test-results'),{recursive:true});
     assert.equal(await page.evaluate(()=>mdcatTimer),null);
     await tool('Updates').click();
     await page.getByRole('heading',{name:'Demo portal notice',exact:true}).waitFor();
+    await page.getByText('Published: 2026-09-24',{exact:true}).waitFor();
     assert.equal(await page.getByRole('heading',{name:'Future update',exact:true}).count(),0);
     assert.equal(await page.getByRole('heading',{name:'Expired update',exact:true}).count(),0);
     assert.equal(await page.getByRole('link',{name:'View source',exact:true}).count(),0);
