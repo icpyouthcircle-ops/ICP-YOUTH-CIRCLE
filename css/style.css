@@ -16,6 +16,13 @@
 #mdcatRetry[hidden] { display: none; }
 .mdcat-subject-card { cursor: default; overflow-wrap: anywhere; }
 .mdcat-subject-card h3 { margin: 16px 0 10px; font-size: 20px; }
+.mdcat-subject-card { position: relative; }
+.mdcat-open-units { border: 0; cursor: pointer; }
+.mdcat-open-units::after { content: ''; position: absolute; inset: 0; border-radius: 14px; }
+.mdcat-open-units:focus-visible::after { outline: 3px solid #991b2f; outline-offset: 3px; }
+.mdcat-back { background: none; border: 0; padding: 0; color: #991b2f; font: inherit; text-decoration: underline; cursor: pointer; }
+.mdcat-back:focus-visible { outline: 3px solid #991b2f; outline-offset: 4px; }
+.mdcat-subject-card .mdcat-demo { margin-top: 16px; color: #991b2f; font-weight: bold; }
 .mdcat-subject-icon {
   display: inline-flex;
   align-items: center;
