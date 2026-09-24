@@ -1,3 +1,37 @@
+/* MDCAT additions are scoped to preserve the existing portal modules. */
+.mdcat-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.mdcat-actions[hidden] { display: none; }
+.mdcat-actions a { color: #991b2f; }
+.mdcat-actions .resource-button { color: white; margin-top: 0; }
+#mdcatHubTitle { margin: 0 0 8px; font-size: 32px; }
+.mdcat-note { color: #64748b; line-height: 1.6; text-align: center; }
+#mdcatStatus { margin: 24px 0; }
+#mdcatRetry { border: 0; cursor: pointer; margin: 0 0 24px; }
+#mdcatRetry[hidden] { display: none; }
+.mdcat-subject-card { cursor: default; overflow-wrap: anywhere; }
+.mdcat-subject-card h3 { margin: 16px 0 10px; font-size: 20px; }
+.mdcat-subject-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px;
+  border-radius: 12px;
+  background: #fceef0;
+  color: #991b2f;
+  font-weight: bold;
+}
+.mdcat-actions a:focus-visible, #mdcatRetry:focus-visible {
+  outline: 3px solid #991b2f;
+  outline-offset: 4px;
+}
     * {
       box-sizing: border-box;
     }

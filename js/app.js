@@ -11,6 +11,7 @@ const API_BASE_URL =
     let currentIslamicContent = [];
     let currentBlogPosts = [];
     let currentEntryTests = [];
+    let navigationVersion = 0;
 
     let mcqScore = 0;
     let mcqAnswered = 0;
@@ -256,6 +257,11 @@ function renderNavigation(items) {
 
     function openCategory(category) {
 
+      if (['entry-tests', 'mdcat', 'mdcat-2027'].includes(category.Slug)) {
+        handleNavigation({Slug: category.Slug, Label: category.Name});
+        return;
+      }
+
       console.log(
         'Category:',
         category
@@ -268,6 +274,15 @@ function renderNavigation(items) {
 
     }
 function handleNavigation(item) {
+
+  navigationVersion += 1;
+  closeMDCATHub();
+  document.getElementById('mdcatEntryLink').hidden = true;
+
+  if (item.Slug === 'mdcat' || item.Slug === 'mdcat-2027') {
+    openMDCATHub();
+    return;
+  }
 
   if (item.Slug === 'home') {
     showHome();
@@ -342,14 +357,14 @@ if (item.Slug === 'blog') {
 }
 if (
   item.Slug === 'entry-tests' ||
-  item.Slug === 'mdcat' ||
+  item.Slug === 'mdcat-info' ||
   item.Slug === 'nums' ||
   item.Slug === 'etea' ||
   item.Slug === 'ecat' ||
   item.Slug === 'nust-net' ||
   item.Slug === 'other-tests'
 ) {
-  loadEntryTests(item.Slug);
+  loadEntryTests(item.Slug === 'mdcat-info' ? 'mdcat' : item.Slug);
 }
 
   document.getElementById(
@@ -373,6 +388,9 @@ if (
   });
 }
 function showHome() {
+
+  navigationVersion += 1;
+  closeMDCATHub();
 
   document.getElementById(
     'dynamicPage'
@@ -2381,6 +2399,9 @@ function showIslamicContentError(error) {
 }
 
 function loadEntryTests(slug) {
+  const requestVersion = navigationVersion;
+  document.getElementById('mdcatEntryLink').hidden =
+    slug !== 'entry-tests' && slug !== 'mdcat';
   const title =
     document.getElementById('dynamicPageTitle');
 
@@ -2429,6 +2450,8 @@ function loadEntryTests(slug) {
         );
       }
 
+      if (requestVersion !== navigationVersion) return;
+
       renderEntryTests(
         result.data,
         slug
@@ -2440,6 +2463,7 @@ function loadEntryTests(slug) {
         error
       );
 
+      if (requestVersion !== navigationVersion) return;
       showEntryTestsError(error);
     });
 }

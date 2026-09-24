@@ -112,6 +112,10 @@
       <p id="dynamicPageDescription"></p>
     </div>
 
+    <div id="mdcatEntryLink" class="mdcat-actions" hidden>
+      <a href="#mdcat" class="resource-button" onclick="event.preventDefault(); handleNavigation({Slug: 'mdcat', Label: 'MDCAT 2027'});">Open MDCAT 2027 subject hub →</a>
+    </div>
+
     <div
   id="resourceFilters"
   class="resource-filters"
@@ -122,6 +126,23 @@
 
   </div>
 </section>
+
+      <section id="mdcatHub" hidden aria-labelledby="mdcatHubTitle">
+        <div class="container">
+          <div class="mdcat-actions">
+            <a href="#entry-tests" onclick="event.preventDefault(); handleNavigation({Slug: 'entry-tests', Label: 'Entry Tests'});">← Entry Tests</a>
+            <a href="#mdcat-info" onclick="event.preventDefault(); handleNavigation({Slug: 'mdcat-info', Label: 'MDCAT'});">MDCAT test information</a>
+          </div>
+          <div class="section-title">
+            <h2 id="mdcatHubTitle" tabindex="-1">MDCAT 2027</h2>
+            <p>Explore the subjects for your MDCAT preparation.</p>
+          </div>
+          <p class="mdcat-note">Subject directory · Lessons, questions and practice tests will be added in later updates.</p>
+          <p id="mdcatStatus" role="status" aria-live="polite"></p>
+          <button id="mdcatRetry" class="resource-button" type="button" hidden>Try again</button>
+          <div id="mdcatSubjects" class="grid" aria-label="MDCAT subjects"></div>
+        </div>
+      </section>
 
     </main>
 
@@ -138,6 +159,7 @@
   </div>
 
   <script src="js/app.js"></script>
+  <script src="js/mdcat.js"></script>
 
 </body>
 </html>
