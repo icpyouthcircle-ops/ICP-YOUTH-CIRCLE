@@ -1323,6 +1323,97 @@ function mdcatAuthenticate_(token) {
   return firebaseAuthenticate_(token).uid;
 }
 
+const PUBLIC_FORM_LIMITS_ = {
+  resource: {sheet:'SUBMISSIONS',prefix:'SUBM',required:[['Name','SubmittedBy','SubmitterName','FullName'],['Email','ContactEmail'],['Title','ResourceTitle'],['ResourceType','Type','Category'],['URL','ResourceURL','Link']]},
+  help: {sheet:'HELP_DESK',prefix:'HELP',required:[['Name','SubmittedBy','RequesterName','FullName'],['Email','ContactEmail'],['RequestType','Category','Type'],['Subject','Title'],['Message','Description','Request','Details']]}
+};
+
+function publicFormText_(value, label, maximum, required) {
+  const text=String(value == null ? '' : value).replace(/\r\n?/g,'\n').trim();
+  if (required && !text) mdcatError_('BAD_REQUEST',label+' is required.');
+  if (text.length>maximum) mdcatError_('BAD_REQUEST',label+' is too long.');
+  return text;
+}
+
+function publicFormEmail_(value) {
+  const email=publicFormText_(value,'Email',160,true).toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) mdcatError_('BAD_REQUEST','Enter a valid email address.');
+  return email;
+}
+
+function publicFormToken_(value, action) {
+  const token=String(value || '');
+  if (!/^[A-Za-z0-9_-]{20,80}$/.test(token)) mdcatError_('BAD_REQUEST','Refresh the page and try again.');
+  const cache=CacheService.getScriptCache();
+  const digest=Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,action+':'+token)
+    .map(byte=>(byte<0?byte+256:byte).toString(16).padStart(2,'0')).join('').slice(0,32);
+  const key='icp-public-form-'+digest;
+  const count=Number(cache.get(key) || 0);
+  if (count>=5) mdcatError_('RATE_LIMITED','Too many requests. Please wait ten minutes and try again.');
+  cache.put(key,String(count+1),600);
+}
+
+function publicFormAppend_(kind, fields) {
+  const definition=PUBLIC_FORM_LIMITS_[kind];
+  const sheetName=CONFIG.SHEETS[definition.sheet];
+  const sheet=getSheet_(sheetName);
+  const values=sheet.getDataRange().getValues();
+  const headers=(values[0] || []).map(value=>String(value).replace(/\uFEFF/g,'').trim());
+  if (!headers.length || !headers.some(Boolean) || new Set(headers.filter(Boolean)).size!==headers.filter(Boolean).length) {
+    mdcatError_('SETUP_REQUIRED',sheetName+' needs a valid header row.');
+  }
+  const lowerHeaders=new Set(headers.filter(Boolean).map(header=>header.toLowerCase()));
+  const missing=definition.required.filter(group=>!group.some(key=>lowerHeaders.has(key.toLowerCase()))).map(group=>group[0]);
+  if (missing.length) mdcatError_('SETUP_REQUIRED',sheetName+' is missing required field column(s): '+missing.join(', ')+'.');
+  const now=new Date();
+  const id=generateNextId_(sheetName,definition.prefix);
+  const record=Object.assign({},fields,{ID:id,Status:'Pending Review',SubmittedAt:now,CreatedAt:now,UpdatedAt:now});
+  const byLower={};Object.keys(record).forEach(key=>{byLower[key.toLowerCase()]=record[key];});
+  const row=headers.map(header=>header ? mdcatCell_(byLower[header.toLowerCase()] == null ? '' : byLower[header.toLowerCase()]) : '');
+  sheet.appendRow(row);
+  return {id:id,status:'Pending Review'};
+}
+
+function publicSubmitResource_(body) {
+  if (String(body.website || '').trim()) mdcatError_('BAD_REQUEST','Unable to accept this submission.');
+  publicFormToken_(body.submissionToken,'resource');
+  const title=publicFormText_(body.title,'Resource title',200,true);
+  const url=publicFormText_(body.url,'Resource link',1000,true);
+  if (!/^https?:\/\/[^\s]+$/i.test(url)) mdcatError_('BAD_REQUEST','Enter a complete http or https resource link.');
+  const name=publicFormText_(body.name,'Name',120,true);
+  const email=publicFormEmail_(body.email);
+  const resourceType=publicFormText_(body.resourceType,'Resource type',80,true);
+  return publicFormAppend_('resource',{
+    Name:name,SubmittedBy:name,SubmitterName:name,FullName:name,
+    Email:email,ContactEmail:email,
+    Title:title,ResourceTitle:title,
+    ResourceType:resourceType,Type:resourceType,Category:resourceType,
+    Subject:publicFormText_(body.subject,'Subject',120,false),
+    Level:publicFormText_(body.level,'Level',120,false),
+    Description:publicFormText_(body.description,'Description',1500,false),
+    URL:url,ResourceURL:url,Link:url,
+    Consent:'Yes'
+  });
+}
+
+function publicHelpRequest_(body) {
+  if (String(body.website || '').trim()) mdcatError_('BAD_REQUEST','Unable to accept this request.');
+  publicFormToken_(body.submissionToken,'help');
+  const subject=publicFormText_(body.subject,'Subject',200,true);
+  const message=publicFormText_(body.message,'Message',2000,true);
+  const name=publicFormText_(body.name,'Name',120,true);
+  const email=publicFormEmail_(body.email);
+  const requestType=publicFormText_(body.requestType,'Request type',80,true);
+  return publicFormAppend_('help',{
+    Name:name,SubmittedBy:name,RequesterName:name,FullName:name,
+    Email:email,ContactEmail:email,
+    RequestType:requestType,Category:requestType,Type:requestType,
+    Subject:subject,Title:subject,
+    Message:message,Description:message,Request:message,Details:message,
+    Consent:'Yes'
+  });
+}
+
 const ADMIN_TABLES_ = [
   ['RESOURCES','Resources','RES'],['CATEGORIES','Categories','CAT'],['SUBJECTS','Subjects','SUB'],
   ['LEVELS','Levels','LVL'],['INSTITUTIONS','Institutions','INS'],['ENTRY_TESTS','Entry tests','TEST'],
@@ -1467,6 +1558,13 @@ function doPost(e) {
     let body;
     try { body = JSON.parse(raw); } catch (_) { mdcatError_('BAD_REQUEST','Invalid request.'); }
     if (!body || Array.isArray(body) || typeof body !== 'object') mdcatError_('BAD_REQUEST','Invalid request.');
+    if (body.action==='publicSubmitResource' || body.action==='publicHelpRequest') {
+      const publicLock=LockService.getScriptLock();
+      if (!publicLock.tryLock(10000)) mdcatError_('BUSY','The service is busy. Please retry.');
+      try {
+        return jsonResponse_(body.action==='publicSubmitResource' ? publicSubmitResource_(body) : publicHelpRequest_(body));
+      } finally { publicLock.releaseLock(); }
+    }
     const adminActions=['adminSession','adminList','adminSave','adminBulk','adminArchive'];
     if (adminActions.includes(body.action)) {
       const admin=adminAuthenticate_(body.idToken);

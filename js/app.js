@@ -374,6 +374,85 @@ function renderContactPage() {
   renderSectionNotice(details.length ? 'Contact ICP YOUTH CIRCLE: '+details.join(' • ') : 'Official contact details have not been published yet.');
 }
 
+function publicFormToken() {
+  const key='icp-public-form-token';
+  try {
+    let token=localStorage.getItem(key);
+    if (/^[A-Za-z0-9_-]{20,80}$/.test(token || '')) return token;
+    const bytes=new Uint8Array(24);crypto.getRandomValues(bytes);
+    token=Array.from(bytes,byte=>byte.toString(16).padStart(2,'0')).join('');
+    localStorage.setItem(key,token);return token;
+  } catch (_) {
+    return String(Date.now())+Math.random().toString(36).slice(2)+Math.random().toString(36).slice(2);
+  }
+}
+
+async function submitPublicPortalForm(action, values) {
+  const response=await fetch(API_BASE_URL,{
+    method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body:JSON.stringify(Object.assign({action:action,submissionToken:publicFormToken()},values))
+  });
+  if (!response.ok) throw new Error('The portal service could not be reached.');
+  const result=await response.json();
+  if (!result.success) throw new Error(result.error && result.error.message ? result.error.message : 'Unable to submit the form.');
+  return result.data;
+}
+
+function publicFormField(label, name, type, required, options) {
+  const wrapper=document.createElement('label');wrapper.className='portal-form-field';
+  const title=document.createElement('span');title.textContent=label+(required?' *':'');wrapper.appendChild(title);
+  let input;
+  if (type==='textarea') { input=document.createElement('textarea');input.rows=5; }
+  else if (type==='select') {
+    input=document.createElement('select');
+    const empty=document.createElement('option');empty.value='';empty.textContent='Select one';input.appendChild(empty);
+    options.forEach(value=>{const option=document.createElement('option');option.value=value;option.textContent=value;input.appendChild(option);});
+  } else { input=document.createElement('input');input.type=type; }
+  input.name=name;input.required=required;input.autocomplete=name==='email'?'email':name==='name'?'name':'off';
+  wrapper.appendChild(input);return wrapper;
+}
+
+function renderPublicPortalForm(kind) {
+  const content=document.getElementById('dynamicPageContent');
+  const filters=document.getElementById('resourceFilters');filters.innerHTML='';filters.style.display='none';content.replaceChildren();
+  const resource=kind==='resource';
+  const card=document.createElement('article');card.className='card portal-form-card';
+  const intro=document.createElement('p');
+  intro.textContent=resource ? 'Share a useful, legal student resource for administrator review. Submitting it does not publish it automatically.' : 'Send a question or support request to the ICP YOUTH CIRCLE administrators. Do not include passwords, identity documents or payment details.';
+  const form=document.createElement('form');form.className='portal-form';form.noValidate=false;
+  const fields=resource ? [
+    ['Your name','name','text',true],['Email','email','email',true],['Resource title','title','text',true],
+    ['Resource type','resourceType','select',true,['Notes','Past Paper','Book','Video','Course','Website','Tool','Other']],
+    ['Subject','subject','text',false],['Level or class','level','text',false],['Resource link','url','url',true],
+    ['Why is this useful?','description','textarea',false]
+  ] : [
+    ['Your name','name','text',true],['Email','email','email',true],
+    ['Request type','requestType','select',true,['Resource request','Study guidance','Portal problem','Correction','Suggestion','Other']],
+    ['Subject','subject','text',true],['How can we help?','message','textarea',true]
+  ];
+  fields.forEach(field=>form.appendChild(publicFormField(field[0],field[1],field[2],field[3],field[4] || [])));
+  const trap=document.createElement('label');trap.className='portal-form-trap';trap.setAttribute('aria-hidden','true');trap.textContent='Website';
+  const trapInput=document.createElement('input');trapInput.name='website';trapInput.tabIndex=-1;trapInput.autocomplete='off';trap.appendChild(trapInput);form.appendChild(trap);
+  const consent=document.createElement('label');consent.className='portal-form-consent';
+  const consentInput=document.createElement('input');consentInput.type='checkbox';consentInput.required=true;
+  consent.append(consentInput,document.createTextNode(resource ? ' I confirm this link is safe to review and I have permission to share it.' : ' I agree that administrators may use my email to respond to this request.'));
+  const submit=document.createElement('button');submit.type='submit';submit.className='resource-button';submit.textContent=resource?'Send for review':'Send request';
+  const status=document.createElement('p');status.className='portal-form-status';status.setAttribute('role','status');status.setAttribute('aria-live','polite');
+  form.append(consent,submit,status);
+  form.addEventListener('submit',async event=>{
+    event.preventDefault();if(!form.reportValidity()) return;
+    submit.disabled=true;status.className='portal-form-status';status.textContent='Sending…';
+    const values=Object.fromEntries(new FormData(form).entries());
+    try {
+      const result=await submitPublicPortalForm(resource?'publicSubmitResource':'publicHelpRequest',values);
+      form.reset();status.className='portal-form-status portal-form-success';
+      status.textContent=(resource?'Resource submitted':'Request submitted')+' successfully. Reference: '+result.id+'.';
+    } catch(error) { status.className='portal-form-status portal-form-error';status.textContent=error.message || 'Unable to submit the form.'; }
+    finally { submit.disabled=false; }
+  });
+  card.append(intro,form);content.appendChild(card);
+}
+
 function handleNavigation(item) {
 
   navigationVersion += 1;
@@ -467,7 +546,11 @@ if (resourceCategories[item.Slug]) {
   renderContactPage();
 } else if (item.Slug === 'prep-tracker') {
   renderSectionNotice('No public preparation tracker has been published yet. MDCAT students can use My activity and Study plan inside the MDCAT 2027 hub.');
-} else if (['forum','student-help-desk','submit-resource','suggestions'].includes(item.Slug)) {
+} else if (item.Slug === 'submit-resource') {
+  renderPublicPortalForm('resource');
+} else if (item.Slug === 'student-help-desk' || item.Slug === 'suggestions') {
+  renderPublicPortalForm('help');
+} else if (item.Slug === 'forum') {
   renderSectionNotice(itemLabel+' is not publicly available yet. An official link will appear here when it is published.');
 } else {
   renderSectionNotice('No published content is available in '+itemLabel+' yet.');
