@@ -73,6 +73,7 @@ async function openMDCATAccount(pending) {
   try {
     const identity=await mdcatLoadIdentity();
     if(view!==mdcatGradeView) return;
+    if (typeof setPortalAccountButton === 'function') setPortalAccountButton(Boolean(identity.auth.currentUser));
     document.getElementById('mdcatStatus').textContent='';
     if(!identity.auth.currentUser) {
       const panel=mdcatElement('div',null,'mdcat-wide');
@@ -88,7 +89,7 @@ async function openMDCATAccount(pending) {
     }
     const panel=mdcatElement('div',null,'mdcat-wide');
     panel.appendChild(mdcatElement('p','Signed in as '+(identity.auth.currentUser.email || 'student')));
-    panel.append(mdcatButton('My saved results',()=>openMDCATSavedResults()),mdcatButton('My scored progress',()=>openMDCATScoredProgress()),mdcatButton('Sign out',async()=>{await identity.sdk.signOut(identity.auth);openMDCATAccount();}));
+    panel.append(mdcatButton('My saved results',()=>openMDCATSavedResults()),mdcatButton('My scored progress',()=>openMDCATScoredProgress()),mdcatButton('Sign out',async()=>{await identity.sdk.signOut(identity.auth);if (typeof setPortalAccountButton === 'function') setPortalAccountButton(false);openMDCATAccount();}));
     if(pending) panel.appendChild(mdcatButton('Continue to scored practice',()=>openMDCATGraded(pending.mode,pending.contextId)));
     grid.appendChild(panel);
   } catch(error) {if(view===mdcatGradeView) mdcatAccountError(error,grid,()=>openMDCATAccount(pending));}

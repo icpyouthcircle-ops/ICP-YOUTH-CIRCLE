@@ -408,6 +408,31 @@ function renderNavigation(items) {
     wrapper.prepend(row);
     nav.appendChild(wrapper);
   });
+
+  const accountButton = document.createElement('button');
+  accountButton.id = 'portalAccountButton';
+  accountButton.type = 'button';
+  accountButton.className = 'nav-account-button';
+  accountButton.textContent = 'Student sign in';
+  accountButton.onclick = () => {
+    closeMobileNavigation();
+    openPortalAccount();
+  };
+  nav.appendChild(accountButton);
+}
+
+function setPortalAccountButton(signedIn) {
+  const button = document.getElementById('portalAccountButton');
+  if (button) button.textContent = signedIn ? 'My account' : 'Student sign in';
+}
+
+function openPortalAccount() {
+  document.getElementById('homeHero').style.display = 'none';
+  document.getElementById('homeExplore').style.display = 'none';
+  document.getElementById('dynamicPage').style.display = 'none';
+  document.getElementById('mdcatHub').hidden = false;
+  window.location.hash = 'student-account';
+  openMDCATAccount();
 }
 
 function setMobileNavigationOpen(open) {

@@ -30,11 +30,12 @@ const {createBackend}=require('./scoring-harness.cjs');
   });
   await page.goto(pathToFileURL(path.join(__dirname,'../index.html')).href);
   await page.locator('#app').waitFor({state:'visible'});
-  await page.evaluate(()=>handleNavigation({Slug:'mdcat',Label:'MDCAT'}));
   // Inject a signed-in SDK test double; provider token verification still runs in the backend harness.
   await page.evaluate(token=>{mdcatIdentity={auth:{currentUser:{email:'student@example.test',getIdToken:async()=>token}},sdk:{signOut:async(auth)=>{auth.currentUser=null;}}};},token);
-  await page.evaluate(()=>openMDCATAccount());
+  await page.getByRole('button',{name:'Student sign in',exact:true}).click();
+  assert.equal(await page.locator('#mdcatHub').isVisible(),true);
   await page.getByRole('button',{name:'My saved results',exact:true}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'My account',exact:true}).count(),1);
   assert.equal(configRequests,0);
   await page.evaluate(()=>openMDCATGraded('test','MDTEST-DEMO-001'));
   loseStart=true;

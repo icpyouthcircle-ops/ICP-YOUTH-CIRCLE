@@ -93,6 +93,7 @@ const {pathToFileURL}=require('node:url');
     assert.equal(await page.locator('#mainNavigation').isVisible(),false);
     await menuToggle.click();assert.equal(await menuToggle.getAttribute('aria-expanded'),'true');
     assert.equal(await page.locator('#mainNavigation').isVisible(),true);
+    assert.equal(await page.getByRole('button',{name:'Student sign in',exact:true}).isVisible(),true);
     const studyToggle=page.getByRole('button',{name:'Show Study submenu'});
     await studyToggle.click();assert.equal(await studyToggle.getAttribute('aria-expanded'),'true');
     assert.equal(await page.locator('#submenu-NAV-002').isVisible(),true);

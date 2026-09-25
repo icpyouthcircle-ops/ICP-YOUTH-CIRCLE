@@ -131,6 +131,8 @@ nav {
 .nav-item-row { display: flex; align-items: center; }
 .nav-item-row > a { display: block; padding: 10px 4px; }
 .submenu-toggle { display: none; border: 0; background: transparent; color: #334155; font: inherit; font-size: 20px; cursor: pointer; }
+.nav-account-button { padding: 10px 14px; border: 1px solid #991b2f; border-radius: 8px; background: #991b2f; color: white; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.nav-account-button:hover,.nav-account-button:focus-visible { background: #7f1728; }
 
 .dropdown-menu {
   display: none;
@@ -311,6 +313,7 @@ nav {
       #mainNavigation { display: none; width: 100%; flex-direction: column; align-items: stretch; gap: 0; max-height: calc(100vh - 100px); overflow-y: auto; padding: 8px 0; border-top: 1px solid #e5e7eb; }
       #mainNavigation.is-open { display: flex; }
       .nav-item { width: 100%; }
+      .nav-account-button { width: 100%; margin-top: 8px; min-height: 44px; }
       .nav-item-row > a { flex: 1; padding: 12px 4px; font-weight: 700; }
       .submenu-toggle { display: inline-flex; min-width: 44px; min-height: 44px; align-items: center; justify-content: center; }
       .dropdown-menu { position: static; display: none; min-width: 0; margin: 0 0 8px 12px; padding: 4px 8px; border: 0; border-left: 2px solid #e5e7eb; border-radius: 0; box-shadow: none; }
