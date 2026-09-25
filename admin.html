@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Admin Dashboard | ICP YOUTH CIRCLE</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body class="admin-page">
+  <header>
+    <div class="header-inner">
+      <div class="brand"><h1>ICP YOUTH CIRCLE</h1><p>ADMIN DASHBOARD</p></div>
+      <nav><a href="index.html">Public portal</a></nav>
+    </div>
+  </header>
+
+  <main class="admin-shell">
+    <section id="adminLogin" class="admin-login" aria-labelledby="adminLoginTitle">
+      <h2 id="adminLoginTitle">Administrator sign-in</h2>
+      <p>Use the Google account listed as Active in the private <strong>Admins</strong> sheet.</p>
+      <button id="adminSignIn" class="resource-button" type="button">Continue with Google</button>
+      <p id="adminLoginStatus" role="status" aria-live="polite"></p>
+    </section>
+
+    <section id="adminDashboard" hidden aria-labelledby="adminTitle">
+      <div class="admin-title-row">
+        <div><h2 id="adminTitle">Content dashboard</h2><p id="adminUser"></p></div>
+        <button id="adminSignOut" type="button">Sign out</button>
+      </div>
+
+      <div class="admin-layout">
+        <aside class="admin-sidebar">
+          <label for="adminTable">Portal section</label>
+          <select id="adminTable"></select>
+          <button id="adminNew" class="resource-button" type="button">New record</button>
+          <button id="adminBulkToggle" type="button">Paste multiple rows</button>
+        </aside>
+
+        <div class="admin-workspace">
+          <p id="adminStatus" role="status" aria-live="polite"></p>
+          <section class="admin-panel" aria-labelledby="adminRecordsTitle">
+            <div class="admin-toolbar">
+              <div><h3 id="adminRecordsTitle">Records</h3><p id="adminCount"></p></div>
+              <div class="admin-search"><label for="adminQuery">Search records</label><input id="adminQuery" type="search"><button id="adminSearch" type="button">Search</button></div>
+            </div>
+            <div id="adminTableWrap" class="admin-table-wrap"></div>
+          </section>
+
+          <section id="adminEditorPanel" class="admin-panel" hidden aria-labelledby="adminEditorTitle">
+            <div class="admin-panel-title"><h3 id="adminEditorTitle">Edit record</h3><button id="adminEditorClose" type="button">Close</button></div>
+            <form id="adminEditor"></form>
+          </section>
+
+          <section id="adminBulkPanel" class="admin-panel" hidden aria-labelledby="adminBulkTitle">
+            <div class="admin-panel-title"><h3 id="adminBulkTitle">Paste rows from Google Sheets</h3><button id="adminBulkClose" type="button">Close</button></div>
+            <p>Include the header row. Its names and order must exactly match:</p>
+            <pre id="adminHeaders"></pre>
+            <button id="adminCopyHeaders" type="button">Copy headers</button>
+            <label for="adminBulkText">Tab-separated rows</label>
+            <textarea id="adminBulkText" rows="12" spellcheck="false"></textarea>
+            <button id="adminBulkSave" class="resource-button" type="button">Validate and save rows</button>
+          </section>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script src="js/admin.js"></script>
+</body>
+</html>

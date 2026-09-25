@@ -1271,20 +1271,26 @@ function mdcatError_(code, message) {
 }
 
 function mdcatAuthConfig_() {
-  const properties = PropertiesService.getScriptProperties();
-  let firebase;
-  try { firebase = JSON.parse(properties.getProperty('MDCAT_FIREBASE_CONFIG') || '{}'); }
-  catch (_) { firebase = {}; }
-  const valid = ['apiKey','authDomain','projectId','appId'].every(key => typeof firebase[key] === 'string' && firebase[key].trim());
-  const enabled = valid && properties.getProperty('MDCAT_SCORING_ENABLED') === 'true';
+  const settings=mdcatFirebaseSettings_();
+  const enabled = settings.valid && settings.scoringEnabled;
   return {enabled:enabled, version:1, firebase: enabled ? {
-    apiKey:firebase.apiKey, authDomain:firebase.authDomain, projectId:firebase.projectId, appId:firebase.appId
+    apiKey:settings.firebase.apiKey, authDomain:settings.firebase.authDomain, projectId:settings.firebase.projectId, appId:settings.firebase.appId
   } : null};
 }
 
-function mdcatAuthenticate_(token) {
-  const config = mdcatAuthConfig_();
-  if (!config.enabled) mdcatError_('NOT_CONFIGURED','Scoring is not enabled yet.');
+function mdcatFirebaseSettings_() {
+  const properties=PropertiesService.getScriptProperties();
+  let firebase;
+  try { firebase=JSON.parse(properties.getProperty('MDCAT_FIREBASE_CONFIG') || '{}'); }
+  catch (_) { firebase={}; }
+  const valid=['apiKey','authDomain','projectId','appId'].every(key=>typeof firebase[key]==='string' && firebase[key].trim());
+  return {firebase:firebase,valid:valid,scoringEnabled:properties.getProperty('MDCAT_SCORING_ENABLED')==='true'};
+}
+
+function firebaseAuthenticate_(token) {
+  const settings=mdcatFirebaseSettings_();
+  if (!settings.valid) mdcatError_('NOT_CONFIGURED','Google sign-in is not configured yet.');
+  const config={firebase:settings.firebase};
   if (typeof token !== 'string' || token.length < 100 || token.length > 12000) mdcatError_('AUTH_REQUIRED','Please sign in again.');
   // Google validates the ID token on the account lookup endpoint. Never trust a submitted UserID.
   const response = UrlFetchApp.fetch('https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' + encodeURIComponent(config.firebase.apiKey), {
@@ -1309,7 +1315,149 @@ function mdcatAuthenticate_(token) {
     !claims.firebase || claims.firebase.sign_in_provider !== 'google.com') {
     mdcatError_('AUTH_REQUIRED','A current, verified Google sign-in is required.');
   }
-  return String(account.localId);
+  return {uid:String(account.localId),email:String(account.email || '').trim().toLowerCase()};
+}
+
+function mdcatAuthenticate_(token) {
+  if (!mdcatAuthConfig_().enabled) mdcatError_('NOT_CONFIGURED','Scoring is not enabled yet.');
+  return firebaseAuthenticate_(token).uid;
+}
+
+const ADMIN_TABLES_ = [
+  ['RESOURCES','Resources','RES'],['CATEGORIES','Categories','CAT'],['SUBJECTS','Subjects','SUB'],
+  ['LEVELS','Levels','LVL'],['INSTITUTIONS','Institutions','INS'],['ENTRY_TESTS','Entry tests','TEST'],
+  ['ADMISSIONS','Admissions','ADM'],['SCHOLARSHIPS','Scholarships','SCH'],['OPPORTUNITIES','Opportunities','OPP'],
+  ['ANNOUNCEMENTS','Announcements','ANN'],['MCQS','MCQs','MCQ'],['VIDEOS','Videos','VID'],
+  ['AI_TOOLS','AI tools','AIT'],['ISLAMIC_CONTENT','Islamic content','ISL'],['BLOG','Blog','BLOG'],
+  ['NAVIGATION','Navigation','NAV'],['HOMEPAGE','Homepage','HOME'],['SOCIAL_LINKS','Social links','SOC'],
+  ['SETTINGS','Settings','SET'],['SUBMISSIONS','Resource submissions','SUBM'],['HELP_DESK','Help desk','HELP'],
+  ['MDCAT_SUBJECTS','MDCAT subjects','MDS'],['MDCAT_UNITS','MDCAT units','MDU'],
+  ['MDCAT_CHAPTERS','MDCAT chapters','MDC'],['MDCAT_TOPICS','MDCAT topics','MDT'],
+  ['MDCAT_QUESTION_BANK','MDCAT question bank','MDQ'],['MDCAT_TESTS','MDCAT tests','MDTEST'],
+  ['MDCAT_TEST_QUESTIONS','MDCAT test questions','MDTQ'],['MDCAT_DAILY_PRACTICE','MDCAT daily practice','MDDP'],
+  ['MDCAT_UPDATES','MDCAT updates','MDUP']
+].map(row=>({key:row[0],label:row[1],prefix:row[2]}));
+
+function adminTable_(key) {
+  const table=ADMIN_TABLES_.find(item=>item.key===String(key || ''));
+  if (!table || !CONFIG.SHEETS[table.key]) mdcatError_('BAD_REQUEST','This dashboard section is not available.');
+  return Object.assign({},table,{sheetName:CONFIG.SHEETS[table.key]});
+}
+
+function adminHeaders_(sheetName) {
+  const values=getSheet_(sheetName).getDataRange().getValues();
+  if (!values.length) mdcatError_('SETUP_REQUIRED','The '+sheetName+' sheet needs a header row.');
+  const headers=values[0].map(value=>String(value).replace(/\uFEFF/g,'').trim()).filter(Boolean);
+  if (!headers.length) mdcatError_('SETUP_REQUIRED','The '+sheetName+' sheet needs a header row.');
+  return headers;
+}
+
+function adminAuthenticate_(token) {
+  const user=firebaseAuthenticate_(token);
+  if (!user.email) mdcatError_('ADMIN_REQUIRED','Your Google account has no verified email address.');
+  const rows=getSheetData_(CONFIG.SHEETS.ADMINS);
+  const admin=rows.find(row=>{
+    const email=String(row.Email || row.AdminEmail || row.GoogleEmail || '').trim().toLowerCase();
+    const status=String(row.Status == null ? 'Active' : row.Status).trim().toLowerCase();
+    return email===user.email && status==='active';
+  });
+  if (!admin) mdcatError_('ADMIN_REQUIRED','This Google account is not an active portal administrator.');
+  return {uid:user.uid,email:user.email,role:String(admin.Role || admin.AdminRole || 'Editor').trim() || 'Editor'};
+}
+
+function adminManifest_(admin) {
+  return {
+    email:admin.email,
+    role:admin.role,
+    tables:ADMIN_TABLES_.map(item=>{
+      const sheet=getSheet_(CONFIG.SHEETS[item.key]);
+      return {key:item.key,label:item.label,headers:adminHeaders_(CONFIG.SHEETS[item.key]),rowCount:Math.max(0,sheet.getLastRow()-1)};
+    })
+  };
+}
+
+function adminList_(body) {
+  const table=adminTable_(body.table);
+  const rows=getSheetData_(table.sheetName);
+  const query=String(body.query || '').trim().toLowerCase().slice(0,100);
+  const filtered=query ? rows.filter(row=>Object.values(row).some(value=>String(value).toLowerCase().includes(query))) : rows;
+  const offset=Math.max(0,Math.floor(Number(body.offset) || 0));
+  const limit=Math.max(1,Math.min(100,Math.floor(Number(body.limit) || 50)));
+  return {table:table.key,headers:adminHeaders_(table.sheetName),rows:filtered.slice(offset,offset+limit),total:filtered.length,offset:offset,limit:limit};
+}
+
+function adminCell_(value) {
+  if (value == null) return '';
+  if (typeof value==='number' || typeof value==='boolean') return value;
+  const text=String(value).slice(0,20000);
+  return (/^[=+@]/.test(text) || (/^-/.test(text) && !/^-\d+(\.\d+)?$/.test(text))) ? "'"+text : text;
+}
+
+function adminSaveRecord_(table, input, admin) {
+  if (!input || Array.isArray(input) || typeof input!=='object') mdcatError_('BAD_REQUEST','A record is required.');
+  const sheet=getSheet_(table.sheetName);
+  const values=sheet.getDataRange().getValues();
+  const rawHeaders=values[0] || [];
+  const headers=rawHeaders.map(value=>String(value).replace(/\uFEFF/g,'').trim());
+  if (!headers.filter(Boolean).length) mdcatError_('SETUP_REQUIRED','The '+table.sheetName+' sheet needs a header row.');
+  const record={};
+  headers.forEach(header=>{if(header && Object.prototype.hasOwnProperty.call(input,header)) record[header]=adminCell_(input[header]);});
+  const keyField=headers.includes('ID') ? 'ID' : (headers.includes('Key') ? 'Key' : headers.find(Boolean));
+  if (!keyField) mdcatError_('SETUP_REQUIRED','The sheet needs an ID or key column.');
+  if (keyField==='ID' && !String(record.ID || '').trim()) record.ID=generateNextId_(table.sheetName,table.prefix);
+  const key=String(record[keyField] || '').trim();
+  if (!key) mdcatError_('BAD_REQUEST',keyField+' is required.');
+  const keyIndex=headers.indexOf(keyField);
+  const existingIndex=values.findIndex((row,index)=>index>0 && String(row[keyIndex] || '').trim()===key);
+  const now=new Date();
+  if (headers.includes('UpdatedAt')) record.UpdatedAt=now;
+  if (existingIndex<0 && headers.includes('CreatedAt') && !record.CreatedAt) record.CreatedAt=now;
+  if (existingIndex<0 && headers.includes('Status') && !String(record.Status || '').trim()) record.Status='Inactive';
+  if (existingIndex>=0) {
+    const updated=headers.map((header,index)=>{
+      if (header==='CreatedAt' && values[existingIndex][index]) return values[existingIndex][index];
+      return Object.prototype.hasOwnProperty.call(record,header) ? record[header] : values[existingIndex][index];
+    });
+    sheet.getRange(existingIndex+1,1,1,headers.length).setValues([updated]);
+  } else {
+    sheet.appendRow(headers.map(header=>record[header] == null ? '' : record[header]));
+  }
+  try {
+    addRecord_(CONFIG.SHEETS.ACTIVITY_LOG,{ID:generateNextId_(CONFIG.SHEETS.ACTIVITY_LOG,'LOG'),AdminEmail:admin.email,Action:existingIndex>=0?'UPDATE':'CREATE',EntityType:table.key,EntityID:key,Details:'Admin dashboard',Timestamp:now});
+  } catch (_) {}
+  return {key:key,created:existingIndex<0};
+}
+
+function adminSave_(body,admin) {
+  return adminSaveRecord_(adminTable_(body.table),body.record,admin);
+}
+
+function adminBulk_(body,admin) {
+  const table=adminTable_(body.table);
+  if (!Array.isArray(body.records) || !body.records.length || body.records.length>100) mdcatError_('BAD_REQUEST','Paste between 1 and 100 rows at a time.');
+  const expected=adminHeaders_(table.sheetName);
+  const supplied=Array.isArray(body.headers) ? body.headers.map(value=>String(value).trim()) : [];
+  if (expected.length!==supplied.length || expected.some((header,index)=>header!==supplied[index])) mdcatError_('BAD_REQUEST','The pasted header row must exactly match the sheet headers shown in the dashboard.');
+  const results=body.records.map(record=>adminSaveRecord_(table,record,admin));
+  return {saved:results.length,created:results.filter(row=>row.created).length,updated:results.filter(row=>!row.created).length};
+}
+
+function adminArchive_(body,admin) {
+  const table=adminTable_(body.table);
+  const headers=adminHeaders_(table.sheetName);
+  if (!headers.includes('Status')) mdcatError_('BAD_REQUEST','This section cannot be archived because it has no Status column.');
+  const record={};
+  const keyField=headers.includes('ID') ? 'ID' : (headers.includes('Key') ? 'Key' : headers[0]);
+  record[keyField]=String(body.key || '').trim();record.Status='Inactive';
+  if (!record[keyField]) mdcatError_('BAD_REQUEST','A record key is required.');
+  return adminSaveRecord_(table,record,admin);
+}
+
+function adminClearPublicCache_() {
+  try {
+    const cache=CacheService.getScriptCache();
+    cache.removeAll(['icp-public-v1-portalData','icp-public-v1-searchIndex','icp-public-v1-mcqs','icp-public-v1-videos','icp-public-v1-admissions','icp-public-v1-scholarships','icp-public-v1-opportunities','icp-public-v1-announcements','icp-public-v1-aiTools','icp-public-v1-islamicContent','icp-public-v1-blog','icp-public-v1-entryTests','icp-public-v1-mdcatSubjects','icp-public-v1-mdcatTests','icp-public-v1-mdcatDailyPractice','icp-public-v1-mdcatUpdates']);
+  } catch (_) {}
 }
 
 function doPost(e) {
@@ -1319,6 +1467,22 @@ function doPost(e) {
     let body;
     try { body = JSON.parse(raw); } catch (_) { mdcatError_('BAD_REQUEST','Invalid request.'); }
     if (!body || Array.isArray(body) || typeof body !== 'object') mdcatError_('BAD_REQUEST','Invalid request.');
+    const adminActions=['adminSession','adminList','adminSave','adminBulk','adminArchive'];
+    if (adminActions.includes(body.action)) {
+      const admin=adminAuthenticate_(body.idToken);
+      if (body.action==='adminSession') return jsonResponse_(adminManifest_(admin));
+      if (body.action==='adminList') return jsonResponse_(adminList_(body));
+      const adminLock=LockService.getScriptLock();
+      if (!adminLock.tryLock(10000)) mdcatError_('BUSY','The service is busy. Please retry.');
+      try {
+        let adminData;
+        if (body.action==='adminSave') adminData=adminSave_(body,admin);
+        if (body.action==='adminBulk') adminData=adminBulk_(body,admin);
+        if (body.action==='adminArchive') adminData=adminArchive_(body,admin);
+        adminClearPublicCache_();
+        return jsonResponse_(adminData);
+      } finally { adminLock.releaseLock(); }
+    }
     if (!['mdcatStart','mdcatSubmit','mdcatMyResults','mdcatResult','mdcatMyProgress','mdcatResume'].includes(body.action)) mdcatError_('BAD_REQUEST','Unknown action.');
     const uid = mdcatAuthenticate_(body.idToken);
     const lock = LockService.getScriptLock();

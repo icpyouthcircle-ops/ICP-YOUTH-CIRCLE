@@ -28,7 +28,7 @@ function createBackend(){
  class FakeDate extends Date{constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}}
  const context=vm.createContext({console,Date:FakeDate,SpreadsheetApp:{getActiveSpreadsheet:()=>({getSheetByName:name=>sheets.get(name),insertSheet:name=>{const sheet=new Sheet(name);sheets.set(name,sheet);return sheet;}}),flush:()=>{}},
   PropertiesService:{getScriptProperties:()=>({getProperty:key=>props[key]||null})},
-  CacheService:{getScriptCache:()=>({get:key=>cache.get(key)||null,put:(key,value)=>cache.set(key,value)})},
+  CacheService:{getScriptCache:()=>({get:key=>cache.get(key)||null,put:(key,value)=>cache.set(key,value),removeAll:keys=>keys.forEach(key=>cache.delete(key))})},
   LockService:{getScriptLock:()=>({tryLock:()=>{if(locked)return false;locked=true;return true;},releaseLock:()=>{locked=false;}})},
   UrlFetchApp:{fetch:(url,options)=>{if(!url.startsWith('https://identitytoolkit.googleapis.com/v1/accounts:lookup?key='))throw new Error('Unexpected outbound auth request');const token=JSON.parse(options.payload).idToken;const account=tokens.get(token);return {getResponseCode:()=>account?200:400,getContentText:()=>JSON.stringify(account?{users:[account]}:{error:{message:'INVALID_ID_TOKEN'}})};}},
   Utilities:{getUuid:()=>`00000000-0000-4000-8000-${String(++counter).padStart(12,'0')}`,base64DecodeWebSafe:value=>Buffer.from(value,'base64url'),newBlob:value=>({getDataAsString:()=>Buffer.from(value).toString()}),DigestAlgorithm:{SHA_256:'sha256'},computeDigest:(_,value)=>[...crypto.createHash('sha256').update(value).digest()]},
@@ -44,6 +44,7 @@ function createBackend(){
   tokens.set(value,{localId:uid,emailVerified:true,disabled:false,validSince:String(seconds-10),...account});return value;
  }
  function call(action,idToken,body={}){return JSON.parse(context.doPost({postData:{contents:JSON.stringify({...body,action,idToken})}}).getContent());}
- return {context,sheets,props,token,call,rows:name=>context.getSheetData_(name),change:(name,id,record)=>context.mdcatPut_(name,{ID:id,...record}),advance:ms=>{now+=ms;},setLocked:value=>{locked=value;},failNext:name=>{failSheet=name;}};
+ function addSheet(name,rows){const headers=[...new Set(rows.flatMap(Object.keys))];const sheet=new Sheet(name,[headers,...rows.map(row=>headers.map(key=>row[key]??''))]);sheets.set(name,sheet);return sheet;}
+ return {context,sheets,props,token,call,rows:name=>context.getSheetData_(name),addSheet,change:(name,id,record)=>context.mdcatPut_(name,{ID:id,...record}),advance:ms=>{now+=ms;},setLocked:value=>{locked=value;},failNext:name=>{failSheet=name;}};
 }
 module.exports={createBackend};
