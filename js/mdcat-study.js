@@ -4,6 +4,7 @@ let mdcatSession = null;
 const MDCAT_LOCAL_KEY = 'icp-mdcat-local-v1';
 
 function resetMDCATStudy() {
+  if (typeof resetMDCATGrading === 'function') resetMDCATGrading();
   clearInterval(mdcatTimer);
   mdcatTimer = null;
   mdcatSession = null;
@@ -182,7 +183,7 @@ async function openMDCATPractice(scope = {}, title = 'Question bank', back) {
     if (mdcatRequest !== controller) return;
     grid.setAttribute('aria-busy', 'false');
     document.getElementById('mdcatStatus').textContent = rows.length ? rows.length + ' questions available.' : 'No questions are published here yet.';
-    if (rows.length) mdcatPrepareSession(rows, {Title:title}, grid, false);
+    if (rows.length) mdcatPrepareSession(rows, {Title:title,gradeContext:scope.TopicID ? {mode:'topic',contextId:scope.TopicID} : null}, grid, false);
   } catch (_) { mdcatFailure(controller, () => openMDCATPractice(scope, title, back)); }
 }
 
@@ -223,7 +224,7 @@ async function openMDCATSet(kind, row) {
     if (kind === 'daily') questions = questions.slice(0, count);
     grid.setAttribute('aria-busy', 'false');
     document.getElementById('mdcatStatus').textContent = questions.length ? questions.length + ' questions ready.' : 'No questions are published for this set yet.';
-    if (questions.length) mdcatPrepareSession(questions, row, grid, true);
+    if (questions.length) mdcatPrepareSession(questions, {...row,gradeContext:{mode:kind==='tests'?'test':'daily',contextId:row.ID}}, grid, true);
   } catch (_) { mdcatFailure(controller, () => openMDCATSet(kind, row)); }
 }
 
@@ -238,6 +239,9 @@ function mdcatShuffle(items) {
 
 function mdcatPrepareSession(questions, settings, grid, timed) {
   const intro = mdcatElement('div', null, 'mdcat-wide mdcat-study-card');
+  if (settings.gradeContext && settings.gradeContext.contextId) {
+    intro.appendChild(mdcatButton('Scored practice with account', () => openMDCATGraded(settings.gradeContext.mode,settings.gradeContext.contextId)));
+  }
   intro.appendChild(mdcatElement('p', 'Answers are not graded. Finish the session to review your selections; you can then save activity in this browser. Leaving discards the unfinished session.'));
   const minutes = Number(settings.DurationMinutes);
   const duration = timed && Number.isFinite(minutes) && minutes > 0 ? minutes * 60000 : null;
