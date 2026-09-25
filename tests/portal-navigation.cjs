@@ -62,6 +62,8 @@ const {pathToFileURL}=require('node:url');
     await page.getByText('Biology PDF',{exact:true}).waitFor();
     assert.equal(await page.getByRole('link',{name:'View PDF',exact:true}).getAttribute('href'),'https://drive.google.com/file/d/demo-file-1/view?resourcekey=demo-key');
     assert.match(await page.getByRole('link',{name:'Download PDF',exact:true}).getAttribute('href'),/drive\.google\.com\/uc\?export=download&id=demo-file-1&resourcekey=demo-key/);
+    const saveResource=page.getByRole('button',{name:'Save resource',exact:true});await saveResource.click();
+    assert.equal(await page.locator('#dynamicPageContent button[aria-pressed="true"]').count(),1);assert.equal(await page.evaluate(()=>getPortalBookmarks()[0].title),'Biology PDF');
 
     const navigation=await page.evaluate(()=>PORTAL_BOOTSTRAP_DATA.navigation);
     for(const item of navigation){

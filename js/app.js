@@ -5,6 +5,7 @@ const PUBLIC_MODULE_CACHE_PREFIX = 'icp-public-module-v2:';
 const PUBLIC_MODULE_CACHE_TTL = 30 * 60 * 1000;
 const publicModuleMemory = new Map();
 const publicModuleRequests = new Map();
+const PORTAL_BOOKMARKS_KEY = 'icp-student-bookmarks-v1';
 const PORTAL_BOOTSTRAP_DATA = {
   settings: {
     site_name: 'ICP YOUTH CIRCLE',
@@ -99,6 +100,39 @@ function googleDriveDownloadURL(value) {
     const resourceKey=url.searchParams.get('resourcekey');if(resourceKey)download.searchParams.set('resourcekey',resourceKey);
     return download.href;
   } catch (_) { return ''; }
+}
+
+function getPortalBookmarks() {
+  try {
+    const rows=JSON.parse(localStorage.getItem(PORTAL_BOOKMARKS_KEY) || '[]');
+    return Array.isArray(rows) ? rows.filter(row=>row && row.key && row.title).slice(0,100) : [];
+  } catch (_) { return []; }
+}
+
+function portalBookmarkKey(resource) {
+  return String(resource.ID || resource.FileURL || resource.Title || '').trim().slice(0,300);
+}
+
+function isPortalResourceBookmarked(resource) {
+  const key=portalBookmarkKey(resource);
+  return Boolean(key && getPortalBookmarks().some(row=>row.key===key));
+}
+
+function togglePortalResourceBookmark(resource,button) {
+  const key=portalBookmarkKey(resource);
+  if (!key) return;
+  const rows=getPortalBookmarks();
+  const index=rows.findIndex(row=>row.key===key);
+  if (index>=0) rows.splice(index,1);
+  else rows.unshift({
+    key:key,title:String(resource.Title || 'Resource').slice(0,240),
+    category:String(resource.Category || '').slice(0,80),subject:String(resource.Subject || '').slice(0,160),
+    level:String(resource.Level || '').slice(0,120),fileURL:safePortalURL(resource.FileURL),
+    resourceType:String(resource.ResourceType || '').slice(0,80),savedAt:new Date().toISOString()
+  });
+  try {localStorage.setItem(PORTAL_BOOKMARKS_KEY,JSON.stringify(rows.slice(0,100)));} catch (_) {}
+  const saved=index<0;
+  button.textContent=saved?'Saved ✓':'Save resource';button.setAttribute('aria-pressed',String(saved));
 }
 
 function publicModuleKey(action, params = {}) {
@@ -1141,6 +1175,12 @@ function drawResourceCards(resources) {
         body.appendChild(download);
       }
     }
+
+    const bookmark=document.createElement('button');
+    const bookmarked=isPortalResourceBookmarked(resource);
+    bookmark.type='button';bookmark.className='resource-button';bookmark.textContent=bookmarked?'Saved ✓':'Save resource';
+    bookmark.setAttribute('aria-pressed',String(bookmarked));bookmark.onclick=()=>togglePortalResourceBookmark(resource,bookmark);
+    body.appendChild(bookmark);
 
 
     card.appendChild(body);

@@ -87,12 +87,35 @@ async function openMDCATAccount(pending) {
       });
       panel.appendChild(signIn);grid.appendChild(panel);return;
     }
-    const panel=mdcatElement('div',null,'mdcat-wide');
+    document.getElementById('mdcatHubTitle').textContent='Student dashboard';
+    document.getElementById('mdcatHubDescription').textContent='Your profile, saved resources and MDCAT learning records.';
+    const panel=mdcatElement('div',null,'mdcat-wide student-dashboard-card');
+    panel.appendChild(mdcatElement('h3',identity.auth.currentUser.displayName || 'Student profile'));
     panel.appendChild(mdcatElement('p','Signed in as '+(identity.auth.currentUser.email || 'student')));
-    panel.append(mdcatButton('My saved results',()=>openMDCATSavedResults()),mdcatButton('My scored progress',()=>openMDCATScoredProgress()),mdcatButton('Sign out',async()=>{await identity.sdk.signOut(identity.auth);if (typeof setPortalAccountButton === 'function') setPortalAccountButton(false);openMDCATAccount();}));
+    panel.append(mdcatButton('My bookmarks',()=>openStudentBookmarks()),mdcatButton('My saved results',()=>openMDCATSavedResults()),mdcatButton('My scored progress',()=>openMDCATScoredProgress()),mdcatButton('Sign out',async()=>{await identity.sdk.signOut(identity.auth);if (typeof setPortalAccountButton === 'function') setPortalAccountButton(false);openMDCATAccount();}));
     if(pending) panel.appendChild(mdcatButton('Continue to scored practice',()=>openMDCATGraded(pending.mode,pending.contextId)));
     grid.appendChild(panel);
   } catch(error) {if(view===mdcatGradeView) mdcatAccountError(error,grid,()=>openMDCATAccount(pending));}
+}
+
+function openStudentBookmarks() {
+  const {grid}=mdcatStudyPage('My bookmarks','Resources saved in this browser.');
+  const rows=typeof getPortalBookmarks==='function' ? getPortalBookmarks() : [];
+  if (!rows.length) {grid.appendChild(mdcatElement('p','No resources saved yet. Open Notes, Past Papers or Study Resources and choose Save resource.','mdcat-wide'));return;}
+  rows.forEach(row=>{
+    const card=mdcatElement('article',null,'mdcat-subject-card');
+    card.appendChild(mdcatElement('h3',row.title));
+    const details=[row.category,row.subject,row.level].filter(Boolean).join(' • ');
+    if(details)card.appendChild(mdcatElement('p',details));
+    const url=typeof safePortalURL==='function' ? safePortalURL(row.fileURL) : '';
+    if(url){const link=mdcatElement('a','Open resource','resource-button');link.href=url;link.target='_blank';link.rel='noopener noreferrer';card.appendChild(link);}
+    const remove=mdcatButton('Remove bookmark',()=>{
+      const kept=getPortalBookmarks().filter(item=>item.key!==row.key);
+      try {localStorage.setItem(PORTAL_BOOKMARKS_KEY,JSON.stringify(kept));} catch (_) {}
+      openStudentBookmarks();
+    });
+    card.appendChild(remove);grid.appendChild(card);
+  });
 }
 
 async function openMDCATGraded(mode,contextId) {

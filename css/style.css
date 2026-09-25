@@ -42,6 +42,9 @@
 .mdcat-back { background: none; border: 0; padding: 0; color: #991b2f; font: inherit; text-decoration: underline; cursor: pointer; }
 .mdcat-back:focus-visible { outline: 3px solid #991b2f; outline-offset: 4px; }
 .mdcat-subject-card .mdcat-demo { margin-top: 16px; color: #991b2f; font-weight: bold; }
+.student-dashboard-card { padding: 22px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; }
+.student-dashboard-card h3 { margin-top: 0; }
+.student-dashboard-card .resource-button { margin: 6px 8px 0 0; }
 .mdcat-subject-icon {
   display: inline-flex;
   align-items: center;

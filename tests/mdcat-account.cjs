@@ -30,12 +30,15 @@ const {createBackend}=require('./scoring-harness.cjs');
   });
   await page.goto(pathToFileURL(path.join(__dirname,'../index.html')).href);
   await page.locator('#app').waitFor({state:'visible'});
+  await page.evaluate(()=>localStorage.setItem(PORTAL_BOOKMARKS_KEY,JSON.stringify([{key:'RES-BOOKMARK',title:'Saved Biology Notes',category:'Notes',subject:'Biology',level:'Class 12',fileURL:'https://example.test/biology.pdf',resourceType:'PDF'}])));
   // Inject a signed-in SDK test double; provider token verification still runs in the backend harness.
   await page.evaluate(token=>{mdcatIdentity={auth:{currentUser:{email:'student@example.test',getIdToken:async()=>token}},sdk:{signOut:async(auth)=>{auth.currentUser=null;}}};},token);
   await page.getByRole('button',{name:'Student sign in',exact:true}).click();
   assert.equal(await page.locator('#mdcatHub').isVisible(),true);
   await page.getByRole('button',{name:'My saved results',exact:true}).waitFor();
   assert.equal(await page.getByRole('button',{name:'My account',exact:true}).count(),1);
+  await page.getByRole('button',{name:'My bookmarks',exact:true}).click();await page.getByText('Saved Biology Notes',{exact:true}).waitFor();
+  await page.evaluate(()=>openMDCATAccount());await page.getByRole('button',{name:'My saved results',exact:true}).waitFor();
   assert.equal(configRequests,0);
   await page.evaluate(()=>openMDCATGraded('test','MDTEST-DEMO-001'));
   loseStart=true;
