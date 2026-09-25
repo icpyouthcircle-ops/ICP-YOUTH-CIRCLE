@@ -26,7 +26,7 @@ async function mdcatLoadIdentity() {
     ]);
     const app=appSDK.initializeApp(MDCAT_FIREBASE_WEB_CONFIG,'icp-mdcat');
     const auth=authSDK.getAuth(app);
-    await authSDK.setPersistence(auth,authSDK.inMemoryPersistence);
+    await authSDK.setPersistence(auth,authSDK.browserSessionPersistence);
     mdcatIdentity={auth,sdk:authSDK};
     return mdcatIdentity;
   })();
@@ -77,7 +77,7 @@ async function openMDCATAccount(pending) {
     document.getElementById('mdcatStatus').textContent='';
     if(!identity.auth.currentUser) {
       const panel=mdcatElement('div',null,'mdcat-wide');
-      panel.appendChild(mdcatElement('p','Your Google account identifies your saved results. This browser will sign out when the page is reloaded. Your submitted results stay in your account.'));
+      panel.appendChild(mdcatElement('p','Your Google account identifies your saved results and requests. You stay signed in during this browser session.'));
       const signIn=mdcatButton('Continue with Google',async()=>{
         signIn.disabled=true;
         try {
@@ -92,7 +92,7 @@ async function openMDCATAccount(pending) {
     const panel=mdcatElement('div',null,'mdcat-wide student-dashboard-card');
     panel.appendChild(mdcatElement('h3',identity.auth.currentUser.displayName || 'Student profile'));
     panel.appendChild(mdcatElement('p','Signed in as '+(identity.auth.currentUser.email || 'student')));
-    panel.append(mdcatButton('My bookmarks',()=>openStudentBookmarks()),mdcatButton('My saved results',()=>openMDCATSavedResults()),mdcatButton('My scored progress',()=>openMDCATScoredProgress()),mdcatButton('Sign out',async()=>{await identity.sdk.signOut(identity.auth);if (typeof setPortalAccountButton === 'function') setPortalAccountButton(false);openMDCATAccount();}));
+    panel.append(mdcatButton('My bookmarks',()=>openStudentBookmarks()),mdcatButton('My requests',()=>openStudentRequests()),mdcatButton('My saved results',()=>openMDCATSavedResults()),mdcatButton('My scored progress',()=>openMDCATScoredProgress()),mdcatButton('Sign out',async()=>{await identity.sdk.signOut(identity.auth);if (typeof setPortalAccountButton === 'function') setPortalAccountButton(false);openMDCATAccount();}));
     if(pending) panel.appendChild(mdcatButton('Continue to scored practice',()=>openMDCATGraded(pending.mode,pending.contextId)));
     grid.appendChild(panel);
   } catch(error) {if(view===mdcatGradeView) mdcatAccountError(error,grid,()=>openMDCATAccount(pending));}
@@ -116,6 +116,40 @@ function openStudentBookmarks() {
     });
     card.appendChild(remove);grid.appendChild(card);
   });
+}
+
+function studentRequestDate(value) {
+  if (!value) return '';
+  const date=new Date(value);
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleDateString('en-PK',{timeZone:'Asia/Karachi'});
+}
+
+function renderStudentRequestSection(grid,title,rows,type) {
+  const section=mdcatElement('section',null,'mdcat-wide student-request-section');
+  section.appendChild(mdcatElement('h3',title));
+  if (!rows.length) section.appendChild(mdcatElement('p','No '+title.toLowerCase()+' found for this Google account.'));
+  rows.forEach(row=>{
+    const card=mdcatElement('article',null,'mdcat-subject-card');
+    card.appendChild(mdcatElement('h4',type==='resource'?(row.Title || 'Resource submission'):(row.Subject || 'Help request')));
+    const details=[row.ID,type==='resource'?row.ResourceType:row.RequestType,row.Status,studentRequestDate(row.SubmittedAt)].filter(Boolean).join(' • ');
+    card.appendChild(mdcatElement('p',details));
+    if(row.Response)card.appendChild(mdcatElement('p','Administrator response: '+row.Response));
+    section.appendChild(card);
+  });
+  grid.appendChild(section);
+}
+
+async function openStudentRequests() {
+  const {grid}=mdcatStudyPage('My requests','Track resource submissions and help-desk requests sent with your signed-in Google email.');
+  const view=mdcatGradeView;
+  document.getElementById('mdcatStatus').textContent='Loading your requests…';
+  try {
+    const data=await mdcatPrivateRequest('studentDashboard');
+    if(view!==mdcatGradeView)return;
+    document.getElementById('mdcatStatus').textContent='';
+    renderStudentRequestSection(grid,'Resource submissions',data.submissions || [],'resource');
+    renderStudentRequestSection(grid,'Help-desk requests',data.helpRequests || [],'help');
+  } catch(error) {if(view===mdcatGradeView) mdcatAccountError(error,grid,()=>openStudentRequests());}
 }
 
 async function openMDCATGraded(mode,contextId) {

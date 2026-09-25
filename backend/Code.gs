@@ -1434,6 +1434,30 @@ function publicHelpRequest_(body) {
   });
 }
 
+function studentOwnedRows_(sheetName,email) {
+  return getSheetData_(sheetName).filter(row=>{
+    const owner=String(row.Email || row.ContactEmail || row.SubmitterEmail || row.RequesterEmail || '').trim().toLowerCase();
+    return owner===email;
+  }).sort((a,b)=>new Date(b.UpdatedAt || b.SubmittedAt || b.CreatedAt || 0).getTime()-new Date(a.UpdatedAt || a.SubmittedAt || a.CreatedAt || 0).getTime()).slice(0,100);
+}
+
+function studentDashboard_(user) {
+  const clean=(value,max)=>String(value == null ? '' : value).replace(/\s+/g,' ').trim().slice(0,max || 500);
+  const submissions=studentOwnedRows_(CONFIG.SHEETS.SUBMISSIONS,user.email).map(row=>({
+    ID:clean(row.ID,120),Title:clean(row.Title || row.ResourceTitle,240),ResourceType:clean(row.ResourceType || row.Type,100),
+    Subject:clean(row.Subject,160),Status:clean(row.Status || 'Pending Review',80),
+    SubmittedAt:row.SubmittedAt || row.CreatedAt || '',UpdatedAt:row.UpdatedAt || '',
+    Response:clean(row.AdminResponse || row.ReviewNotes || row.Response,1000)
+  }));
+  const helpRequests=studentOwnedRows_(CONFIG.SHEETS.HELP_DESK,user.email).map(row=>({
+    ID:clean(row.ID,120),RequestType:clean(row.RequestType || row.Category || row.Type,100),
+    Subject:clean(row.Subject || row.Title,240),Status:clean(row.Status || 'Pending Review',80),
+    SubmittedAt:row.SubmittedAt || row.CreatedAt || '',UpdatedAt:row.UpdatedAt || '',
+    Response:clean(row.AdminResponse || row.Response || row.Resolution,1000)
+  }));
+  return {email:user.email,submissions:submissions,helpRequests:helpRequests};
+}
+
 const ADMIN_TABLES_ = [
   ['RESOURCES','Resources','RES'],['CATEGORIES','Categories','CAT'],['SUBJECTS','Subjects','SUB'],
   ['LEVELS','Levels','LVL'],['INSTITUTIONS','Institutions','INS'],['ENTRY_TESTS','Entry tests','TEST'],
@@ -1650,6 +1674,9 @@ function doPost(e) {
       try {
         return jsonResponse_(body.action==='publicSubmitResource' ? publicSubmitResource_(body) : publicHelpRequest_(body));
       } finally { publicLock.releaseLock(); }
+    }
+    if (body.action==='studentDashboard') {
+      return jsonResponse_(studentDashboard_(firebaseAuthenticate_(body.idToken)));
     }
     const adminActions=['adminSession','adminList','adminSave','adminBulk','adminArchive','adminUploadPdf'];
     if (adminActions.includes(body.action)) {

@@ -7,7 +7,10 @@ const {createBackend}=require('./scoring-harness.cjs');
 (async()=>{
  const browser=await chromium.launch({headless:true,...(process.env.MDCAT_BROWSER_CHANNEL?{channel:process.env.MDCAT_BROWSER_CHANNEL}:{})});
  try {
-  const backend=createBackend(),token=backend.token('student');
+  const backend=createBackend();
+  backend.addSheet('Submissions',[{ID:'SUBM-OWN',Email:'student@example.test',Title:'My Biology Resource',ResourceType:'Notes',Subject:'Biology',Status:'Pending Review',SubmittedAt:'2026-09-24T10:00:00Z'},{ID:'SUBM-OTHER',Email:'other@example.test',Title:'Other Student Resource',Status:'Active'}]);
+  backend.addSheet('Help_Desk',[{ID:'HELP-OWN',Email:'student@example.test',RequestType:'Study guidance',Subject:'My Physics Plan',Status:'Resolved',AdminResponse:'Plan shared.',SubmittedAt:'2026-09-24T11:00:00Z'},{ID:'HELP-OTHER',Email:'other@example.test',Subject:'Other Student Request',Status:'Pending Review'}]);
+  const token=backend.token('student',{}, {email:'student@example.test'});
   const page=await browser.newPage({viewport:{width:1280,height:900}});
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   let loseStart=false,loseSubmit=false,configRequests=0;
@@ -39,6 +42,10 @@ const {createBackend}=require('./scoring-harness.cjs');
   assert.equal(await page.getByRole('button',{name:'My account',exact:true}).count(),1);
   await page.getByRole('button',{name:'My bookmarks',exact:true}).click();await page.getByText('Saved Biology Notes',{exact:true}).waitFor();
   await page.evaluate(()=>openMDCATAccount());await page.getByRole('button',{name:'My saved results',exact:true}).waitFor();
+  await page.getByRole('button',{name:'My requests',exact:true}).click();await page.getByText('My Biology Resource',{exact:true}).waitFor();await page.getByText('My Physics Plan',{exact:true}).waitFor();
+  assert.equal(await page.getByText('Other Student Resource',{exact:true}).count(),0);assert.equal(await page.getByText('Other Student Request',{exact:true}).count(),0);
+  await page.evaluate(()=>openMDCATAccount());await page.getByRole('button',{name:'My saved results',exact:true}).waitFor();
+  assert.match(fs.readFileSync(path.join(__dirname,'../js/mdcat-account.js'),'utf8'),/browserSessionPersistence/);
   assert.equal(configRequests,0);
   await page.evaluate(()=>openMDCATGraded('test','MDTEST-DEMO-001'));
   loseStart=true;

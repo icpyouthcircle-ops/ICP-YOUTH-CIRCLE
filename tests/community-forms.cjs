@@ -17,6 +17,11 @@ function backendChecks(){
   assert.equal(saved.Email,'student@example.test');assert.equal(saved.Status,'Pending Review');assert.equal(saved.URL,'https://example.test/biology');
   const help=ok(backend.call('publicHelpRequest',null,{submissionToken:'helpabcdefghijklmnopqrst',name:'Student',email:'student@example.test',requestType:'Study guidance',subject:'Physics plan',message:'Please guide me.'}));
   assert.match(help.id,/^HELP-/);assert.equal(backend.rows('Help_Desk').find(row=>row.ID===help.id).Message,'Please guide me.');
+  ok(backend.call('publicSubmitResource',null,{submissionToken:'outsiderabcdefghijklmnop',name:'Other',email:'other@example.test',title:'Other resource',resourceType:'Notes',url:'https://example.test/other'}));
+  const studentToken=backend.token('student',{}, {email:'student@example.test'});
+  const dashboard=ok(backend.call('studentDashboard',studentToken));
+  assert.equal(dashboard.email,'student@example.test');assert.ok(dashboard.submissions.some(row=>row.Title==='Biology notes'));assert.ok(dashboard.helpRequests.some(row=>row.Subject==='Physics plan'));
+  assert.equal(dashboard.submissions.some(row=>row.Title==='Other resource'),false);
   bad(backend.call('publicSubmitResource',null,{submissionToken:'badurlabcdefghijklmnopqr',name:'Student',email:'student@example.test',title:'Bad link',resourceType:'Other',url:'javascript:alert(1)'}),'BAD_REQUEST');
   bad(backend.call('publicHelpRequest',null,{submissionToken:'honeypotabcdefghijklmnop',website:'spam',name:'Bot',email:'bot@example.test',requestType:'Other',subject:'Spam',message:'Spam'}),'BAD_REQUEST');
   for(let index=0;index<5;index++) ok(backend.call('publicHelpRequest',null,{submissionToken:'ratelimitabcdefghijklmnop',name:'Student',email:'student@example.test',requestType:'Other',subject:'Question '+index,message:'Message'}));
@@ -61,4 +66,4 @@ async function browserChecks(){
   }finally{await browser.close();}
 }
 
-(async()=>{backendChecks();await browserChecks();console.log('PASS community forms: resource and help submissions validate, save for review, resist spam, show references, and fit mobile screens.');})().catch(error=>{console.error(error);process.exit(1);});
+(async()=>{backendChecks();await browserChecks();console.log('PASS community forms: resource and help submissions validate, save for review, resist spam, show references, remain owner-filtered in the student dashboard, and fit mobile screens.');})().catch(error=>{console.error(error);process.exit(1);});

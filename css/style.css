@@ -45,6 +45,9 @@
 .student-dashboard-card { padding: 22px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; }
 .student-dashboard-card h3 { margin-top: 0; }
 .student-dashboard-card .resource-button { margin: 6px 8px 0 0; }
+.student-request-section { display: grid; gap: 12px; }
+.student-request-section > h3 { margin: 10px 0 0; }
+.student-request-section .mdcat-subject-card h4 { margin: 0 0 8px; font-size: 17px; }
 .mdcat-subject-icon {
   display: inline-flex;
   align-items: center;
