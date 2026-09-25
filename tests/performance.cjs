@@ -9,11 +9,18 @@ const {createBackend}=require('./scoring-harness.cjs');
   const browser=await chromium.launch({headless:true,...(process.env.MDCAT_BROWSER_CHANNEL?{channel:process.env.MDCAT_BROWSER_CHANNEL}:{})});
   try {
     const page=await browser.newPage({viewport:{width:1280,height:900}});
+    await page.addInitScript(()=>{ window.__ICP_ENABLE_PREFETCH__=true; });
+    const requestCounts=new Map();
     await page.route('https://script.google.com/**',async route=>{
       const action=new URL(route.request().url()).searchParams.get('action');
+      requestCounts.set(action,(requestCounts.get(action)||0)+1);
       if(action==='portalData'){
         await new Promise(resolve=>setTimeout(resolve,2500));
         return route.fulfill({json:{success:true,data:{settings:{site_name:'Live title'},navigation:[],categories:[]}}});
+      }
+      if(action==='announcements'){
+        await new Promise(resolve=>setTimeout(resolve,500));
+        return route.fulfill({json:{success:true,data:[{ID:'ANN-1',Title:'Cached announcement',Category:'Notice',Summary:'Ready immediately'}]}});
       }
       return route.fulfill({json:{success:true,data:[]}});
     });
@@ -26,6 +33,13 @@ const {createBackend}=require('./scoring-harness.cjs');
     assert.equal(await page.locator('#loading').isHidden(),true);
     await page.locator('#siteName').getByText('Live title',{exact:true}).waitFor({timeout:5000});
 
+    await page.waitForFunction(()=>localStorage.getItem('icp-public-module-v2:action=announcements'),null,{timeout:5000});
+    const clickStarted=Date.now();
+    await page.evaluate(()=>handleNavigation({Slug:'announcements',Label:'Announcements'}));
+    await page.getByText('Cached announcement',{exact:true}).waitFor({timeout:400});
+    assert.ok(Date.now()-clickStarted<450,'Cached section did not render immediately');
+    assert.ok((requestCounts.get('announcements')||0)>=1,'Background warming did not request announcements');
+
     const accountSource=fs.readFileSync(path.join(__dirname,'../js/mdcat-account.js'),'utf8');
     assert.equal(accountSource.includes('?action=mdcatAccountConfig'),false);
     assert.match(accountSource,/MDCAT_FIREBASE_WEB_CONFIG/);
@@ -35,6 +49,6 @@ const {createBackend}=require('./scoring-harness.cjs');
     const before=readSubjects();
     backend.change('MDCAT_Subjects','MDS-001',{Name:'Changed after cache'});
     assert.deepEqual(readSubjects(),before);
-    console.log('PASS performance: immediate static startup during a slow API response; background refresh; non-blocking account configuration; server public-data cache.');
+    console.log('PASS performance: immediate startup; background module warming; instant cached navigation; background refresh; non-blocking account configuration; server public-data cache.');
   } finally { await browser.close(); }
 })().catch(error=>{console.error(error);process.exit(1);});

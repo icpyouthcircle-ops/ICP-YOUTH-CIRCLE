@@ -1,6 +1,10 @@
 const API_BASE_URL =
   'https://script.google.com/macros/s/AKfycbwfIALyzy8rVPAyIyTj-RkFdjX5f92uaVpESOGHrBIsnsFQLH14uoYeAdggXKNEhQUo/exec';
 const PORTAL_CACHE_KEY = 'icp-public-portal-v1';
+const PUBLIC_MODULE_CACHE_PREFIX = 'icp-public-module-v2:';
+const PUBLIC_MODULE_CACHE_TTL = 30 * 60 * 1000;
+const publicModuleMemory = new Map();
+const publicModuleRequests = new Map();
 const PORTAL_BOOTSTRAP_DATA = {
   settings: {
     site_name: 'ICP YOUTH CIRCLE',
@@ -71,6 +75,97 @@ const PORTAL_BOOTSTRAP_DATA = {
 
     let mockTestSubmitted = false;
     let mockTestAnswers = {};
+
+function safePortalURL(value) {
+  const raw=String(value == null ? '' : value).trim();
+  if (!raw) return '';
+  try {
+    const url=new URL(raw,window.location.href);
+    return ['http:','https:'].includes(url.protocol) ? url.href : '';
+  } catch (_) { return ''; }
+}
+
+function publicModuleKey(action, params = {}) {
+  const query = new URLSearchParams({ action, ...params });
+  return query.toString();
+}
+
+function readPublicModuleCache(key, allowStale = false) {
+  if (publicModuleMemory.has(key)) return publicModuleMemory.get(key);
+  try {
+    const cached = JSON.parse(localStorage.getItem(PUBLIC_MODULE_CACHE_PREFIX + key));
+    if (!cached || !Array.isArray(cached.data)) return null;
+    if (!allowStale && Date.now() - Number(cached.savedAt || 0) > PUBLIC_MODULE_CACHE_TTL) return null;
+    publicModuleMemory.set(key, cached.data);
+    return cached.data;
+  } catch (_) { return null; }
+}
+
+function storePublicModuleCache(key, data) {
+  if (!Array.isArray(data)) return;
+  publicModuleMemory.set(key, data);
+  try {
+    const value = JSON.stringify({ savedAt: Date.now(), data });
+    if (value.length <= 500000) localStorage.setItem(PUBLIC_MODULE_CACHE_PREFIX + key, value);
+  } catch (_) {}
+}
+
+function refreshPublicModule(action, params = {}) {
+  const key = publicModuleKey(action, params);
+  if (publicModuleRequests.has(key)) return publicModuleRequests.get(key);
+  const url = API_BASE_URL + '?' + key;
+  const request = fetch(url)
+    .then(response => {
+      if (!response.ok) throw new Error('HTTP error: ' + response.status);
+      return response.json();
+    })
+    .then(result => {
+      if (!result.success || !Array.isArray(result.data)) {
+        throw new Error(result.error || 'Unable to load portal content.');
+      }
+      storePublicModuleCache(key, result.data);
+      return result.data;
+    })
+    .finally(() => publicModuleRequests.delete(key));
+  publicModuleRequests.set(key, request);
+  return request;
+}
+
+function loadPublicModule(action, params = {}) {
+  const key = publicModuleKey(action, params);
+  const cached = readPublicModuleCache(key, true);
+  if (cached) {
+    refreshPublicModule(action, params).catch(() => {});
+    return Promise.resolve(cached);
+  }
+  return refreshPublicModule(action, params);
+}
+
+function warmPublicModules() {
+  if (location.hostname !== 'icpyouthcircle-ops.github.io' && !window.__ICP_ENABLE_PREFETCH__) return;
+  const modules = [
+    ['announcements'], ['entryTests'], ['admissions'], ['scholarships'],
+    ['opportunities'], ['aiTools'], ['islamicContent'], ['blog'], ['videos'], ['mcqs'],
+    ['resources', { category: 'Notes' }],
+    ['resources', { category: 'Past Papers' }],
+    ['resources', { category: 'Study Resources' }]
+  ];
+  let index = 0;
+  const next = () => {
+    if (index >= modules.length) return;
+    const [action, params] = modules[index++];
+    const key = publicModuleKey(action, params || {});
+    if (readPublicModuleCache(key)) {
+      setTimeout(next, 80);
+      return;
+    }
+    refreshPublicModule(action, params || {}).catch(() => {}).finally(() => setTimeout(next, 120));
+  };
+  const start = () => { next(); next(); };
+  if ('requestIdleCallback' in window) window.requestIdleCallback(start, { timeout: 1500 });
+  else setTimeout(start, 600);
+}
+
     document.addEventListener(
       'DOMContentLoaded',
       loadPortal
@@ -125,6 +220,7 @@ function loadPortal() {
 
       // The already-rendered snapshot keeps the portal usable while the API recovers.
     });
+  warmPublicModules();
 }
 
 
@@ -641,6 +737,7 @@ function showHome() {
   });
 }
 function loadResourcesByCategory(categoryName) {
+  const requestVersion = navigationVersion;
 
   const content =
     document.getElementById('dynamicPageContent');
@@ -648,29 +745,10 @@ function loadResourcesByCategory(categoryName) {
   content.innerHTML =
     '<p>Loading resources...</p>';
 
-fetch(
-  API_BASE_URL +
-  '?action=resources&category=' +
-  encodeURIComponent(categoryName)
-)
-  .then(response => {
-    if (!response.ok) {
-      throw new Error(
-        'HTTP error: ' + response.status
-      );
-    }
-
-    return response.json();
-  })
-  .then(result => {
-    if (!result.success) {
-      throw new Error(
-        result.error ||
-        'Unable to load resources.'
-      );
-    }
-
-    renderResourceCards(result.data);
+loadPublicModule('resources', {category: categoryName})
+  .then(data => {
+    if (requestVersion !== navigationVersion) return;
+    renderResourceCards(data);
   })
   .catch(error => {
     console.error(
@@ -678,7 +756,7 @@ fetch(
       error
     );
 
-  showResourceError(error);
+  if (requestVersion === navigationVersion) showResourceError(error);
   });
   }
 
@@ -854,13 +932,15 @@ function drawResourceCards(resources) {
       'card resource-card';
 
 
-    if (resource.ThumbnailURL) {
+    const resourceThumbnailURL=safePortalURL(resource.ThumbnailURL);
+    if (resourceThumbnailURL) {
 
       const image =
         document.createElement('img');
 
-      image.src =
-        resource.ThumbnailURL;
+      image.src = resourceThumbnailURL;
+      image.loading = 'lazy';
+      image.decoding = 'async';
 
       image.alt =
         resource.Title || 'Resource';
@@ -966,13 +1046,13 @@ function drawResourceCards(resources) {
     }
 
 
-    if (resource.FileURL) {
+    const resourceFileURL=safePortalURL(resource.FileURL);
+    if (resourceFileURL) {
 
       const link =
         document.createElement('a');
 
-      link.href =
-        resource.FileURL;
+      link.href = resourceFileURL;
 
       link.target =
         '_blank';
@@ -1016,6 +1096,7 @@ function showResourceError(error) {
   console.error(error);
 }
 function loadMCQs() {
+  const requestVersion = navigationVersion;
 
   const content =
     document.getElementById(
@@ -1032,27 +1113,10 @@ function loadMCQs() {
   content.innerHTML =
     '<p>Loading MCQs...</p>';
 
- fetch(
-  API_BASE_URL + '?action=mcqs'
-)
-  .then(response => {
-    if (!response.ok) {
-      throw new Error(
-        'HTTP error: ' + response.status
-      );
-    }
-
-    return response.json();
-  })
-  .then(result => {
-    if (!result.success) {
-      throw new Error(
-        result.error ||
-        'Unable to load MCQs.'
-      );
-    }
-
-    renderMCQs(result.data);
+ loadPublicModule('mcqs')
+  .then(data => {
+    if (requestVersion !== navigationVersion) return;
+    renderMCQs(data);
   })
   .catch(error => {
     console.error(
@@ -1060,7 +1124,7 @@ function loadMCQs() {
       error
     );
 
-  showMCQError(error);
+  if (requestVersion === navigationVersion) showMCQError(error);
   });
   }
 
@@ -1745,6 +1809,7 @@ function showMCQError(error) {
   console.error(error);
 }
 function loadVideos() {
+  const requestVersion = navigationVersion;
 
   const content =
     document.getElementById(
@@ -1761,27 +1826,10 @@ function loadVideos() {
   content.innerHTML =
     '<p>Loading videos...</p>';
 
-fetch(
-  API_BASE_URL + '?action=videos'
-)
-  .then(response => {
-    if (!response.ok) {
-      throw new Error(
-        'HTTP error: ' + response.status
-      );
-    }
-
-    return response.json();
-  })
-  .then(result => {
-    if (!result.success) {
-      throw new Error(
-        result.error ||
-        'Unable to load videos.'
-      );
-    }
-
-    renderVideos(result.data);
+loadPublicModule('videos')
+  .then(data => {
+    if (requestVersion !== navigationVersion) return;
+    renderVideos(data);
   })
   .catch(error => {
     console.error(
@@ -1789,7 +1837,7 @@ fetch(
       error
     );
 
-  showVideoError(error);
+  if (requestVersion === navigationVersion) showVideoError(error);
   });
   }
 
@@ -1931,12 +1979,15 @@ function drawVideoCards(videos) {
     card.className =
       'card resource-card';
 
-    if (video.ThumbnailURL) {
+    const videoThumbnailURL=safePortalURL(video.ThumbnailURL);
+    if (videoThumbnailURL) {
 
       const image =
         document.createElement('img');
 
-      image.src = video.ThumbnailURL;
+      image.src = videoThumbnailURL;
+      image.loading = 'lazy';
+      image.decoding = 'async';
       image.alt = video.Title || 'Video';
       image.className = 'resource-thumbnail';
 
@@ -2030,12 +2081,13 @@ if (badges.children.length > 0) {
       body.appendChild(description);
     }
 
-    if (video.VideoURL) {
+    const videoURL=safePortalURL(video.VideoURL);
+    if (videoURL) {
 
       const link =
         document.createElement('a');
 
-      link.href = video.VideoURL;
+      link.href = videoURL;
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
       link.textContent = 'Watch Video';
@@ -2079,28 +2131,10 @@ function loadAdmissions(slug='admissions',parentSlug='') {
   content.innerHTML =
     '<p>Loading admissions...</p>';
 
-fetch(
-  API_BASE_URL + '?action=admissions'
-)
-  .then(response => {
-    if (!response.ok) {
-      throw new Error(
-        'HTTP error: ' + response.status
-      );
-    }
-
-    return response.json();
-  })
-  .then(result => {
-    if (!result.success) {
-      throw new Error(
-        result.error ||
-        'Unable to load admissions.'
-      );
-    }
-
+loadPublicModule('admissions')
+  .then(data => {
     if (requestVersion !== navigationVersion) return;
-    renderAdmissions(filterAdmissionsForRoute(result.data || [],slug,parentSlug));
+    renderAdmissions(filterAdmissionsForRoute(data,slug,parentSlug));
   })
   .catch(error => {
     console.error(
@@ -2136,28 +2170,10 @@ function loadScholarships(slug='scholarships') {
   content.innerHTML =
     '<p>Loading scholarships...</p>';
 
- fetch(
-  API_BASE_URL + '?action=scholarships'
-)
-  .then(response => {
-    if (!response.ok) {
-      throw new Error(
-        'HTTP error: ' + response.status
-      );
-    }
-
-    return response.json();
-  })
-  .then(result => {
-    if (!result.success) {
-      throw new Error(
-        result.error ||
-        'Unable to load scholarships.'
-      );
-    }
-
+ loadPublicModule('scholarships')
+  .then(data => {
     if (requestVersion !== navigationVersion) return;
-    renderScholarships(filterScholarshipsForRoute(result.data || [],slug));
+    renderScholarships(filterScholarshipsForRoute(data,slug));
   })
   .catch(error => {
     console.error(
@@ -2191,28 +2207,10 @@ function loadOpportunities(slug='career') {
   content.innerHTML =
     '<p>Loading opportunities...</p>';
 
- fetch(
-  API_BASE_URL + '?action=opportunities'
-)
-  .then(response => {
-    if (!response.ok) {
-      throw new Error(
-        'HTTP error: ' + response.status
-      );
-    }
-
-    return response.json();
-  })
-  .then(result => {
-    if (!result.success) {
-      throw new Error(
-        result.error ||
-        'Unable to load opportunities.'
-      );
-    }
-
+ loadPublicModule('opportunities')
+  .then(data => {
     if (requestVersion !== navigationVersion) return;
-    renderOpportunities(filterOpportunitiesForRoute(result.data || [],slug));
+    renderOpportunities(filterOpportunitiesForRoute(data,slug));
   })
   .catch(error => {
     console.error(
@@ -2248,28 +2246,10 @@ function loadAnnouncements(slug='updates',parentSlug='') {
   content.innerHTML =
     '<p>Loading announcements...</p>';
 
- fetch(
-  API_BASE_URL + '?action=announcements'
-)
-  .then(response => {
-    if (!response.ok) {
-      throw new Error(
-        'HTTP error: ' + response.status
-      );
-    }
-
-    return response.json();
-  })
-  .then(result => {
-    if (!result.success) {
-      throw new Error(
-        result.error ||
-        'Unable to load announcements.'
-      );
-    }
-
+ loadPublicModule('announcements')
+  .then(data => {
     if (requestVersion !== navigationVersion) return;
-    renderAnnouncements(filterAnnouncementsForRoute(result.data || [],slug,parentSlug));
+    renderAnnouncements(filterAnnouncementsForRoute(data,slug,parentSlug));
   })
   .catch(error => {
     console.error(
@@ -2303,28 +2283,10 @@ function loadAITools(slug='ai-smart-tools') {
   content.innerHTML =
     '<p>Loading AI tools...</p>';
 
- fetch(
-  API_BASE_URL + '?action=aiTools'
-)
-  .then(response => {
-    if (!response.ok) {
-      throw new Error(
-        'HTTP error: ' + response.status
-      );
-    }
-
-    return response.json();
-  })
-  .then(result => {
-    if (!result.success) {
-      throw new Error(
-        result.error ||
-        'Unable to load AI tools.'
-      );
-    }
-
+ loadPublicModule('aiTools')
+  .then(data => {
     if (requestVersion !== navigationVersion) return;
-    renderAITools(filterAIToolsForRoute(result.data || [],slug));
+    renderAITools(filterAIToolsForRoute(data,slug));
   })
   .catch(error => {
     console.error(
@@ -2344,6 +2306,7 @@ function filterAIToolsForRoute(items,slug) {
 }
   
 function loadIslamicContent(slug) {
+  const requestVersion = navigationVersion;
   const title =
     document.getElementById('dynamicPageTitle');
 
@@ -2369,28 +2332,11 @@ function loadIslamicContent(slug) {
   content.innerHTML =
     '<p>Loading Islamic content...</p>';
 
-  fetch(
-    API_BASE_URL + '?action=islamicContent'
-  )
-    .then(response => {
-      if (!response.ok) {
-        throw new Error(
-          'HTTP error: ' + response.status
-        );
-      }
-
-      return response.json();
-    })
-    .then(result => {
-      if (!result.success) {
-        throw new Error(
-          result.error ||
-          'Unable to load Islamic content.'
-        );
-      }
-
+  loadPublicModule('islamicContent')
+    .then(data => {
+      if (requestVersion !== navigationVersion) return;
       renderIslamicContent(
-        result.data,
+        data,
         slug
       );
     })
@@ -2400,7 +2346,7 @@ function loadIslamicContent(slug) {
         error
       );
 
-      showIslamicContentError(error);
+      if (requestVersion === navigationVersion) showIslamicContentError(error);
     });
 }
 
@@ -2621,11 +2567,12 @@ function drawIslamicCards(items) {
       body.appendChild(description);
     }
 
-    if (item.SourceURL) {
+    const sourceURL=safePortalURL(item.SourceURL);
+    if (sourceURL) {
       const link =
         document.createElement('a');
 
-      link.href = item.SourceURL;
+      link.href = sourceURL;
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
       link.textContent = 'View Source';
@@ -2686,30 +2633,12 @@ function loadEntryTests(slug) {
   content.innerHTML =
     '<p>Loading entry tests...</p>';
 
-  fetch(
-    API_BASE_URL + '?action=entryTests'
-  )
-    .then(response => {
-      if (!response.ok) {
-        throw new Error(
-          'HTTP error: ' + response.status
-        );
-      }
-
-      return response.json();
-    })
-    .then(result => {
-      if (!result.success) {
-        throw new Error(
-          result.error ||
-          'Unable to load entry tests.'
-        );
-      }
-
+  loadPublicModule('entryTests')
+    .then(data => {
       if (requestVersion !== navigationVersion) return;
 
       renderEntryTests(
-        result.data,
+        data,
         slug
       );
     })
@@ -2921,12 +2850,12 @@ function drawEntryTestCards(items) {
       body.appendChild(testDate);
     }
 
-    if (item.OfficialURL) {
+    const entryTestURL=safePortalURL(item.OfficialURL);
+    if (entryTestURL) {
       const link =
         document.createElement('a');
 
-      link.href =
-        item.OfficialURL;
+      link.href = entryTestURL;
 
       link.target =
         '_blank';
@@ -2977,28 +2906,10 @@ function loadBlog(slug='blog') {
   content.innerHTML =
     '<p>Loading blog posts...</p>';
 
-  fetch(
-    API_BASE_URL + '?action=blog'
-  )
-    .then(response => {
-      if (!response.ok) {
-        throw new Error(
-          'HTTP error: ' + response.status
-        );
-      }
-
-      return response.json();
-    })
-    .then(result => {
-      if (!result.success) {
-        throw new Error(
-          result.error ||
-          'Unable to load blog posts.'
-        );
-      }
-
+  loadPublicModule('blog')
+    .then(data => {
       if (requestVersion !== navigationVersion) return;
-      const posts=result.data || [];
+      const posts=data;
       renderBlog(slug==='study-abroad' ? posts.filter(item=>routeContains(item,['Title','Category','Summary','Content'],['study abroad','international education'])) : posts);
     })
     .catch(error => {
@@ -3115,11 +3026,14 @@ function drawBlogCards(posts) {
     card.className =
       'card resource-card';
 
-    if (item.ThumbnailURL) {
+    const blogThumbnailURL=safePortalURL(item.ThumbnailURL);
+    if (blogThumbnailURL) {
       const image =
         document.createElement('img');
 
-      image.src = item.ThumbnailURL;
+      image.src = blogThumbnailURL;
+      image.loading = 'lazy';
+      image.decoding = 'async';
       image.alt =
         item.Title || 'Blog post';
 
@@ -3398,12 +3312,14 @@ function drawAIToolCards(tools) {
       'resource-card-body';
 
 
-    if (item.LogoURL) {
+    const toolLogoURL=safePortalURL(item.LogoURL);
+    if (toolLogoURL) {
       const logo =
         document.createElement('img');
 
-      logo.src =
-        item.LogoURL;
+      logo.src = toolLogoURL;
+      logo.loading = 'lazy';
+      logo.decoding = 'async';
 
       logo.alt =
         item.Name || 'AI Tool';
@@ -3526,12 +3442,12 @@ function drawAIToolCards(tools) {
     }
 
 
-    if (item.ToolURL) {
+    const toolURL=safePortalURL(item.ToolURL);
+    if (toolURL) {
       const link =
         document.createElement('a');
 
-      link.href =
-        item.ToolURL;
+      link.href = toolURL;
 
       link.target =
         '_blank';
@@ -3830,13 +3746,13 @@ function drawAnnouncementCards(announcements) {
     }
 
 
-    if (item.OfficialURL) {
+    const announcementURL=safePortalURL(item.OfficialURL);
+    if (announcementURL) {
 
       const link =
         document.createElement('a');
 
-      link.href =
-        item.OfficialURL;
+      link.href = announcementURL;
 
       link.target =
         '_blank';
@@ -4102,12 +4018,12 @@ function drawOpportunityCards(opportunities) {
       body.appendChild(description);
     }
 
-    if (item.OfficialURL) {
+    const opportunityURL=safePortalURL(item.OfficialURL);
+    if (opportunityURL) {
       const link =
         document.createElement('a');
 
-      link.href =
-        item.OfficialURL;
+      link.href = opportunityURL;
 
       link.target =
         '_blank';
@@ -4380,12 +4296,12 @@ function drawScholarshipCards(scholarships) {
       body.appendChild(description);
     }
 
-    if (item.OfficialURL) {
+    const scholarshipURL=safePortalURL(item.OfficialURL);
+    if (scholarshipURL) {
       const link =
         document.createElement('a');
 
-      link.href =
-        item.OfficialURL;
+      link.href = scholarshipURL;
 
       link.target =
         '_blank';
@@ -4702,13 +4618,13 @@ function drawAdmissionCards(admissions) {
     }
 
 
-    if (item.OfficialURL) {
+    const admissionURL=safePortalURL(item.OfficialURL);
+    if (admissionURL) {
 
       const link =
         document.createElement('a');
 
-      link.href =
-        item.OfficialURL;
+      link.href = admissionURL;
 
       link.target =
         '_blank';
