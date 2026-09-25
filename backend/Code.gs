@@ -804,6 +804,8 @@ function doGet(e) {
 
     if (action === 'mdcatAccountConfig') return jsonResponse_(mdcatAuthConfig_());
 
+    if (action === 'searchIndex') return cachedPublicJsonResponse_('searchIndex',getPublicSearchIndex_,300);
+
     if (action === 'portalData') {
       return cachedPublicJsonResponse_('portalData',getPublicPortalData_,300);
     }
@@ -1191,6 +1193,61 @@ function getPublicEntryTests_() {
     TestDate: item.TestDate,
     OfficialURL: item.OfficialURL
   }));
+}
+
+function searchText_(value, limit) {
+  return String(value == null ? '' : value).replace(/\s+/g,' ').trim().slice(0,limit || 500);
+}
+
+function searchRows_(loader) {
+  try { const rows=loader(); return Array.isArray(rows) ? rows : []; }
+  catch (_) { return []; }
+}
+
+function getPublicSearchIndex_() {
+  const index=[];
+  const add=(kind,title,description,route,row,keywords,level)=>{
+    const cleanTitle=searchText_(title,240);
+    if (!cleanTitle || index.length >= 10000) return;
+    index.push({
+      ID:searchText_(row && row.ID,120),Kind:kind,Title:cleanTitle,
+      Description:searchText_(description,500),Keywords:searchText_(keywords,600),Route:route,
+      MDCATLevel:level || '',SubjectID:searchText_(row && row.SubjectID,120),UnitID:searchText_(row && row.UnitID,120),
+      ChapterID:searchText_(row && row.ChapterID,120),TopicID:searchText_(row && row.TopicID,120),
+      SubjectName:searchText_(row && row.SubjectName,160),UnitName:searchText_(row && row.UnitName,160),ChapterName:searchText_(row && row.ChapterName,160)
+    });
+  };
+  const resourceRoute=category=>({notes:'notes','past papers':'past-papers','study resources':'study-resources'}[String(category||'').trim().toLowerCase()] || 'study');
+  searchRows_(()=>getPublicResources_('')).forEach(row=>add('Resource',row.Title,row.Description,resourceRoute(row.Category),row,[row.Category,row.Subject,row.Level,row.Institution,row.Year,row.ResourceType].join(' ')));
+  searchRows_(getPublicVideos_).forEach(row=>add('Video',row.Title,row.Description,'videos',row,[row.Category,row.Subject,row.Level,row.Platform].join(' ')));
+  // Search only public question text and labels; never index answers or explanations.
+  searchRows_(getPublicMCQs_).forEach(row=>add('MCQ',row.Question,[row.Subject,row.Topic,row.Difficulty].filter(Boolean).join(' • '),'mcqs',row,[row.Subject,row.Topic,row.Level,row.EntryTest,row.Difficulty].join(' ')));
+  searchRows_(getPublicAdmissions_).forEach(row=>add('Admission',row.Program || row.Institution,row.Description,'admissions',row,[row.Institution,row.DegreeLevel,row.AdmissionType,row.Eligibility,row.EntryTest].join(' ')));
+  searchRows_(getPublicScholarships_).forEach(row=>add('Scholarship',row.Name,row.Description,'scholarships',row,[row.Provider,row.Type,row.Country,row.Eligibility,row.Benefits].join(' ')));
+  searchRows_(getPublicOpportunities_).forEach(row=>add('Opportunity',row.Title,row.Description,'career',row,[row.Organization,row.Type,row.Location,row.Eligibility].join(' ')));
+  searchRows_(getPublicAnnouncements_).forEach(row=>add('Announcement',row.Title,row.Summary || row.Content,'updates',row,[row.Category,row.Priority].join(' ')));
+  searchRows_(getPublicAITools_).forEach(row=>add('AI Tool',row.Name,row.Description,'ai-tools',row,[row.Category,row.PricingType,row.BestFor].join(' ')));
+  searchRows_(getPublicIslamicContent_).forEach(row=>add('Islamic Content',row.Title,row.Description,String(row.Type||'').toLowerCase()==='hadith'?'hadith':'islamic',row,[row.Type,row.Reference,row.EnglishTranslation,row.UrduTranslation].join(' ')));
+  searchRows_(getPublicBlog_).forEach(row=>add('Blog',row.Title,row.Summary || row.Content,'blog',row,[row.Category,row.Author].join(' ')));
+  searchRows_(getPublicEntryTests_).forEach(row=>add('Entry Test',row.Name,row.Description,row.Slug || 'entry-tests',row,[row.Organization,row.Eligibility].join(' ')));
+
+  const subjects=searchRows_(getPublicMDCATSubjects_);
+  const units=searchRows_(()=>getPublicMDCATUnits_(''));
+  const chapters=searchRows_(()=>getPublicMDCATChapters_('',''));
+  const topics=searchRows_(()=>getPublicMDCATTopics_('','',''));
+  const subjectNames=new Map(subjects.map(row=>[String(row.ID),row.Name]));
+  const unitNames=new Map(units.map(row=>[String(row.ID),row.Name]));
+  const chapterNames=new Map(chapters.map(row=>[String(row.ID),row.Name]));
+  const names=row=>Object.assign({},row,{SubjectName:subjectNames.get(String(row.SubjectID))||'',UnitName:unitNames.get(String(row.UnitID))||'',ChapterName:chapterNames.get(String(row.ChapterID))||''});
+  subjects.forEach(row=>add('MDCAT Subject',row.Name,row.Description,'mdcat',Object.assign({},row,{SubjectID:row.ID,SubjectName:row.Name}),'MDCAT 2027','subject'));
+  units.forEach(original=>{const row=names(original);add('MDCAT Unit',row.Name,row.Description,'mdcat',row,[row.SubjectName,'MDCAT 2027'].join(' '),'unit');});
+  chapters.forEach(original=>{const row=names(original);add('MDCAT Chapter',row.Name,row.Description,'mdcat',row,[row.SubjectName,row.UnitName,'MDCAT 2027'].join(' '),'chapter');});
+  topics.forEach(original=>{const row=names(original);add('MDCAT Topic',row.Name,row.Description,'mdcat',row,[row.SubjectName,row.UnitName,row.ChapterName,'MDCAT 2027'].join(' '),'topic');});
+  searchRows_(()=>getPublicMDCATQuestions_('','','','')).forEach(original=>{const row=names(original);add('MDCAT Question',row.Question,[row.SubjectName,row.UnitName,row.ChapterName,row.Difficulty].filter(Boolean).join(' • '),'mdcat',row,[row.Source,row.QuestionType,'MDCAT 2027'].join(' '),'question');});
+  searchRows_(getPublicMDCATTests_).forEach(row=>add('MDCAT Test',row.Title,row.Description,'mdcat',row,[row.TestType,'MDCAT 2027'].join(' '),'test'));
+  searchRows_(getPublicMDCATDailyPractice_).forEach(row=>add('MDCAT Daily Practice',row.Title,row.Description,'mdcat',row,[row.Difficulty,'MDCAT 2027'].join(' '),'daily'));
+  searchRows_(getPublicMDCATUpdates_).forEach(row=>add('MDCAT Update',row.Title,row.Summary || row.Content,'mdcat',row,[row.Category,'MDCAT 2027'].join(' '),'update'));
+  return index;
 }
 
 // Authenticated MDCAT scoring. All helpers end in _ to block google.script.run calls.

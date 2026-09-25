@@ -57,6 +57,8 @@ const PORTAL_BOOTSTRAP_DATA = {
     let currentIslamicContent = [];
     let currentBlogPosts = [];
     let currentEntryTests = [];
+    let portalSearchIndex = null;
+    let portalSearchPromise = null;
     let navigationVersion = 0;
 
     let mcqScore = 0;
@@ -87,6 +89,10 @@ function readPortalCache() {
 function loadPortal() {
   // Render immediately from a safe same-origin snapshot; refresh from Sheets in the background.
   renderPortal(readPortalCache() || PORTAL_BOOTSTRAP_DATA);
+  const searchInput=document.getElementById('searchInput');
+  searchInput.addEventListener('input',()=>searchInput.setCustomValidity(''));
+  searchInput.addEventListener('focus',()=>loadPortalSearchIndex().catch(()=>{}));
+  searchInput.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();portalSearch();}});
   fetch(API_BASE_URL + '?action=portalData')
     .then(response => {
       if (!response.ok) {
@@ -4641,29 +4647,143 @@ function showAdmissionsError(error) {
 
   console.error(error);
 }
-    function portalSearch() {
+const PORTAL_SEARCH_CACHE_KEY='icp-search-index-v1';
+const PORTAL_SEARCH_ROUTES=new Set(['study','notes','past-papers','study-resources','videos','mcqs','admissions','scholarships','career','updates','ai-tools','islamic','hadith','blog','entry-tests','mdcat','nums','etea','ecat','nust-net','other-tests']);
 
-      const query =
-        document
-          .getElementById(
-            'searchInput'
-          )
-          .value
-          .trim();
+function readPortalSearchCache() {
+  try {
+    const cached=JSON.parse(localStorage.getItem(PORTAL_SEARCH_CACHE_KEY));
+    if (!cached || Date.now()-Number(cached.savedAt)>30*60*1000 || !Array.isArray(cached.data)) return null;
+    return cached.data.filter(isValidSearchItem);
+  } catch (_) { return null; }
+}
 
-      if (!query) {
-        alert(
-          'Please enter something to search.'
-        );
+function isValidSearchItem(item) {
+  return item && typeof item==='object' && !Array.isArray(item) && typeof item.Title==='string' && item.Title.trim() &&
+    typeof item.Kind==='string' && PORTAL_SEARCH_ROUTES.has(String(item.Route||''));
+}
 
-        return;
-      }
+async function loadPortalSearchIndex(force=false) {
+  if (!force && portalSearchIndex) return portalSearchIndex;
+  if (!force) {
+    const cached=readPortalSearchCache();
+    if (cached && cached.length) { portalSearchIndex=cached; return cached; }
+  }
+  if (portalSearchPromise) return portalSearchPromise;
+  portalSearchPromise=(async()=>{
+    const controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),60000);
+    try {
+      const response=await fetch(API_BASE_URL+'?action=searchIndex',{signal:controller.signal});
+      if (!response.ok) throw new Error('HTTP '+response.status);
+      const result=await response.json();
+      if (!result || result.success!==true || !Array.isArray(result.data)) throw new Error('Invalid search response.');
+      const rows=result.data.filter(isValidSearchItem);
+      portalSearchIndex=rows;
+      try {
+        const value=JSON.stringify({savedAt:Date.now(),data:rows});
+        if (value.length<2000000) localStorage.setItem(PORTAL_SEARCH_CACHE_KEY,value);
+      } catch (_) {}
+      return rows;
+    } finally { clearTimeout(timeout); }
+  })();
+  try { return await portalSearchPromise; }
+  finally { portalSearchPromise=null; }
+}
 
-      alert(
-        'Search for: ' + query
-      );
+function normalizePortalSearch(value) {
+  return String(value||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/g,' ').trim();
+}
 
-    }
+function rankPortalSearch(items,query) {
+  const normalized=normalizePortalSearch(query);
+  const terms=[...new Set(normalized.split(/\s+/).filter(Boolean))];
+  return items.map(item=>{
+    const title=normalizePortalSearch(item.Title);
+    const description=normalizePortalSearch(item.Description);
+    const keywords=normalizePortalSearch(item.Keywords);
+    const kind=normalizePortalSearch(item.Kind);
+    const haystack=[title,description,keywords,kind].join(' ');
+    if (!terms.every(term=>haystack.includes(term))) return null;
+    let score=terms.reduce((total,term)=>total+(title.includes(term)?30:0)+(keywords.includes(term)?12:0)+(description.includes(term)?6:0)+(kind.includes(term)?4:0),0);
+    if (title===normalized) score+=200;
+    else if (title.startsWith(normalized)) score+=100;
+    else if (title.includes(normalized)) score+=50;
+    return {item,score};
+  }).filter(Boolean).sort((a,b)=>b.score-a.score || a.item.Title.localeCompare(b.item.Title)).map(row=>row.item);
+}
+
+function showPortalSearchResults(query,items) {
+  const content=document.getElementById('dynamicPageContent');
+  content.replaceChildren();
+  const total=items.length;
+  const summary=document.createElement('p');summary.className='mdcat-wide';
+  summary.textContent=total ? total+' result'+(total===1?'':'s')+' found.' : 'No published content matched “'+query+'”.';
+  content.appendChild(summary);
+  items.slice(0,50).forEach(item=>{
+    const card=document.createElement('article');card.className='card resource-card';
+    const badges=document.createElement('div');badges.className='resource-badges';
+    const badge=document.createElement('span');badge.className='resource-badge';badge.textContent=item.Kind;badges.appendChild(badge);
+    const title=document.createElement('h4');title.textContent=item.Title;
+    const description=document.createElement('p');description.textContent=item.Description || item.Keywords || 'Open this portal result.';
+    const button=document.createElement('button');button.type='button';button.className='resource-button';button.textContent='Open';
+    button.setAttribute('aria-label','Open '+item.Title);button.onclick=()=>openPortalSearchResult(item);
+    card.append(badges,title,description,button);content.appendChild(card);
+  });
+  if (total>50) {
+    const limit=document.createElement('p');limit.className='mdcat-wide';limit.textContent='Showing the 50 most relevant results. Add another word to narrow your search.';content.appendChild(limit);
+  }
+}
+
+function openPortalSearchResult(item) {
+  if (item.Route!=='mdcat') {
+    handleNavigation({Slug:item.Route,Label:item.Kind});
+    return;
+  }
+  openMDCATHub();
+  const subject={ID:item.SubjectID,Name:item.SubjectName || 'MDCAT'};
+  const unit={ID:item.UnitID,SubjectID:item.SubjectID,Name:item.UnitName || 'Unit'};
+  const chapter={ID:item.ChapterID,UnitID:item.UnitID,SubjectID:item.SubjectID,Name:item.ChapterName || 'Chapter'};
+  if (item.MDCATLevel==='subject') return openMDCATUnits(subject);
+  if (item.MDCATLevel==='unit' && item.SubjectID) return openMDCATChapters(subject,{ID:item.ID,SubjectID:item.SubjectID,Name:item.Title});
+  if (item.MDCATLevel==='chapter' && item.UnitID) return openMDCATTopics(subject,unit,{ID:item.ID,UnitID:item.UnitID,SubjectID:item.SubjectID,Name:item.Title});
+  if (['topic','question'].includes(item.MDCATLevel)) {
+    const scope={SubjectID:item.SubjectID,UnitID:item.UnitID,ChapterID:item.ChapterID,TopicID:item.TopicID || (item.MDCATLevel==='topic'?item.ID:'')};
+    return openMDCATPractice(Object.fromEntries(Object.entries(scope).filter(([,value])=>value)),item.Title);
+  }
+  if (item.MDCATLevel==='test') return openMDCATCollection('tests');
+  if (item.MDCATLevel==='daily') return openMDCATCollection('daily');
+  if (item.MDCATLevel==='update') return openMDCATCollection('updates');
+}
+
+async function portalSearch() {
+  const input=document.getElementById('searchInput');
+  const query=input.value.trim().slice(0,80);
+  if (query.length<2) {
+    input.setCustomValidity('Enter at least two characters to search.');input.reportValidity();input.focus();return;
+  }
+  input.setCustomValidity('');
+  navigationVersion+=1;const requestVersion=navigationVersion;closeMDCATHub();
+  document.getElementById('homeHero').style.display='none';document.getElementById('homeExplore').style.display='none';
+  document.getElementById('dynamicPage').style.display='block';document.getElementById('dynamicPageTitle').textContent='Search results';
+  document.getElementById('dynamicPageDescription').textContent='Searching ICP YOUTH CIRCLE for “'+query+'”.';
+  document.getElementById('resourceFilters').style.display='none';
+  const content=document.getElementById('dynamicPageContent');content.innerHTML='<p>Searching published portal content…</p>';
+  window.location.hash='search='+encodeURIComponent(query);window.scrollTo({top:0,behavior:'smooth'});
+  try {
+    const index=await loadPortalSearchIndex();
+    if (requestVersion!==navigationVersion) return;
+    const results=rankPortalSearch(index,query);
+    document.getElementById('dynamicPageDescription').textContent='Results for “'+query+'”.';
+    showPortalSearchResults(query,results);
+  } catch (error) {
+    if (requestVersion!==navigationVersion) return;
+    content.replaceChildren();
+    const message=document.createElement('p');message.textContent='Search is temporarily unavailable. Please try again.';
+    const retry=document.createElement('button');retry.type='button';retry.className='resource-button';retry.textContent='Retry search';retry.onclick=()=>{portalSearchIndex=null;portalSearch();};
+    content.append(message,retry);console.error('Portal search error:',error);
+  }
+}
 
 
     function showError(error) {
