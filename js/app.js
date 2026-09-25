@@ -463,7 +463,7 @@ function renderNavigation(items) {
   accountButton.id = 'portalAccountButton';
   accountButton.type = 'button';
   accountButton.className = 'nav-account-button';
-  accountButton.textContent = 'Student sign in';
+  accountButton.textContent = 'Sign in';
   accountButton.onclick = () => {
     closeMobileNavigation();
     openPortalAccount();
@@ -473,16 +473,16 @@ function renderNavigation(items) {
 
 function setPortalAccountButton(signedIn) {
   const button = document.getElementById('portalAccountButton');
-  if (button) button.textContent = signedIn ? 'My account' : 'Student sign in';
+  if (button) button.textContent = signedIn ? 'My account' : 'Sign in';
 }
 
-function openPortalAccount() {
+function openPortalAccount(pending) {
   document.getElementById('homeHero').style.display = 'none';
   document.getElementById('homeExplore').style.display = 'none';
   document.getElementById('dynamicPage').style.display = 'none';
   document.getElementById('mdcatHub').hidden = false;
-  window.location.hash = 'student-account';
-  openMDCATAccount();
+  window.location.hash = 'account';
+  openUserAccount(pending);
 }
 
 function setMobileNavigationOpen(open) {

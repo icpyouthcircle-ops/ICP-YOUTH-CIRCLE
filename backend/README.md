@@ -78,12 +78,12 @@ Open this URL:
 
 It should return JSON with `"success":true`, `"enabled":true`, and the four Firebase web fields. It must not show the portal HTML page.
 
-Then open the portal, choose **Entry Tests > MDCAT 2027 > Student account**, and test:
+Then open the portal, choose **Sign in** from the main navigation, and test:
 
 1. Continue with Google.
 2. Open a test, daily set, or topic and choose **Scored practice with account**.
 3. Submit an answer.
-4. Confirm the result appears in **My saved results** and the counts appear in **My scored progress**.
+4. Open **My tests**, then confirm the result appears in **My test results** and the counts appear in **My test progress**.
 5. Confirm guest question-bank practice still works without signing in.
 
 ## Operational limits

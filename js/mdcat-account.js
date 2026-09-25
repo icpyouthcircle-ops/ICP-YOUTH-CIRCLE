@@ -66,8 +66,8 @@ function mdcatAccountError(error,grid,retry) {
   if(retry) grid.appendChild(mdcatButton('Retry',retry));
 }
 
-async function openMDCATAccount(pending) {
-  const {grid}=mdcatStudyPage('Student account','Sign in to save graded attempts and progress to your account. Guest activity and revision remain browser-only.');
+async function openUserAccount(pending) {
+  const {grid}=mdcatStudyPage('My account','Use one Google account for your portal activity, resources, requests and every supported test.');
   const view=mdcatGradeView;
   document.getElementById('mdcatStatus').textContent='Checking sign-in availability…';
   try {
@@ -82,20 +82,32 @@ async function openMDCATAccount(pending) {
         signIn.disabled=true;
         try {
           await identity.sdk.signInWithPopup(identity.auth,new identity.sdk.GoogleAuthProvider());
-          if(view===mdcatGradeView) openMDCATAccount(pending);
+          if(view===mdcatGradeView) openUserAccount(pending);
         } catch(error) {if(view===mdcatGradeView) {mdcatAccountError(error,grid);signIn.disabled=false;}}
       });
       panel.appendChild(signIn);grid.appendChild(panel);return;
     }
-    document.getElementById('mdcatHubTitle').textContent='Student dashboard';
-    document.getElementById('mdcatHubDescription').textContent='Your profile, saved resources and MDCAT learning records.';
+    document.getElementById('mdcatHubTitle').textContent='My dashboard';
+    document.getElementById('mdcatHubDescription').textContent='One account for your saved resources, requests and test activity across ICP YOUTH CIRCLE.';
     const panel=mdcatElement('div',null,'mdcat-wide student-dashboard-card');
-    panel.appendChild(mdcatElement('h3',identity.auth.currentUser.displayName || 'Student profile'));
-    panel.appendChild(mdcatElement('p','Signed in as '+(identity.auth.currentUser.email || 'student')));
-    panel.append(mdcatButton('My bookmarks',()=>openStudentBookmarks()),mdcatButton('My requests',()=>openStudentRequests()),mdcatButton('My saved results',()=>openMDCATSavedResults()),mdcatButton('My scored progress',()=>openMDCATScoredProgress()),mdcatButton('Sign out',async()=>{await identity.sdk.signOut(identity.auth);if (typeof setPortalAccountButton === 'function') setPortalAccountButton(false);openMDCATAccount();}));
+    panel.appendChild(mdcatElement('h3',identity.auth.currentUser.displayName || 'My profile'));
+    panel.appendChild(mdcatElement('p','Signed in as '+(identity.auth.currentUser.email || 'portal user')));
+    panel.append(mdcatButton('My bookmarks',()=>openStudentBookmarks()),mdcatButton('My requests',()=>openStudentRequests()),mdcatButton('My tests',()=>openUserTests()),mdcatButton('Sign out',async()=>{await identity.sdk.signOut(identity.auth);if (typeof setPortalAccountButton === 'function') setPortalAccountButton(false);openUserAccount();}));
     if(pending) panel.appendChild(mdcatButton('Continue to scored practice',()=>openMDCATGraded(pending.mode,pending.contextId)));
     grid.appendChild(panel);
-  } catch(error) {if(view===mdcatGradeView) mdcatAccountError(error,grid,()=>openMDCATAccount(pending));}
+  } catch(error) {if(view===mdcatGradeView) mdcatAccountError(error,grid,()=>openUserAccount(pending));}
+}
+
+// Retained for existing scored-test links while the visible portal uses one universal account.
+function openMDCATAccount(pending) { return openUserAccount(pending); }
+
+function openUserTests() {
+  const {grid}=mdcatStudyPage('My tests','Results and progress from every supported test use this same account.');
+  const card=mdcatElement('article',null,'card mdcat-study-card');
+  card.appendChild(mdcatElement('h3','MDCAT'));
+  card.appendChild(mdcatElement('p','View your saved MDCAT attempts and subject progress. Other test categories will appear here when their online tests are published.'));
+  card.append(mdcatButton('My test results',()=>openMDCATSavedResults()),mdcatButton('My test progress',()=>openMDCATScoredProgress()));
+  grid.appendChild(card);
 }
 
 function openStudentBookmarks() {
@@ -153,7 +165,7 @@ async function openStudentRequests() {
 }
 
 async function openMDCATGraded(mode,contextId) {
-  if(!mdcatIdentity || !mdcatIdentity.auth.currentUser) return openMDCATAccount({mode,contextId});
+  if(!mdcatIdentity || !mdcatIdentity.auth.currentUser) return openPortalAccount({mode,contextId});
   const {grid}=mdcatStudyPage('Scored practice','Your score is calculated on the server and saved to your signed-in account.');
   const view=mdcatGradeView;
   const panel=mdcatElement('div',null,'mdcat-wide');
@@ -238,7 +250,7 @@ function mdcatRenderScore(result,grid) {
     mdcatElement('p',result.correct+' correct · '+result.wrong+' incorrect · '+result.unanswered+' unanswered'),
     mdcatElement('p','Time: '+result.seconds+' seconds. Saved to your signed-in account.'));
   if(result.passed!==null) summary.appendChild(mdcatElement('p',result.passed ? 'Passed the configured practice threshold.' : 'Below the configured practice threshold.'));
-  summary.appendChild(mdcatButton('My saved results',()=>openMDCATSavedResults()));grid.appendChild(summary);
+  summary.appendChild(mdcatButton('My test results',()=>openMDCATSavedResults()));grid.appendChild(summary);
   for(const answer of result.answers || []) {
     const card=mdcatElement('article',null,'card mdcat-study-card');
     card.append(mdcatElement('h3',answer.question),mdcatElement('p','Your answer: '+(answer.selectedOption || 'Unanswered')),
@@ -248,7 +260,7 @@ function mdcatRenderScore(result,grid) {
 }
 
 async function openMDCATSavedResults() {
-  const {grid}=mdcatStudyPage('My saved results','Only your signed-in account’s attempts are shown. Open attempts retain their original deadline.');
+  const {grid}=mdcatStudyPage('My test results','Your MDCAT attempts are shown here. All supported tests will use this same signed-in account. Open attempts retain their original deadline.');
   const view=mdcatGradeView;
   try {
     const rows=await mdcatPrivateRequest('mdcatMyResults');
@@ -269,7 +281,7 @@ async function openMDCATSavedResults() {
 }
 
 async function openMDCATScoredProgress() {
-  const {grid}=mdcatStudyPage('My scored progress','Accuracy is based on answered questions in your submitted attempts. It is not a prediction of exam performance.');
+  const {grid}=mdcatStudyPage('My test progress','MDCAT accuracy is based on answered questions in your submitted attempts. It is not a prediction of exam performance.');
   const view=mdcatGradeView;
   try {
     const rows=await mdcatPrivateRequest('mdcatMyProgress');
