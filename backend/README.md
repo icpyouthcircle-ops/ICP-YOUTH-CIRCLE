@@ -7,6 +7,29 @@ This update adds Google sign-in, server-calculated scores, saved attempts, answe
 - `Code.gs` is the complete Apps Script backend. Replace the entire current `Code.gs` with this file rather than pasting only the new section.
 - The GitHub frontend is already wired to the new `mdcatAccountConfig` GET route and authenticated POST actions.
 
+## Universal tests and notifications setup
+
+After replacing `Code.gs`, temporarily add this wrapper at the bottom:
+
+```javascript
+function runUniversalPortalSetup() {
+  return setupUniversalTestsAndNotifications_();
+}
+```
+
+Save, select `runUniversalPortalSetup`, and run it once. It safely creates and validates:
+
+- `Test_Catalog` — tests shown under **My tests**
+- `Notifications` — updates shown to signed-in users
+
+It also adds MDCAT to the test catalog without changing MDCAT questions, attempts, or results. Delete the temporary wrapper and save before deploying the web app.
+
+Notification rows use these exact columns:
+
+`ID | Title | Message | Audience | TestID | LinkURL | PublishAt | ExpiresAt | DisplayOrder | Status | CreatedAt | UpdatedAt`
+
+Use `Registered Users` for `Audience` and `Active` for `Status`. `LinkURL`, `PublishAt`, `ExpiresAt`, and `TestID` may be left empty.
+
 ## 1. Back up the current Apps Script
 
 Open the Apps Script project, copy the current `Code.gs` into a local backup, and keep the spreadsheet unchanged.
@@ -91,7 +114,7 @@ Then open the portal, choose **Sign in** from the main navigation, and test:
 - A student can start at most 20 scored attempts per day.
 - An attempt can contain at most 200 questions.
 - Answers submitted after the deadline plus the 30-second network allowance are rejected.
-- Reloading signs the student out on that device; submitted results remain saved.
+- Sign-in survives page refreshes during the browser session; submitted results remain saved after sign-out.
 - Never expose spreadsheet editing access to students.
 
 ## Performance behavior

@@ -26,6 +26,8 @@ const CONFIG = {
     ADMINS: 'Admins',
     ACTIVITY_LOG: 'Activity_Log',
     SETTINGS: 'Settings',
+    TEST_CATALOG: 'Test_Catalog',
+    NOTIFICATIONS: 'Notifications',
     MDCAT_SUBJECTS: 'MDCAT_Subjects',
     MDCAT_UNITS: 'MDCAT_Units',
     MDCAT_CHAPTERS: 'MDCAT_Chapters',
@@ -851,6 +853,9 @@ function doGet(e) {
     if (action === 'entryTests') {
       return cachedPublicJsonResponse_('entryTests',getPublicEntryTests_,300);
     }
+    if (action === 'testCatalog') {
+      return cachedPublicJsonResponse_('testCatalog',getPublicTestCatalog_,300);
+    }
     if (action === 'resources') {
       const category =
         e.parameter.category || '';
@@ -1434,11 +1439,56 @@ function publicHelpRequest_(body) {
   });
 }
 
+function getOptionalSheetData_(sheetName) {
+  const sheet = getSpreadsheet_().getSheetByName(sheetName);
+  if (!sheet) return [];
+  return getSheetData_(sheetName);
+}
+
+function getPublicTestCatalog_() {
+  const sheet = getSpreadsheet_().getSheetByName(CONFIG.SHEETS.TEST_CATALOG);
+  const rows = sheet ? getActiveSheetData_(CONFIG.SHEETS.TEST_CATALOG) : [{
+    ID:'TST-MDCAT',Name:'MDCAT',Slug:'mdcat',Description:'Medical and Dental College Admission Test preparation and scored practice.',
+    TestType:'Entry Test',Route:'mdcat',Engine:'MDCAT',DisplayOrder:1
+  }];
+  return rows.map(row=>({
+    ID:String(row.ID || '').slice(0,120),Name:String(row.Name || row.Title || '').slice(0,200),
+    Slug:String(row.Slug || '').slice(0,120),Description:String(row.Description || '').slice(0,1000),
+    TestType:String(row.TestType || row.Category || '').slice(0,120),Route:String(row.Route || row.Slug || '').slice(0,120),
+    Engine:String(row.Engine || '').slice(0,80),DisplayOrder:Number(row.DisplayOrder || 0)
+  })).filter(row=>row.ID && row.Name).sort((a,b)=>a.DisplayOrder-b.DisplayOrder || a.Name.localeCompare(b.Name));
+}
+
 function studentOwnedRows_(sheetName,email) {
   return getSheetData_(sheetName).filter(row=>{
     const owner=String(row.Email || row.ContactEmail || row.SubmitterEmail || row.RequesterEmail || '').trim().toLowerCase();
     return owner===email;
   }).sort((a,b)=>new Date(b.UpdatedAt || b.SubmittedAt || b.CreatedAt || 0).getTime()-new Date(a.UpdatedAt || a.SubmittedAt || a.CreatedAt || 0).getTime()).slice(0,100);
+}
+
+function studentNotifications_() {
+  const now=Date.now();
+  const timestamp=value=>{
+    if (!value) return 0;
+    const parsed=new Date(value).getTime();
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+  return getOptionalSheetData_(CONFIG.SHEETS.NOTIFICATIONS).filter(row=>{
+    if (String(row.Status == null ? 'Active' : row.Status).trim().toLowerCase()!=='active') return false;
+    const audience=String(row.Audience || 'All').trim().toLowerCase();
+    if (!['all','everyone','registered users','students'].includes(audience)) return false;
+    const publishAt=timestamp(row.PublishAt || row.PublishDate);
+    const expiresAt=timestamp(row.ExpiresAt || row.ExpiryDate);
+    return (!publishAt || publishAt<=now) && (!expiresAt || expiresAt>=now);
+  }).sort((a,b)=>{
+    const order=Number(a.DisplayOrder || 0)-Number(b.DisplayOrder || 0);
+    return order || timestamp(b.PublishAt || b.CreatedAt)-timestamp(a.PublishAt || a.CreatedAt);
+  }).slice(0,50).map(row=>({
+    ID:String(row.ID || '').slice(0,120),Title:String(row.Title || '').replace(/\s+/g,' ').trim().slice(0,240),
+    Message:String(row.Message || row.Description || '').trim().slice(0,2000),
+    TestID:String(row.TestID || '').slice(0,120),LinkURL:String(row.LinkURL || row.URL || '').trim().slice(0,1000),
+    PublishAt:row.PublishAt || row.PublishDate || row.CreatedAt || ''
+  })).filter(row=>row.ID && row.Title);
 }
 
 function studentDashboard_(user) {
@@ -1455,7 +1505,7 @@ function studentDashboard_(user) {
     SubmittedAt:row.SubmittedAt || row.CreatedAt || '',UpdatedAt:row.UpdatedAt || '',
     Response:clean(row.AdminResponse || row.Response || row.Resolution,1000)
   }));
-  return {email:user.email,submissions:submissions,helpRequests:helpRequests};
+  return {email:user.email,submissions:submissions,helpRequests:helpRequests,notifications:studentNotifications_()};
 }
 
 const ADMIN_TABLES_ = [
@@ -1466,6 +1516,7 @@ const ADMIN_TABLES_ = [
   ['AI_TOOLS','AI tools','AIT'],['ISLAMIC_CONTENT','Islamic content','ISL'],['BLOG','Blog','BLOG'],
   ['NAVIGATION','Navigation','NAV'],['HOMEPAGE','Homepage','HOME'],['SOCIAL_LINKS','Social links','SOC'],
   ['SETTINGS','Settings','SET'],['SUBMISSIONS','Resource submissions','SUBM'],['HELP_DESK','Help desk','HELP'],
+  ['TEST_CATALOG','Test catalog','TST'],['NOTIFICATIONS','Notifications','NTF'],
   ['MDCAT_SUBJECTS','MDCAT subjects','MDS'],['MDCAT_UNITS','MDCAT units','MDU'],
   ['MDCAT_CHAPTERS','MDCAT chapters','MDC'],['MDCAT_TOPICS','MDCAT topics','MDT'],
   ['MDCAT_QUESTION_BANK','MDCAT question bank','MDQ'],['MDCAT_TESTS','MDCAT tests','MDTEST'],
@@ -1501,13 +1552,17 @@ function adminAuthenticate_(token) {
 }
 
 function adminManifest_(admin) {
+  const spreadsheet=getSpreadsheet_();
+  const optional={TEST_CATALOG:true,NOTIFICATIONS:true};
   return {
     email:admin.email,
     role:admin.role,
     tables:ADMIN_TABLES_.map(item=>{
-      const sheet=getSheet_(CONFIG.SHEETS[item.key]);
+      const sheet=spreadsheet.getSheetByName(CONFIG.SHEETS[item.key]);
+      if (!sheet && optional[item.key]) return null;
+      if (!sheet) getSheet_(CONFIG.SHEETS[item.key]);
       return {key:item.key,label:item.label,headers:adminHeaders_(CONFIG.SHEETS[item.key]),rowCount:Math.max(0,sheet.getLastRow()-1)};
-    })
+    }).filter(Boolean)
   };
 }
 
@@ -1656,7 +1711,7 @@ function adminUploadPdf_(body,admin) {
 function adminClearPublicCache_() {
   try {
     const cache=CacheService.getScriptCache();
-    cache.removeAll(['icp-public-v1-portalData','icp-public-v1-portalBundle','icp-public-v1-searchIndex','icp-public-v1-mcqs','icp-public-v1-videos','icp-public-v1-admissions','icp-public-v1-scholarships','icp-public-v1-opportunities','icp-public-v1-announcements','icp-public-v1-aiTools','icp-public-v1-islamicContent','icp-public-v1-blog','icp-public-v1-entryTests','icp-public-v1-mdcatSubjects','icp-public-v1-mdcatTests','icp-public-v1-mdcatDailyPractice','icp-public-v1-mdcatUpdates']);
+    cache.removeAll(['icp-public-v1-portalData','icp-public-v1-portalBundle','icp-public-v1-searchIndex','icp-public-v1-mcqs','icp-public-v1-videos','icp-public-v1-admissions','icp-public-v1-scholarships','icp-public-v1-opportunities','icp-public-v1-announcements','icp-public-v1-aiTools','icp-public-v1-islamicContent','icp-public-v1-blog','icp-public-v1-entryTests','icp-public-v1-testCatalog','icp-public-v1-mdcatSubjects','icp-public-v1-mdcatTests','icp-public-v1-mdcatDailyPractice','icp-public-v1-mdcatUpdates']);
   } catch (_) {}
 }
 
@@ -1714,6 +1769,34 @@ function doPost(e) {
       code:error.mdcatCode || 'SERVICE_ERROR', message:error.mdcatCode ? error.message : 'Unable to complete the request. Please retry.'
     }})).setMimeType(ContentService.MimeType.JSON);
   }
+}
+
+// Run once after deploying this version. It preserves existing sheets and records.
+function setupUniversalTestsAndNotifications_() {
+  const spreadsheet=getSpreadsheet_();
+  const definitions=[
+    [CONFIG.SHEETS.TEST_CATALOG,['ID','Name','Slug','Description','TestType','Route','Engine','DisplayOrder','Status','CreatedAt','UpdatedAt']],
+    [CONFIG.SHEETS.NOTIFICATIONS,['ID','Title','Message','Audience','TestID','LinkURL','PublishAt','ExpiresAt','DisplayOrder','Status','CreatedAt','UpdatedAt']]
+  ];
+  definitions.forEach(([name,headers])=>{
+    let sheet=spreadsheet.getSheetByName(name);
+    if (!sheet) sheet=spreadsheet.insertSheet(name);
+    if (sheet.getLastRow()===0) sheet.getRange(1,1,1,headers.length).setValues([headers]);
+    const actual=(sheet.getDataRange().getValues()[0] || []).map(value=>String(value).replace(/\uFEFF/g,'').trim()).filter(Boolean);
+    if (actual.length!==headers.length || headers.some((header,index)=>actual[index]!==header)) {
+      mdcatError_('SETUP_REQUIRED',name+' must use these headers in this order: '+headers.join(', '));
+    }
+  });
+  const catalog=getSheetData_(CONFIG.SHEETS.TEST_CATALOG);
+  if (!catalog.some(row=>String(row.Slug).trim().toLowerCase()==='mdcat')) {
+    const now=new Date();
+    getSheet_(CONFIG.SHEETS.TEST_CATALOG).appendRow([
+      'TST-MDCAT','MDCAT','mdcat','Medical and Dental College Admission Test preparation and scored practice.',
+      'Entry Test','mdcat','MDCAT',1,'Active',now,now
+    ]);
+  }
+  adminClearPublicCache_();
+  return 'Test_Catalog and Notifications are ready. MDCAT is connected to the universal test catalog.';
 }
 
 // Run once from the Apps Script editor. Never called by the public website.

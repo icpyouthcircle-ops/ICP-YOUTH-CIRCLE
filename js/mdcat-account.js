@@ -9,6 +9,7 @@ let mdcatIdentity = null;
 let mdcatIdentityLoading = null;
 let mdcatGradeTimer = null;
 let mdcatGradeView = 0;
+const PORTAL_NOTIFICATION_SEEN_KEY = 'icp-notifications-seen-v1';
 
 function resetMDCATGrading() {
   clearInterval(mdcatGradeTimer);
@@ -97,7 +98,7 @@ async function openUserAccount(pending) {
     const panel=mdcatElement('div',null,'mdcat-wide student-dashboard-card');
     panel.appendChild(mdcatElement('h3',identity.auth.currentUser.displayName || 'My profile'));
     panel.appendChild(mdcatElement('p','Signed in as '+(identity.auth.currentUser.email || 'portal user')));
-    panel.append(mdcatButton('My bookmarks',()=>openStudentBookmarks()),mdcatButton('My requests',()=>openStudentRequests()),mdcatButton('My tests',()=>openUserTests()),mdcatButton('Sign out',async()=>{await identity.sdk.signOut(identity.auth);if (typeof setPortalAccountButton === 'function') setPortalAccountButton(false);openUserAccount();}));
+    panel.append(mdcatButton('My bookmarks',()=>openStudentBookmarks()),mdcatButton('My requests',()=>openStudentRequests()),mdcatButton('My tests',()=>openUserTests()),mdcatButton('Notifications',()=>openUserNotifications()),mdcatButton('Sign out',async()=>{await identity.sdk.signOut(identity.auth);if (typeof setPortalAccountButton === 'function') setPortalAccountButton(false);openUserAccount();}));
     if(pending) panel.appendChild(mdcatButton('Continue to scored practice',()=>openMDCATGraded(pending.mode,pending.contextId)));
     grid.appendChild(panel);
   } catch(error) {if(view===mdcatGradeView) mdcatAccountError(error,grid,()=>openUserAccount(pending));}
@@ -106,14 +107,76 @@ async function openUserAccount(pending) {
 // Retained for existing scored-test links while the visible portal uses one universal account.
 function openMDCATAccount(pending) { return openUserAccount(pending); }
 
-function openUserTests() {
-  const {grid}=mdcatStudyPage('My tests','Results and progress from every supported test use this same account.');
+function renderUserTestCatalog(grid,rows) {
+  if(!rows.length){grid.appendChild(mdcatElement('p','No tests are published yet.','mdcat-wide'));return;}
+  rows.forEach(row=>{
+      const card=mdcatElement('article',null,'card mdcat-study-card');
+      card.appendChild(mdcatElement('h3',row.Name));
+      if(row.TestType)card.appendChild(mdcatElement('p',row.TestType));
+      if(row.Description)card.appendChild(mdcatElement('p',row.Description));
+      const isMDCAT=String(row.Engine || row.Slug).toLowerCase()==='mdcat';
+      if(isMDCAT){
+        card.append(mdcatButton('Open MDCAT',()=>openMDCATHub()),mdcatButton('My test results',()=>openMDCATSavedResults()),mdcatButton('My test progress',()=>openMDCATScoredProgress()));
+      }else if(row.Route || row.Slug){
+        card.appendChild(mdcatButton('Open test information',()=>handleNavigation({Slug:row.Route || row.Slug,Label:row.Name})));
+      }
+      grid.appendChild(card);
+  });
+}
+
+async function openUserTests() {
+  const {grid,controller}=mdcatStudyPage('My tests','Results and progress from every supported test use this same account.');
   showPortalAccountShell();
-  const card=mdcatElement('article',null,'card mdcat-study-card');
-  card.appendChild(mdcatElement('h3','MDCAT'));
-  card.appendChild(mdcatElement('p','View your saved MDCAT attempts and subject progress. Other test categories will appear here when their online tests are published.'));
-  card.append(mdcatButton('My test results',()=>openMDCATSavedResults()),mdcatButton('My test progress',()=>openMDCATScoredProgress()));
-  grid.appendChild(card);
+  document.getElementById('mdcatStatus').textContent='Loading available tests…';
+  try {
+    const rows=await mdcatPublicRequest('testCatalog',{},controller);
+    if(mdcatRequest!==controller)return;
+    document.getElementById('mdcatStatus').textContent='';
+    renderUserTestCatalog(grid,rows);
+  }catch(error){
+    if(mdcatRequest!==controller)return;
+    document.getElementById('mdcatStatus').textContent='Showing the currently available test.';
+    renderUserTestCatalog(grid,[{ID:'TST-MDCAT',Name:'MDCAT',Slug:'mdcat',Description:'Medical and Dental College Admission Test preparation and scored practice.',TestType:'Entry Test',Route:'mdcat',Engine:'MDCAT'}]);
+  }
+}
+
+function portalSeenNotifications() {
+  try {const rows=JSON.parse(localStorage.getItem(PORTAL_NOTIFICATION_SEEN_KEY) || '[]');return Array.isArray(rows)?rows.map(String).slice(-500):[];}
+  catch(_){return [];}
+}
+
+function portalMarkNotificationsSeen(ids) {
+  try {localStorage.setItem(PORTAL_NOTIFICATION_SEEN_KEY,JSON.stringify([...new Set([...portalSeenNotifications(),...ids.map(String)])].slice(-500)));}
+  catch(_){}
+}
+
+async function openUserNotifications() {
+  const {grid}=mdcatStudyPage('Notifications','Updates published for registered ICP YOUTH CIRCLE users.');
+  showPortalAccountShell();
+  const view=mdcatGradeView;
+  const seen=new Set(portalSeenNotifications());
+  document.getElementById('mdcatStatus').textContent='Loading notifications…';
+  try {
+    const data=await mdcatPrivateRequest('studentDashboard');
+    if(view!==mdcatGradeView)return;
+    const rows=data.notifications || [];
+    document.getElementById('mdcatStatus').textContent='';
+    if(!rows.length){grid.appendChild(mdcatElement('p','No current notifications.','mdcat-wide'));return;}
+    rows.forEach(row=>{
+      const card=mdcatElement('article',null,'card mdcat-study-card');
+      card.appendChild(mdcatElement('h3',(seen.has(String(row.ID))?'':'New — ')+row.Title));
+      if(row.PublishAt)card.appendChild(mdcatElement('p',studentRequestDate(row.PublishAt)));
+      if(row.Message)card.appendChild(mdcatElement('p',row.Message));
+      const raw=String(row.LinkURL || '').trim();
+      if(/^#[a-z0-9-]+$/i.test(raw))card.appendChild(mdcatButton('Open',()=>handleNavigation({Slug:raw.slice(1),Label:row.Title})));
+      else {
+        const url=typeof safePortalURL==='function'?safePortalURL(raw):'';
+        if(url){const link=mdcatElement('a','Open link','resource-button');link.href=url;link.target='_blank';link.rel='noopener noreferrer';card.appendChild(link);}
+      }
+      grid.appendChild(card);
+    });
+    portalMarkNotificationsSeen(rows.map(row=>row.ID));
+  }catch(error){if(view===mdcatGradeView)mdcatAccountError(error,grid,()=>openUserNotifications());}
 }
 
 function openStudentBookmarks() {
