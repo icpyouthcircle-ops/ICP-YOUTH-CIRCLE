@@ -66,8 +66,13 @@ function mdcatAccountError(error,grid,retry) {
   if(retry) grid.appendChild(mdcatButton('Retry',retry));
 }
 
+function showPortalAccountShell() {
+  document.getElementById('mdcatHub').classList.add('portal-account-view');
+}
+
 async function openUserAccount(pending) {
   const {grid}=mdcatStudyPage('My account','Use one Google account for your portal activity, resources, requests and every supported test.');
+  showPortalAccountShell();
   const view=mdcatGradeView;
   document.getElementById('mdcatStatus').textContent='Checking sign-in availability…';
   try {
@@ -103,6 +108,7 @@ function openMDCATAccount(pending) { return openUserAccount(pending); }
 
 function openUserTests() {
   const {grid}=mdcatStudyPage('My tests','Results and progress from every supported test use this same account.');
+  showPortalAccountShell();
   const card=mdcatElement('article',null,'card mdcat-study-card');
   card.appendChild(mdcatElement('h3','MDCAT'));
   card.appendChild(mdcatElement('p','View your saved MDCAT attempts and subject progress. Other test categories will appear here when their online tests are published.'));
@@ -112,6 +118,7 @@ function openUserTests() {
 
 function openStudentBookmarks() {
   const {grid}=mdcatStudyPage('My bookmarks','Resources saved in this browser.');
+  showPortalAccountShell();
   const rows=typeof getPortalBookmarks==='function' ? getPortalBookmarks() : [];
   if (!rows.length) {grid.appendChild(mdcatElement('p','No resources saved yet. Open Notes, Past Papers or Study Resources and choose Save resource.','mdcat-wide'));return;}
   rows.forEach(row=>{
@@ -153,6 +160,7 @@ function renderStudentRequestSection(grid,title,rows,type) {
 
 async function openStudentRequests() {
   const {grid}=mdcatStudyPage('My requests','Track resource submissions and help-desk requests sent with your signed-in Google email.');
+  showPortalAccountShell();
   const view=mdcatGradeView;
   document.getElementById('mdcatStatus').textContent='Loading your requests…';
   try {
@@ -261,6 +269,7 @@ function mdcatRenderScore(result,grid) {
 
 async function openMDCATSavedResults() {
   const {grid}=mdcatStudyPage('My test results','Your MDCAT attempts are shown here. All supported tests will use this same signed-in account. Open attempts retain their original deadline.');
+  showPortalAccountShell();
   const view=mdcatGradeView;
   try {
     const rows=await mdcatPrivateRequest('mdcatMyResults');
@@ -282,6 +291,7 @@ async function openMDCATSavedResults() {
 
 async function openMDCATScoredProgress() {
   const {grid}=mdcatStudyPage('My test progress','MDCAT accuracy is based on answered questions in your submitted attempts. It is not a prediction of exam performance.');
+  showPortalAccountShell();
   const view=mdcatGradeView;
   try {
     const rows=await mdcatPrivateRequest('mdcatMyProgress');

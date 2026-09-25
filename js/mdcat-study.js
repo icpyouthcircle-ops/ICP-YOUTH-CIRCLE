@@ -25,6 +25,7 @@ function mdcatButton(text, action) {
 }
 
 function mdcatStudyPage(title, description, back) {
+  document.getElementById('mdcatHub').classList.remove('portal-account-view');
   resetMDCATStudy();
   if (mdcatRequest) mdcatRequest.abort();
   const controller = new AbortController();
