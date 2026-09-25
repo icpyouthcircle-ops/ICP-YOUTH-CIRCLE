@@ -1,5 +1,31 @@
 const API_BASE_URL =
   'https://script.google.com/macros/s/AKfycbwfIALyzy8rVPAyIyTj-RkFdjX5f92uaVpESOGHrBIsnsFQLH14uoYeAdggXKNEhQUo/exec';
+const PORTAL_CACHE_KEY = 'icp-public-portal-v1';
+const PORTAL_BOOTSTRAP_DATA = {
+  settings: {
+    site_name: 'ICP YOUTH CIRCLE',
+    site_tagline: 'Learn • Connect • Grow',
+    site_description: 'A student resource, opportunity, guidance and community platform by ICP YOUTH CIRCLE.',
+    footer_text: 'ICP YOUTH CIRCLE'
+  },
+  navigation: [
+    ['NAV-001','Home','home',''],['NAV-002','Study','study',''],['NAV-003','Entry Tests','entry-tests',''],
+    ['NAV-004','Admissions','admissions',''],['NAV-005','Scholarships','scholarships',''],['NAV-006','Career','career',''],
+    ['NAV-007','AI & Smart Tools','ai-smart-tools',''],['NAV-008','Community','community',''],['NAV-009','Updates','updates',''],
+    ['NAV-010','Islamic','islamic',''],['NAV-011','Explore','explore',''],
+    ['NAV-012','Notes','notes','NAV-002'],['NAV-013','Past Papers','past-papers','NAV-002'],['NAV-014','MCQs','mcqs','NAV-002'],
+    ['NAV-015','Videos','videos','NAV-002'],['NAV-016','Study Resources','study-resources','NAV-002'],
+    ['NAV-018','MDCAT','mdcat','NAV-003'],['NAV-019','NUMS','nums','NAV-003'],['NAV-020','ETEA','etea','NAV-003'],
+    ['NAV-021','ECAT','ecat','NAV-003'],['NAV-022','NUST NET','nust-net','NAV-003'],['NAV-023','Other Tests','other-tests','NAV-003']
+  ].map((row,index)=>({ID:row[0],Label:row[1],Slug:row[2],ParentID:row[3],DisplayOrder:index+1})),
+  categories: [
+    ['Study','study','Study materials and learning resources'],['Entry Tests','entry-tests','Entry test preparation and related content'],
+    ['Admissions','admissions','College and university admission information'],['Scholarships','scholarships','Scholarships and financial aid'],
+    ['Career','career','Career guidance and student opportunities'],['AI & Smart Tools','ai-smart-tools','AI tools and smart study utilities'],
+    ['Community','community','Student support and community features'],['Updates','updates','Announcements, results and important notices'],
+    ['Islamic','islamic','Islamic reminders, hadith and duas'],['Explore','explore','Blog, study abroad, about and contact content']
+  ].map((row,index)=>({ID:'BOOT-'+(index+1),Name:row[0],Slug:row[1],Description:row[2],DisplayOrder:index+1}))
+};
     let portalData = null;
     let currentResources = [];
     let currentVideos = [];
@@ -29,7 +55,18 @@ const API_BASE_URL =
     );
 
 
-   function loadPortal() {
+function readPortalCache() {
+  try {
+    const cached = JSON.parse(localStorage.getItem(PORTAL_CACHE_KEY));
+    if (!cached || Date.now() - Number(cached.savedAt) > 6 * 60 * 60 * 1000) return null;
+    if (!cached.data || !Array.isArray(cached.data.navigation) || !Array.isArray(cached.data.categories)) return null;
+    return cached.data;
+  } catch (_) { return null; }
+}
+
+function loadPortal() {
+  // Render immediately from a safe same-origin snapshot; refresh from Sheets in the background.
+  renderPortal(readPortalCache() || PORTAL_BOOTSTRAP_DATA);
   fetch(API_BASE_URL + '?action=portalData')
     .then(response => {
       if (!response.ok) {
@@ -48,6 +85,10 @@ const API_BASE_URL =
         );
       }
 
+      if (!result.data || !Array.isArray(result.data.navigation) || !Array.isArray(result.data.categories)) {
+        throw new Error('Invalid portal data.');
+      }
+      try { localStorage.setItem(PORTAL_CACHE_KEY, JSON.stringify({savedAt:Date.now(),data:result.data})); } catch (_) {}
       renderPortal(result.data);
     })
     .catch(error => {
@@ -56,7 +97,7 @@ const API_BASE_URL =
         error
       );
 
-      showError(error);
+      // The already-rendered snapshot keeps the portal usable while the API recovers.
     });
 }
 

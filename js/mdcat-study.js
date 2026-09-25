@@ -51,22 +51,7 @@ function mdcatStudyPage(title, description, back) {
 }
 
 async function mdcatFetch(action, params, controller) {
-  const url = new URL(API_BASE_URL);
-  url.searchParams.set('action', action);
-  for (const [key, value] of Object.entries(params || {})) {
-    if (value != null && String(value).trim()) url.searchParams.set(key, String(value));
-  }
-  const timeout = setTimeout(() => controller.abort(), 20000);
-  try {
-    const response = await fetch(url, {signal: controller.signal});
-    if (!response.ok) throw new Error('HTTP ' + response.status);
-    const result = await response.json();
-    if (!result || result.success !== true || !Array.isArray(result.data) ||
-      result.data.some(row => !row || typeof row !== 'object' || Array.isArray(row))) {
-      throw new Error('Invalid public MDCAT response');
-    }
-    return result.data;
-  } finally { clearTimeout(timeout); }
+  return mdcatPublicRequest(action,params,controller);
 }
 
 function mdcatFailure(controller, retry) {

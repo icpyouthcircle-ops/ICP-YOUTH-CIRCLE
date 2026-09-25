@@ -423,6 +423,21 @@ function jsonResponse_(data, status) {
     .createTextOutput(JSON.stringify(payload))
     .setMimeType(ContentService.MimeType.JSON);
 }
+
+function cachedPublicJsonResponse_(key, loader, seconds) {
+  const cacheKey = 'icp-public-v1-' + String(key).replace(/[^A-Za-z0-9_.-]/g, '_').slice(0, 200);
+  let cache = null;
+  try {
+    cache = CacheService.getScriptCache();
+    const cached = cache.get(cacheKey);
+    if (cached) return ContentService.createTextOutput(cached).setMimeType(ContentService.MimeType.JSON);
+  } catch (_) {}
+  const payload = JSON.stringify({success:true,data:loader()});
+  try {
+    if (cache && payload.length < 95000) cache.put(cacheKey,payload,seconds || 300);
+  } catch (_) {}
+  return ContentService.createTextOutput(payload).setMimeType(ContentService.MimeType.JSON);
+}
 // ==========================================
 // MDCAT 2027 - PUBLIC DATA FUNCTIONS
 // ==========================================
@@ -790,84 +805,58 @@ function doGet(e) {
     if (action === 'mdcatAccountConfig') return jsonResponse_(mdcatAuthConfig_());
 
     if (action === 'portalData') {
-      return jsonResponse_(
-        getPublicPortalData_()
-      );
+      return cachedPublicJsonResponse_('portalData',getPublicPortalData_,300);
     }
 
     if (action === 'mcqs') {
-      return jsonResponse_(
-        getPublicMCQs_()
-      );
+      return cachedPublicJsonResponse_('mcqs',getPublicMCQs_,300);
     }
 
     if (action === 'videos') {
-      return jsonResponse_(
-        getPublicVideos_()
-      );
+      return cachedPublicJsonResponse_('videos',getPublicVideos_,300);
     }
 
     if (action === 'admissions') {
-      return jsonResponse_(
-        getPublicAdmissions_()
-      );
+      return cachedPublicJsonResponse_('admissions',getPublicAdmissions_,300);
     }
 
     if (action === 'scholarships') {
-      return jsonResponse_(
-        getPublicScholarships_()
-      );
+      return cachedPublicJsonResponse_('scholarships',getPublicScholarships_,300);
     }
 
     if (action === 'opportunities') {
-      return jsonResponse_(
-        getPublicOpportunities_()
-      );
+      return cachedPublicJsonResponse_('opportunities',getPublicOpportunities_,300);
     }
 
     if (action === 'announcements') {
-      return jsonResponse_(
-        getPublicAnnouncements_()
-      );
+      return cachedPublicJsonResponse_('announcements',getPublicAnnouncements_,300);
     }
 
     if (action === 'aiTools') {
-      return jsonResponse_(
-        getPublicAITools_()
-      );
+      return cachedPublicJsonResponse_('aiTools',getPublicAITools_,300);
     }
 
     if (action === 'islamicContent') {
-      return jsonResponse_(
-        getPublicIslamicContent_()
-      );
+      return cachedPublicJsonResponse_('islamicContent',getPublicIslamicContent_,300);
     }
     if (action === 'blog') {
-      return jsonResponse_(
-        getPublicBlog_()
-      );
+      return cachedPublicJsonResponse_('blog',getPublicBlog_,300);
     }
     if (action === 'entryTests') {
-      return jsonResponse_(
-        getPublicEntryTests_()
-      );
+      return cachedPublicJsonResponse_('entryTests',getPublicEntryTests_,300);
     }
     if (action === 'resources') {
       const category =
         e.parameter.category || '';
 
-      return jsonResponse_(
-        getPublicResources_(category)
-      );
+      return cachedPublicJsonResponse_('resources-' + category,function(){return getPublicResources_(category);},300);
     }
     // ==========================================
 // MDCAT 2027 API ROUTES
 // ==========================================
 
 if (action === 'mdcatSubjects') {
-  return jsonResponse_(
-    getPublicMDCATSubjects_()
-  );
+  return cachedPublicJsonResponse_('mdcatSubjects',getPublicMDCATSubjects_,300);
 }
 
 
@@ -875,11 +864,7 @@ if (action === 'mdcatUnits') {
   const subjectId =
     e.parameter.subjectId || '';
 
-  return jsonResponse_(
-    getPublicMDCATUnits_(
-      subjectId
-    )
-  );
+  return cachedPublicJsonResponse_('mdcatUnits-' + subjectId,function(){return getPublicMDCATUnits_(subjectId);},300);
 }
 
 
@@ -890,12 +875,7 @@ if (action === 'mdcatChapters') {
   const unitId =
     e.parameter.unitId || '';
 
-  return jsonResponse_(
-    getPublicMDCATChapters_(
-      subjectId,
-      unitId
-    )
-  );
+  return cachedPublicJsonResponse_('mdcatChapters-' + subjectId + '-' + unitId,function(){return getPublicMDCATChapters_(subjectId,unitId);},300);
 }
 
 
@@ -909,13 +889,7 @@ if (action === 'mdcatTopics') {
   const chapterId =
     e.parameter.chapterId || '';
 
-  return jsonResponse_(
-    getPublicMDCATTopics_(
-      subjectId,
-      unitId,
-      chapterId
-    )
-  );
+  return cachedPublicJsonResponse_('mdcatTopics-' + subjectId + '-' + unitId + '-' + chapterId,function(){return getPublicMDCATTopics_(subjectId,unitId,chapterId);},300);
 }
 
 
@@ -932,21 +906,12 @@ if (action === 'mdcatQuestions') {
   const topicId =
     e.parameter.topicId || '';
 
-  return jsonResponse_(
-    getPublicMDCATQuestions_(
-      subjectId,
-      unitId,
-      chapterId,
-      topicId
-    )
-  );
+  return cachedPublicJsonResponse_('mdcatQuestions-' + subjectId + '-' + unitId + '-' + chapterId + '-' + topicId,function(){return getPublicMDCATQuestions_(subjectId,unitId,chapterId,topicId);},300);
 }
 
 
 if (action === 'mdcatTests') {
-  return jsonResponse_(
-    getPublicMDCATTests_()
-  );
+  return cachedPublicJsonResponse_('mdcatTests',getPublicMDCATTests_,300);
 }
 
 
@@ -954,25 +919,17 @@ if (action === 'mdcatTestQuestions') {
   const testId =
     e.parameter.testId || '';
 
-  return jsonResponse_(
-    getPublicMDCATTestQuestions_(
-      testId
-    )
-  );
+  return cachedPublicJsonResponse_('mdcatTestQuestions-' + testId,function(){return getPublicMDCATTestQuestions_(testId);},300);
 }
 
 
 if (action === 'mdcatDailyPractice') {
-  return jsonResponse_(
-    getPublicMDCATDailyPractice_()
-  );
+  return cachedPublicJsonResponse_('mdcatDailyPractice',getPublicMDCATDailyPractice_,300);
 }
 
 
 if (action === 'mdcatUpdates') {
-  return jsonResponse_(
-    getPublicMDCATUpdates_()
-  );
+  return cachedPublicJsonResponse_('mdcatUpdates',getPublicMDCATUpdates_,300);
 }
     return HtmlService
       .createTemplateFromFile('Index')

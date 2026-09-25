@@ -1,5 +1,64 @@
 // Read the public MDCAT hierarchy; other portal modules stay separate.
 let mdcatRequest = null;
+const MDCAT_PUBLIC_CACHE_PREFIX = 'icp-mdcat-public-v1:';
+const MDCAT_LIVE_SITE = location.hostname === 'icpyouthcircle-ops.github.io';
+const MDCAT_SUBJECTS_BOOTSTRAP = [
+  {ID:'MDS-001',Name:'Biology',Slug:'biology',Description:'MDCAT Biology subject hub containing syllabus-based topics, resources, MCQs, practice, revision and tests.',Icon:'',DisplayOrder:1},
+  {ID:'MDS-002',Name:'Chemistry',Slug:'chemistry',Description:'MDCAT Chemistry subject hub containing syllabus-based topics, resources, MCQs, practice, revision and tests.',Icon:'',DisplayOrder:2},
+  {ID:'MDS-003',Name:'Physics',Slug:'physics',Description:'MDCAT Physics subject hub containing syllabus-based topics, resources, MCQs, practice, revision and tests.',Icon:'',DisplayOrder:3},
+  {ID:'MDS-004',Name:'English',Slug:'english',Description:'MDCAT English subject hub containing language concepts, vocabulary, comprehension, practice and tests.',Icon:'',DisplayOrder:4},
+  {ID:'MDS-005',Name:'Logical Reasoning',Slug:'logical-reasoning',Description:'MDCAT Logical Reasoning hub containing reasoning concepts, practice questions, revision and tests.',Icon:'',DisplayOrder:5}
+];
+
+function mdcatPublicURL(action, params) {
+  const url = new URL(API_BASE_URL);
+  url.searchParams.set('action', action);
+  for (const [key,value] of Object.entries(params || {})) {
+    if (value != null && String(value).trim()) url.searchParams.set(key,String(value));
+  }
+  return url;
+}
+
+function mdcatStorePublicCache(key, data) {
+  if (!MDCAT_LIVE_SITE) return;
+  try {
+    const value = JSON.stringify({savedAt:Date.now(),data});
+    if (value.length < 250000) localStorage.setItem(MDCAT_PUBLIC_CACHE_PREFIX + key,value);
+  } catch (_) {}
+}
+
+function mdcatReadPublicCache(key) {
+  if (!MDCAT_LIVE_SITE) return null;
+  try {
+    const value = JSON.parse(localStorage.getItem(MDCAT_PUBLIC_CACHE_PREFIX + key));
+    if (!value || Date.now() - Number(value.savedAt) > 15 * 60 * 1000 || !Array.isArray(value.data)) return null;
+    return value.data;
+  } catch (_) { return null; }
+}
+
+async function mdcatPublicRequest(action, params, controller) {
+  const url = mdcatPublicURL(action,params);
+  const key = url.searchParams.toString();
+  const cached = mdcatReadPublicCache(key);
+  if (cached) return cached;
+  if (MDCAT_LIVE_SITE && action === 'mdcatSubjects') {
+    // Show the stable subject directory instantly and refresh it for the next visit.
+    fetch(url).then(response=>response.ok?response.json():null).then(result=>{
+      if (result && result.success === true && Array.isArray(result.data)) mdcatStorePublicCache(key,result.data);
+    }).catch(()=>{});
+    return MDCAT_SUBJECTS_BOOTSTRAP;
+  }
+  const timeout = setTimeout(()=>controller.abort(),60000);
+  try {
+    const response = await fetch(url,{signal:controller.signal});
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    const result = await response.json();
+    if (!result || result.success !== true || !Array.isArray(result.data) ||
+      result.data.some(row=>!row || typeof row !== 'object' || Array.isArray(row))) throw new Error('Invalid public MDCAT response');
+    mdcatStorePublicCache(key,result.data);
+    return result.data;
+  } finally { clearTimeout(timeout); }
+}
 
 function closeMDCATHub() {
   resetMDCATStudy();
@@ -74,27 +133,12 @@ async function loadMDCATDirectory(subject = null, unit = null, chapter = null) {
   retry.hidden = true;
   retry.onclick = () => loadMDCATDirectory(subject, unit, chapter);
 
-  // A slow/unavailable deployment must not leave an endless loading state.
-  const timeout = setTimeout(() => controller.abort(), 20000);
   try {
-    const query = chapter
-      ? '?action=mdcatTopics&subjectId=' + encodeURIComponent(subject.ID) +
-        '&unitId=' + encodeURIComponent(unit.ID) + '&chapterId=' + encodeURIComponent(chapter.ID) : unit
-      ? '?action=mdcatChapters&subjectId=' + encodeURIComponent(subject.ID) +
-        '&unitId=' + encodeURIComponent(unit.ID) : subject
-      ? '?action=mdcatUnits&subjectId=' + encodeURIComponent(subject.ID)
-      : '?action=mdcatSubjects';
-    const response = await fetch(API_BASE_URL + query, {
-      signal: controller.signal
-    });
-    if (!response.ok) throw new Error('HTTP ' + response.status);
-    const result = await response.json();
-    if (!result || result.success !== true || !Array.isArray(result.data)) {
-      throw new Error('Invalid MDCAT directory response');
-    }
+    const action = chapter ? 'mdcatTopics' : unit ? 'mdcatChapters' : subject ? 'mdcatUnits' : 'mdcatSubjects';
+    const params = chapter ? {subjectId:subject.ID,unitId:unit.ID,chapterId:chapter.ID}
+      : unit ? {subjectId:subject.ID,unitId:unit.ID} : subject ? {subjectId:subject.ID} : {};
+    const records = await mdcatPublicRequest(action,params,controller);
     if (mdcatRequest !== controller) return;
-
-    const records = result.data;
     if (records.some(item => !item || typeof item.Name !== 'string' || !item.Name.trim() ||
       (!unit && (item.ID == null || !String(item.ID).trim())) ||
       (subject && String(item.SubjectID) !== String(subject.ID)) ||
@@ -167,7 +211,6 @@ async function loadMDCATDirectory(subject = null, unit = null, chapter = null) {
     status.textContent = 'Unable to load ' + noun + ' right now. Please try again.';
     retry.hidden = false;
   } finally {
-    clearTimeout(timeout);
     if (mdcatRequest === controller) {
       grid.setAttribute('aria-busy', 'false');
       mdcatRequest = null;

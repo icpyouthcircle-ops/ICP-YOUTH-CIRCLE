@@ -5,7 +5,7 @@ const crypto=require('node:crypto');
 
 function createBackend(){
  let now=Date.parse('2026-09-24T12:00:00Z'),counter=0,locked=false,failSheet='';
- const sheets=new Map(),tokens=new Map();
+ const sheets=new Map(),tokens=new Map(),cache=new Map();
  const fixture=JSON.parse(fs.readFileSync(path.join(__dirname,'mdcat-demo-fixture.json'),'utf8'));
  class Sheet {
   constructor(name,values=[]){this.name=name;this.values=values;}
@@ -28,6 +28,7 @@ function createBackend(){
  class FakeDate extends Date{constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}}
  const context=vm.createContext({console,Date:FakeDate,SpreadsheetApp:{getActiveSpreadsheet:()=>({getSheetByName:name=>sheets.get(name),insertSheet:name=>{const sheet=new Sheet(name);sheets.set(name,sheet);return sheet;}}),flush:()=>{}},
   PropertiesService:{getScriptProperties:()=>({getProperty:key=>props[key]||null})},
+  CacheService:{getScriptCache:()=>({get:key=>cache.get(key)||null,put:(key,value)=>cache.set(key,value)})},
   LockService:{getScriptLock:()=>({tryLock:()=>{if(locked)return false;locked=true;return true;},releaseLock:()=>{locked=false;}})},
   UrlFetchApp:{fetch:(url,options)=>{if(!url.startsWith('https://identitytoolkit.googleapis.com/v1/accounts:lookup?key='))throw new Error('Unexpected outbound auth request');const token=JSON.parse(options.payload).idToken;const account=tokens.get(token);return {getResponseCode:()=>account?200:400,getContentText:()=>JSON.stringify(account?{users:[account]}:{error:{message:'INVALID_ID_TOKEN'}})};}},
   Utilities:{getUuid:()=>`00000000-0000-4000-8000-${String(++counter).padStart(12,'0')}`,base64DecodeWebSafe:value=>Buffer.from(value,'base64url'),newBlob:value=>({getDataAsString:()=>Buffer.from(value).toString()}),DigestAlgorithm:{SHA_256:'sha256'},computeDigest:(_,value)=>[...crypto.createHash('sha256').update(value).digest()]},

@@ -1,4 +1,10 @@
-// Google/Firebase sign-in is configured on the backend; no secret is stored in this file.
+// Firebase web configuration is a public client identifier; scoring secrets remain server-side.
+const MDCAT_FIREBASE_WEB_CONFIG = Object.freeze({
+  apiKey:'AIzaSyA5tQEc0yf544hQ0buVmaNG32rStH0UYHQ',
+  authDomain:'icp-youth-circle-1ce3d.firebaseapp.com',
+  projectId:'icp-youth-circle-1ce3d',
+  appId:'1:116078667555:web:7707153d9667bf8fd88e96'
+});
 let mdcatIdentity = null;
 let mdcatIdentityLoading = null;
 let mdcatGradeTimer = null;
@@ -14,24 +20,11 @@ async function mdcatLoadIdentity() {
   if (mdcatIdentity) return mdcatIdentity;
   if (mdcatIdentityLoading) return mdcatIdentityLoading;
   mdcatIdentityLoading = (async () => {
-    const controller = new AbortController();
-    const timeout = setTimeout(()=>controller.abort(),20000);
-    let config;
-    try {
-      const response = await fetch(API_BASE_URL+'?action=mdcatAccountConfig',{signal:controller.signal});
-      if (!response.ok) throw new Error('Account setup is not available yet.');
-      const result = await response.json();
-      if (!result.success || !result.data || result.data.enabled!==true) throw new Error('Scored practice is awaiting account setup. Guest practice is still available.');
-      config=result.data.firebase;
-    } catch (error) {
-      if (error instanceof SyntaxError) throw new Error('The scoring backend has not been deployed yet. Guest practice is still available.');
-      throw error;
-    } finally {clearTimeout(timeout);}
     const [appSDK,authSDK]=await Promise.all([
       import('https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js'),
       import('https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js')
     ]);
-    const app=appSDK.initializeApp(config,'icp-mdcat');
+    const app=appSDK.initializeApp(MDCAT_FIREBASE_WEB_CONFIG,'icp-mdcat');
     const auth=authSDK.getAuth(app);
     await authSDK.setPersistence(auth,authSDK.inMemoryPersistence);
     mdcatIdentity={auth,sdk:authSDK};

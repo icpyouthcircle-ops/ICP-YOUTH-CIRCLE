@@ -41,11 +41,17 @@ Use one valid JSON line for `MDCAT_FIREBASE_CONFIG`, replacing all four sample v
 
 1. Replace the entire Apps Script `Code.gs` with the supplied `backend/Code.gs`.
 2. Save the project.
-3. Select `setupMDCATScoring_` in the function menu and run it once.
-4. Approve the Apps Script permissions requested by Google.
-5. Confirm that the execution log returns:
+3. Temporarily add this wrapper at the bottom of `Code.gs`:
 
-   `Scoring sheets validated. Firebase configuration and enablement are separate steps.`
+   ```javascript
+   function runMDCATScoringSetup() {
+     return setupMDCATScoring_();
+   }
+   ```
+
+4. Save, select `runMDCATScoringSetup` in the function menu, and run it once.
+5. Approve the Apps Script permissions requested by Google and confirm that the execution completes successfully.
+6. Delete the temporary `runMDCATScoringSetup` wrapper and save again before deploying.
 
 The setup preserves existing rows and validates the existing attempt, answer, and progress sheets. It creates these two internal sheets if they do not exist:
 
@@ -87,3 +93,10 @@ Then open the portal, choose **Entry Tests > MDCAT 2027 > Student account**, and
 - Answers submitted after the deadline plus the 30-second network allowance are rejected.
 - Reloading signs the student out on that device; submitted results remain saved.
 - Never expose spreadsheet editing access to students.
+
+## Performance behavior
+
+- The homepage renders from a safe static snapshot and refreshes from Sheets in the background.
+- Public Apps Script responses are cached for up to 5 minutes.
+- Public MDCAT lists are cached in the student's browser for up to 15 minutes.
+- Authentication, scored attempts, answers, results, and progress are never stored in the public cache.
