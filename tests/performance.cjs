@@ -22,6 +22,14 @@ const {createBackend}=require('./scoring-harness.cjs');
         await new Promise(resolve=>setTimeout(resolve,500));
         return route.fulfill({json:{success:true,data:[{ID:'ANN-1',Title:'Cached announcement',Category:'Notice',Summary:'Ready immediately'}]}});
       }
+      if(action==='portalBundle'){
+        await new Promise(resolve=>setTimeout(resolve,250));
+        return route.fulfill({json:{success:true,data:{
+          resources:[],mcqs:[],videos:[],admissions:[],scholarships:[],opportunities:[],
+          announcements:[{ID:'ANN-1',Title:'Cached announcement',Category:'Notice',Summary:'Ready immediately'}],
+          aiTools:[],islamicContent:[],blog:[],entryTests:[]
+        }}});
+      }
       return route.fulfill({json:{success:true,data:[]}});
     });
     const started=Date.now();
@@ -38,7 +46,7 @@ const {createBackend}=require('./scoring-harness.cjs');
     await page.evaluate(()=>handleNavigation({Slug:'announcements',Label:'Announcements'}));
     await page.getByText('Cached announcement',{exact:true}).waitFor({timeout:400});
     assert.ok(Date.now()-clickStarted<450,'Cached section did not render immediately');
-    assert.ok((requestCounts.get('announcements')||0)>=1,'Background warming did not request announcements');
+    assert.equal(requestCounts.get('portalBundle'),1,'Background warming did not request the portal bundle');
 
     const accountSource=fs.readFileSync(path.join(__dirname,'../js/mdcat-account.js'),'utf8');
     assert.equal(accountSource.includes('?action=mdcatAccountConfig'),false);

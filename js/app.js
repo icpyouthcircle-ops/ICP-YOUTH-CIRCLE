@@ -141,6 +141,30 @@ function loadPublicModule(action, params = {}) {
   return refreshPublicModule(action, params);
 }
 
+function storePublicBundle(bundle) {
+  if (!bundle || typeof bundle !== 'object' || Array.isArray(bundle)) return false;
+  const actions = ['mcqs','videos','admissions','scholarships','opportunities','announcements','aiTools','islamicContent','blog','entryTests'];
+  if (!actions.every(action => Array.isArray(bundle[action])) || !Array.isArray(bundle.resources)) return false;
+  actions.forEach(action => storePublicModuleCache(publicModuleKey(action), bundle[action]));
+  ['Notes','Past Papers','Study Resources'].forEach(category => {
+    const rows = bundle.resources.filter(item => String(item.Category || '').trim().toLowerCase() === category.toLowerCase());
+    storePublicModuleCache(publicModuleKey('resources',{category}), rows);
+  });
+  return true;
+}
+
+function warmPublicBundle() {
+  return fetch(API_BASE_URL + '?action=portalBundle')
+    .then(response => {
+      if (!response.ok) throw new Error('HTTP error: ' + response.status);
+      return response.json();
+    })
+    .then(result => {
+      if (!result.success || !storePublicBundle(result.data)) throw new Error('Invalid portal bundle.');
+      return true;
+    });
+}
+
 function warmPublicModules() {
   if (location.hostname !== 'icpyouthcircle-ops.github.io' && !window.__ICP_ENABLE_PREFETCH__) return;
   const modules = [
@@ -161,7 +185,7 @@ function warmPublicModules() {
     }
     refreshPublicModule(action, params || {}).catch(() => {}).finally(() => setTimeout(next, 120));
   };
-  const start = () => { next(); next(); };
+  const start = () => warmPublicBundle().catch(() => { next(); next(); });
   if ('requestIdleCallback' in window) window.requestIdleCallback(start, { timeout: 1500 });
   else setTimeout(start, 600);
 }

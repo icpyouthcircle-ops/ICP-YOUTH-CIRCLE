@@ -810,6 +810,10 @@ function doGet(e) {
       return cachedPublicJsonResponse_('portalData',getPublicPortalData_,300);
     }
 
+    if (action === 'portalBundle') {
+      return cachedPublicJsonResponse_('portalBundle',getPublicPortalBundle_,300);
+    }
+
     if (action === 'mcqs') {
       return cachedPublicJsonResponse_('mcqs',getPublicMCQs_,300);
     }
@@ -1204,6 +1208,22 @@ function searchRows_(loader) {
   catch (_) { return []; }
 }
 
+function getPublicPortalBundle_() {
+  return {
+    resources:getPublicResources_(''),
+    mcqs:getPublicMCQs_(),
+    videos:getPublicVideos_(),
+    admissions:getPublicAdmissions_(),
+    scholarships:getPublicScholarships_(),
+    opportunities:getPublicOpportunities_(),
+    announcements:getPublicAnnouncements_(),
+    aiTools:getPublicAITools_(),
+    islamicContent:getPublicIslamicContent_(),
+    blog:getPublicBlog_(),
+    entryTests:getPublicEntryTests_()
+  };
+}
+
 function getPublicSearchIndex_() {
   const index=[];
   const add=(kind,title,description,route,row,keywords,level)=>{
@@ -1547,7 +1567,7 @@ function adminArchive_(body,admin) {
 function adminClearPublicCache_() {
   try {
     const cache=CacheService.getScriptCache();
-    cache.removeAll(['icp-public-v1-portalData','icp-public-v1-searchIndex','icp-public-v1-mcqs','icp-public-v1-videos','icp-public-v1-admissions','icp-public-v1-scholarships','icp-public-v1-opportunities','icp-public-v1-announcements','icp-public-v1-aiTools','icp-public-v1-islamicContent','icp-public-v1-blog','icp-public-v1-entryTests','icp-public-v1-mdcatSubjects','icp-public-v1-mdcatTests','icp-public-v1-mdcatDailyPractice','icp-public-v1-mdcatUpdates']);
+    cache.removeAll(['icp-public-v1-portalData','icp-public-v1-portalBundle','icp-public-v1-searchIndex','icp-public-v1-mcqs','icp-public-v1-videos','icp-public-v1-admissions','icp-public-v1-scholarships','icp-public-v1-opportunities','icp-public-v1-announcements','icp-public-v1-aiTools','icp-public-v1-islamicContent','icp-public-v1-blog','icp-public-v1-entryTests','icp-public-v1-mdcatSubjects','icp-public-v1-mdcatTests','icp-public-v1-mdcatDailyPractice','icp-public-v1-mdcatUpdates']);
   } catch (_) {}
 }
 
