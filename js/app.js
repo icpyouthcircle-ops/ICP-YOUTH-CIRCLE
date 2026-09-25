@@ -199,8 +199,16 @@ function loadPortal() {
 function renderNavigation(items) {
 
   const nav = document.getElementById('mainNavigation');
+  const menuToggle = document.getElementById('menuToggle');
 
   nav.innerHTML = '';
+  nav.classList.remove('is-open');
+  menuToggle.setAttribute('aria-expanded','false');
+  menuToggle.onclick=()=>setMobileNavigationOpen(!nav.classList.contains('is-open'));
+  if (!nav.dataset.keyboardReady) {
+    document.addEventListener('keydown',event=>{if(event.key==='Escape') closeMobileNavigation();});
+    nav.dataset.keyboardReady='true';
+  }
 
   const parents = items
     .filter(item => !item.ParentID)
@@ -215,6 +223,9 @@ function renderNavigation(items) {
     const wrapper = document.createElement('div');
     wrapper.className = 'nav-item';
 
+    const row = document.createElement('div');
+    row.className = 'nav-item-row';
+
     const link = document.createElement('a');
     link.href = '#';
     link.textContent = parent.Label;
@@ -222,9 +233,10 @@ function renderNavigation(items) {
     link.onclick = function(event) {
       event.preventDefault();
       handleNavigation(parent);
+      closeMobileNavigation();
     };
 
-    wrapper.appendChild(link);
+    row.appendChild(link);
 
     const children = items
       .filter(item => item.ParentID === parent.ID)
@@ -238,6 +250,20 @@ function renderNavigation(items) {
 
       const dropdown = document.createElement('div');
       dropdown.className = 'dropdown-menu';
+      dropdown.id='submenu-'+String(parent.ID || parent.Slug || '').replace(/[^A-Za-z0-9_-]/g,'');
+
+      const submenuToggle=document.createElement('button');
+      submenuToggle.type='button';submenuToggle.className='submenu-toggle';
+      submenuToggle.setAttribute('aria-controls',dropdown.id);submenuToggle.setAttribute('aria-expanded','false');
+      submenuToggle.setAttribute('aria-label','Show '+parent.Label+' submenu');submenuToggle.textContent='⌄';
+      submenuToggle.onclick=()=>{
+        const open=!wrapper.classList.contains('submenu-open');
+        nav.querySelectorAll('.nav-item.submenu-open').forEach(item=>{
+          if(item!==wrapper){item.classList.remove('submenu-open');const button=item.querySelector('.submenu-toggle');if(button)button.setAttribute('aria-expanded','false');}
+        });
+        wrapper.classList.toggle('submenu-open',open);submenuToggle.setAttribute('aria-expanded',String(open));
+      };
+      row.appendChild(submenuToggle);
 
       children.forEach(child => {
 
@@ -249,6 +275,7 @@ function renderNavigation(items) {
         childLink.onclick = function(event) {
           event.preventDefault();
           handleNavigation(child);
+          closeMobileNavigation();
         };
 
         dropdown.appendChild(childLink);
@@ -258,9 +285,18 @@ function renderNavigation(items) {
       wrapper.appendChild(dropdown);
     }
 
+    wrapper.prepend(row);
     nav.appendChild(wrapper);
   });
 }
+
+function setMobileNavigationOpen(open) {
+  const nav=document.getElementById('mainNavigation');const toggle=document.getElementById('menuToggle');
+  nav.classList.toggle('is-open',Boolean(open));toggle.setAttribute('aria-expanded',String(Boolean(open)));
+  if(!open){nav.querySelectorAll('.nav-item.submenu-open').forEach(item=>item.classList.remove('submenu-open'));nav.querySelectorAll('.submenu-toggle').forEach(button=>button.setAttribute('aria-expanded','false'));}
+}
+
+function closeMobileNavigation() { setMobileNavigationOpen(false); }
 
     function renderCategories(categories) {
 

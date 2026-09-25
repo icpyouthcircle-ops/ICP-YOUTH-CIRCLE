@@ -87,6 +87,18 @@ const {pathToFileURL}=require('node:url');
     await page.getByText('University merit list',{exact:true}).waitFor();
 
     await page.setViewportSize({width:375,height:812});
+    await page.evaluate(()=>showHome());
+    const menuToggle=page.getByRole('button',{name:'Menu',exact:true});
+    await menuToggle.waitFor({state:'visible'});
+    assert.equal(await page.locator('#mainNavigation').isVisible(),false);
+    await menuToggle.click();assert.equal(await menuToggle.getAttribute('aria-expanded'),'true');
+    assert.equal(await page.locator('#mainNavigation').isVisible(),true);
+    const studyToggle=page.getByRole('button',{name:'Show Study submenu'});
+    await studyToggle.click();assert.equal(await studyToggle.getAttribute('aria-expanded'),'true');
+    assert.equal(await page.locator('#submenu-NAV-002').isVisible(),true);
+    await page.locator('#submenu-NAV-002').getByText('Notes',{exact:true}).click();
+    assert.equal(await page.locator('#mainNavigation').isVisible(),false);
+    await menuToggle.click();await page.keyboard.press('Escape');assert.equal(await page.locator('#mainNavigation').isVisible(),false);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
     assert.deepEqual(errors,[]);
     console.log('PASS portal navigation: all ten homepage cards and all 59 navigation records resolve without alerts or blank pages; duplicate merit-list routes, filtered modules, empty states, and mobile layout verified.');
