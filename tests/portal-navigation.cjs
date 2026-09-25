@@ -93,6 +93,12 @@ const {pathToFileURL}=require('node:url');
     await page.evaluate(item=>handleNavigation(item),updateMerit);
     await page.getByText('University merit list',{exact:true}).waitFor();
 
+    await page.evaluate(()=>{portalData.settings={contact_email:'icpyouthcircle@example.com',whatsapp_channel:'https://wa.me/923000000000',instagram_url:'https://instagram.com/icp.youth.circle'};handleNavigation({Slug:'contact',Label:'Contact'});});
+    await page.getByRole('link',{name:'Send us an email',exact:true}).waitFor();
+    assert.equal(await page.getByRole('link',{name:'Send us an email',exact:true}).getAttribute('href'),'mailto:icpyouthcircle@example.com');
+    assert.equal(await page.getByRole('link',{name:'Follow our WhatsApp updates',exact:true}).getAttribute('href'),'https://wa.me/923000000000');
+    assert.equal(await page.getByRole('link',{name:'Follow ICP YOUTH CIRCLE',exact:true}).getAttribute('href'),'https://instagram.com/icp.youth.circle');
+
     await page.setViewportSize({width:375,height:812});
     await page.evaluate(()=>showHome());
     const menuToggle=page.getByRole('button',{name:'Menu',exact:true});

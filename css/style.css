@@ -48,6 +48,19 @@
 .portal-account-view .mdcat-actions,
 .portal-account-view .mdcat-tools,
 .portal-account-view .mdcat-note { display: none; }
+.contact-panel { max-width: 960px; margin: 0 auto; padding: 8px 0 28px; }
+.contact-intro { text-align: center; margin: 0 auto 28px; }
+.contact-eyebrow { color: #991b2f; font-size: 12px; font-weight: 700; letter-spacing: .18em; margin: 0 0 10px; }
+.contact-intro h4 { margin: 0; color: #172033; font-size: 30px; }
+.contact-intro p:last-child { color: #64748b; margin: 10px 0 0; }
+.contact-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; }
+.contact-card { display: flex; align-items: flex-start; gap: 14px; min-height: 126px; padding: 22px; background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; box-shadow: 0 8px 24px rgba(15,23,42,.05); }
+.contact-card h5 { margin: 2px 0 8px; font-size: 16px; color: #172033; }
+.contact-icon { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 42px; width: 42px; height: 42px; border-radius: 12px; background: #fceef0; color: #991b2f; font-size: 22px; }
+.contact-link { color: #64748b; text-decoration: none; overflow-wrap: anywhere; line-height: 1.5; }
+.contact-link:hover, .contact-link:focus-visible { color: #991b2f; text-decoration: underline; }
+.contact-empty { max-width: 560px; margin: 0 auto; padding: 24px; text-align: center; color: #64748b; background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; }
+@media (max-width: 760px) { .contact-grid { grid-template-columns: 1fr; } .contact-intro h4 { font-size: 26px; } }
 .student-request-section { display: grid; gap: 12px; }
 .student-request-section > h3 { margin: 10px 0 0; }
 .student-request-section .mdcat-subject-card h4 { margin: 0 0 8px; font-size: 17px; }

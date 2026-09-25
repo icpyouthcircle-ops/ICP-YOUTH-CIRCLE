@@ -601,8 +601,36 @@ function renderAboutPage() {
 
 function renderContactPage() {
   const settings=portalData && portalData.settings || {};
-  const details=[settings.contact_email,settings.whatsapp_channel,settings.instagram_url].filter(Boolean);
-  renderSectionNotice(details.length ? 'Contact ICP YOUTH CIRCLE: '+details.join(' • ') : 'Official contact details have not been published yet.');
+  const content=document.getElementById('dynamicPageContent');
+  const filters=document.getElementById('resourceFilters');
+  filters.innerHTML='';filters.style.display='none';content.replaceChildren();
+  const panel=document.createElement('section');panel.className='contact-panel';
+  const intro=document.createElement('div');intro.className='contact-intro';
+  const eyebrow=document.createElement('p');eyebrow.className='contact-eyebrow';eyebrow.textContent='GET IN TOUCH';
+  const heading=document.createElement('h4');heading.textContent='We are here to help';
+  const description=document.createElement('p');description.textContent='Choose the official ICP YOUTH CIRCLE channel that suits you best.';
+  intro.append(eyebrow,heading,description);panel.appendChild(intro);
+  const cards=document.createElement('div');cards.className='contact-grid';
+  const addCard=(label,detail,href,icon)=>{
+    if(!detail || !href)return;
+    const card=document.createElement('article');card.className='contact-card';
+    const mark=document.createElement('span');mark.className='contact-icon';mark.setAttribute('aria-hidden','true');mark.textContent=icon;
+    const body=document.createElement('div');
+    const title=document.createElement('h5');title.textContent=label;
+    const link=document.createElement('a');link.href=href;link.textContent=detail;link.className='contact-link';
+    if(/^https?:/i.test(href)){link.target='_blank';link.rel='noopener noreferrer';}
+    body.append(title,link);card.append(mark,body);cards.appendChild(card);
+  };
+  const email=String(settings.contact_email || '').trim();
+  if(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))addCard('Email','Send us an email','mailto:'+email,'✉');
+  const whatsapp=safePortalURL(settings.whatsapp_channel);
+  addCard('WhatsApp channel','Follow our WhatsApp updates',whatsapp,'◌');
+  const instagram=safePortalURL(settings.instagram_url);
+  addCard('Instagram','Follow ICP YOUTH CIRCLE',instagram,'◎');
+  if(!cards.children.length){
+    const empty=document.createElement('p');empty.className='contact-empty';empty.textContent='Official contact details have not been published yet.';panel.appendChild(empty);
+  }else panel.appendChild(cards);
+  content.appendChild(panel);
 }
 
 function publicFormToken() {
