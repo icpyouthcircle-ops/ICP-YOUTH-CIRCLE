@@ -15,8 +15,28 @@ const PORTAL_BOOTSTRAP_DATA = {
     ['NAV-010','Islamic','islamic',''],['NAV-011','Explore','explore',''],
     ['NAV-012','Notes','notes','NAV-002'],['NAV-013','Past Papers','past-papers','NAV-002'],['NAV-014','MCQs','mcqs','NAV-002'],
     ['NAV-015','Videos','videos','NAV-002'],['NAV-016','Study Resources','study-resources','NAV-002'],
+    ['NAV-017','Prep Tracker','prep-tracker','NAV-002'],
     ['NAV-018','MDCAT','mdcat','NAV-003'],['NAV-019','NUMS','nums','NAV-003'],['NAV-020','ETEA','etea','NAV-003'],
-    ['NAV-021','ECAT','ecat','NAV-003'],['NAV-022','NUST NET','nust-net','NAV-003'],['NAV-023','Other Tests','other-tests','NAV-003']
+    ['NAV-021','ECAT','ecat','NAV-003'],['NAV-022','NUST NET','nust-net','NAV-003'],['NAV-023','Other Tests','other-tests','NAV-003'],
+    ['NAV-024','College Admissions','college-admissions','NAV-004'],['NAV-025','University Admissions','university-admissions','NAV-004'],
+    ['NAV-026','Eligibility','eligibility','NAV-004'],['NAV-027','Deadlines','deadlines','NAV-004'],
+    ['NAV-028','Merit Lists','merit-lists','NAV-004'],['NAV-029','Admission Guides','admission-guides','NAV-004'],
+    ['NAV-030','Pakistan Scholarships','pakistan-scholarships','NAV-005'],['NAV-031','International Scholarships','international-scholarships','NAV-005'],
+    ['NAV-032','Financial Aid','financial-aid','NAV-005'],['NAV-033','Scholarship Guides','scholarship-guides','NAV-005'],
+    ['NAV-034','Career Guidance','career-guidance','NAV-006'],['NAV-035','Internships','internships','NAV-006'],
+    ['NAV-036','Competitions','competitions','NAV-006'],['NAV-037','Student Programs','student-programs','NAV-006'],
+    ['NAV-038','Portfolio Guidance','portfolio-guidance','NAV-006'],['NAV-039','Mentors','mentors','NAV-006'],
+    ['NAV-040','AI Assistant','ai-assistant','NAV-007'],['NAV-041','AI Tools','ai-tools','NAV-007'],
+    ['NAV-042','Smart Tools','smart-tools','NAV-007'],['NAV-043','Study Tools','study-tools','NAV-007'],
+    ['NAV-044','Forum','forum','NAV-008'],['NAV-045','Student Help Desk','student-help-desk','NAV-008'],
+    ['NAV-046','Submit Resource','submit-resource','NAV-008'],['NAV-047','Suggestions','suggestions','NAV-008'],
+    ['NAV-048','Announcements','announcements','NAV-009'],['NAV-049','Exam Updates','exam-updates','NAV-009'],
+    ['NAV-050','Results','results','NAV-009'],['NAV-051','Merit Lists','merit-lists','NAV-009'],
+    ['NAV-052','Important Notices','important-notices','NAV-009'],
+    ['NAV-053','Hadith','hadith','NAV-010'],['NAV-054','Islamic Reminders','islamic-reminders','NAV-010'],
+    ['NAV-055','Duas / Motivation','duas-motivation','NAV-010'],
+    ['NAV-056','Study Abroad','study-abroad','NAV-011'],['NAV-057','Blog','blog','NAV-011'],
+    ['NAV-058','About','about','NAV-011'],['NAV-059','Contact','contact','NAV-011']
   ].map((row,index)=>({ID:row[0],Label:row[1],Slug:row[2],ParentID:row[3],DisplayOrder:index+1})),
   categories: [
     ['Study','study','Study materials and learning resources'],['Entry Tests','entry-tests','Entry test preparation and related content'],
@@ -297,23 +317,57 @@ function renderNavigation(items) {
 
 
     function openCategory(category) {
-
-      if (['entry-tests', 'mdcat', 'mdcat-2027'].includes(category.Slug)) {
-        handleNavigation({Slug: category.Slug, Label: category.Name});
-        return;
-      }
-
-      console.log(
-        'Category:',
-        category
-      );
-
-      alert(
-        category.Name +
-        ' section will open here.'
-      );
-
+      handleNavigation({Slug: category.Slug, Label: category.Name, TargetURL: category.TargetURL || ''});
     }
+
+function getNavigationParentSlug(item) {
+  if (!item || !item.ParentID || !portalData || !Array.isArray(portalData.navigation)) return '';
+  const parent = portalData.navigation.find(row=>String(row.ID)===String(item.ParentID));
+  return parent ? String(parent.Slug || '') : '';
+}
+
+function renderNavigationSection(parentSlug) {
+  const content=document.getElementById('dynamicPageContent');
+  const filters=document.getElementById('resourceFilters');
+  filters.innerHTML='';filters.style.display='none';content.replaceChildren();
+  const navigation=portalData && Array.isArray(portalData.navigation) ? portalData.navigation : [];
+  const parent=navigation.find(row=>row.Slug===parentSlug && !row.ParentID);
+  const children=parent ? navigation.filter(row=>String(row.ParentID)===String(parent.ID)) : [];
+  children.sort((a,b)=>Number(a.DisplayOrder||0)-Number(b.DisplayOrder||0)).forEach(child=>{
+    const card=document.createElement('article');card.className='card resource-card';
+    const heading=document.createElement('h4');heading.textContent=child.Label;
+    const description=document.createElement('p');
+    const category=portalData.categories && portalData.categories.find(row=>row.Slug===child.Slug);
+    description.textContent=category && category.Description ? category.Description : 'Open '+child.Label+' from ICP YOUTH CIRCLE.';
+    const button=document.createElement('button');button.type='button';button.className='resource-button';button.textContent='Open '+child.Label;
+    button.onclick=()=>handleNavigation(child);card.append(heading,description,button);content.appendChild(card);
+  });
+  if (!children.length) renderSectionNotice('No sections have been published here yet.');
+}
+
+function renderSectionNotice(message) {
+  const filters=document.getElementById('resourceFilters');filters.innerHTML='';filters.style.display='none';
+  const content=document.getElementById('dynamicPageContent');content.replaceChildren();
+  const card=document.createElement('div');card.className='card resource-card';
+  const text=document.createElement('p');text.textContent=message;card.appendChild(text);content.appendChild(card);
+}
+
+function routeContains(item,fields,terms) {
+  const text=fields.map(field=>String(item[field]||'').toLowerCase()).join(' ');
+  return terms.some(term=>text.includes(term));
+}
+
+function renderAboutPage() {
+  const settings=portalData && portalData.settings || {};
+  renderSectionNotice(settings.site_description || 'ICP YOUTH CIRCLE is a student resource, opportunity, guidance and community platform.');
+}
+
+function renderContactPage() {
+  const settings=portalData && portalData.settings || {};
+  const details=[settings.contact_email,settings.whatsapp_channel,settings.instagram_url].filter(Boolean);
+  renderSectionNotice(details.length ? 'Contact ICP YOUTH CIRCLE: '+details.join(' • ') : 'Official contact details have not been published yet.');
+}
+
 function handleNavigation(item) {
 
   navigationVersion += 1;
@@ -339,10 +393,12 @@ function handleNavigation(item) {
   const content =
     document.getElementById('dynamicPageContent');
 
-  title.textContent = item.Label;
+  const itemLabel=item.Label || item.Name || 'Portal';
+  const parentSlug=getNavigationParentSlug(item);
+  title.textContent = itemLabel;
 
   description.textContent =
-    'Explore ' + item.Label +
+    'Explore ' + itemLabel +
     ' content from ICP YOUTH CIRCLE.';
 
   content.innerHTML = '';
@@ -357,46 +413,37 @@ if (resourceCategories[item.Slug]) {
   loadResourcesByCategory(
     resourceCategories[item.Slug]
   );
-}
-if (item.Slug === 'mcqs') {
+} else if (item.Slug === 'mcqs') {
   loadMCQs();
-}
-if (item.Slug === 'videos') {
+} else if (item.Slug === 'videos') {
   loadVideos();
-}
-if (item.Slug === 'admissions') {
-  loadAdmissions();
-}
-if (item.Slug === 'scholarships') {
-  loadScholarships();
-}
-if (item.Slug === 'career') {
-  loadOpportunities();
-}
-if (
+} else if (['admissions','college-admissions','university-admissions','eligibility','deadlines','admission-guides'].includes(item.Slug) || (item.Slug==='merit-lists'&&parentSlug==='admissions')) {
+  loadAdmissions(item.Slug,parentSlug);
+} else if (['scholarships','pakistan-scholarships','international-scholarships','financial-aid','scholarship-guides'].includes(item.Slug)) {
+  loadScholarships(item.Slug);
+} else if (['career','career-guidance','internships','competitions','student-programs','portfolio-guidance','mentors'].includes(item.Slug)) {
+  loadOpportunities(item.Slug);
+} else if (
   item.Slug === 'updates' ||
-  item.Slug === 'announcements'
+  item.Slug === 'announcements' || item.Slug === 'exam-updates' || item.Slug === 'results' ||
+  item.Slug === 'important-notices' || (item.Slug === 'merit-lists' && parentSlug === 'updates')
 ) {
-  loadAnnouncements();
-}
-if (
+  loadAnnouncements(item.Slug,parentSlug);
+} else if (
   item.Slug === 'ai-smart-tools' ||
-  item.Slug === 'ai-tools'
+  item.Slug === 'ai-tools' || item.Slug === 'ai-assistant' || item.Slug === 'smart-tools' || item.Slug === 'study-tools'
 ) {
-  loadAITools();
-}
-if (
+  loadAITools(item.Slug);
+} else if (
   item.Slug === 'islamic' ||
   item.Slug === 'hadith' ||
   item.Slug === 'islamic-reminders' ||
   item.Slug === 'duas-motivation'
 ) {
   loadIslamicContent(item.Slug);
-}
-if (item.Slug === 'blog') {
-  loadBlog();
-}
-if (
+} else if (item.Slug === 'blog' || item.Slug === 'study-abroad') {
+  loadBlog(item.Slug);
+} else if (
   item.Slug === 'entry-tests' ||
   item.Slug === 'mdcat-info' ||
   item.Slug === 'nums' ||
@@ -406,6 +453,18 @@ if (
   item.Slug === 'other-tests'
 ) {
   loadEntryTests(item.Slug === 'mdcat-info' ? 'mdcat' : item.Slug);
+} else if (['study','community','explore'].includes(item.Slug)) {
+  renderNavigationSection(item.Slug);
+} else if (item.Slug === 'about') {
+  renderAboutPage();
+} else if (item.Slug === 'contact') {
+  renderContactPage();
+} else if (item.Slug === 'prep-tracker') {
+  renderSectionNotice('No public preparation tracker has been published yet. MDCAT students can use My activity and Study plan inside the MDCAT 2027 hub.');
+} else if (['forum','student-help-desk','submit-resource','suggestions'].includes(item.Slug)) {
+  renderSectionNotice(itemLabel+' is not publicly available yet. An official link will appear here when it is published.');
+} else {
+  renderSectionNotice('No published content is available in '+itemLabel+' yet.');
 }
 
   document.getElementById(
@@ -1877,7 +1936,8 @@ function showVideoError(error) {
 
   console.error(error);
 }
-function loadAdmissions() {
+function loadAdmissions(slug='admissions',parentSlug='') {
+  const requestVersion=navigationVersion;
 
   const content =
     document.getElementById(
@@ -1914,7 +1974,8 @@ fetch(
       );
     }
 
-    renderAdmissions(result.data);
+    if (requestVersion !== navigationVersion) return;
+    renderAdmissions(filterAdmissionsForRoute(result.data || [],slug,parentSlug));
   })
   .catch(error => {
     console.error(
@@ -1922,21 +1983,27 @@ fetch(
       error
     );
 
-  showAdmissionsError(error);
+  if (requestVersion === navigationVersion) showAdmissionsError(error);
   });
   }
-  
-function loadScholarships() {
-  const title =
-    document.getElementById('dynamicPageTitle');
 
+function filterAdmissionsForRoute(items,slug,parentSlug) {
+  if (slug==='college-admissions') return items.filter(item=>routeContains(item,['DegreeLevel','AdmissionType','Institution','Program'],['college','intermediate','fsc']));
+  if (slug==='university-admissions') return items.filter(item=>routeContains(item,['DegreeLevel','AdmissionType','Institution','Program'],['university','bachelor','undergraduate','graduate','master','phd']));
+  if (slug==='eligibility') return items.filter(item=>String(item.Eligibility||'').trim());
+  if (slug==='deadlines') return items.filter(item=>String(item.Deadline||'').trim());
+  if (slug==='merit-lists'&&parentSlug==='admissions') return items.filter(item=>String(item.MeritListDate||'').trim());
+  if (slug==='admission-guides') return items.filter(item=>routeContains(item,['Program','AdmissionType','Description'],['guide','application','how to apply']));
+  return items;
+}
+
+function loadScholarships(slug='scholarships') {
+  const requestVersion=navigationVersion;
   const content =
     document.getElementById('dynamicPageContent');
 
   const filters =
     document.getElementById('resourceFilters');
-
-  title.textContent = 'Scholarships';
 
   filters.innerHTML = '';
   filters.style.display = 'none';
@@ -1964,7 +2031,8 @@ function loadScholarships() {
       );
     }
 
-    renderScholarships(result.data);
+    if (requestVersion !== navigationVersion) return;
+    renderScholarships(filterScholarshipsForRoute(result.data || [],slug));
   })
   .catch(error => {
     console.error(
@@ -1972,21 +2040,25 @@ function loadScholarships() {
       error
     );
 
-  showScholarshipsError(error);
+  if (requestVersion === navigationVersion) showScholarshipsError(error);
   });
   }
-  
-function loadOpportunities() {
-  const title =
-    document.getElementById('dynamicPageTitle');
 
+function filterScholarshipsForRoute(items,slug) {
+  if (slug==='pakistan-scholarships') return items.filter(item=>String(item.Country||'').toLowerCase().includes('pakistan'));
+  if (slug==='international-scholarships') return items.filter(item=>String(item.Country||'').trim()&&!String(item.Country).toLowerCase().includes('pakistan'));
+  if (slug==='financial-aid') return items.filter(item=>routeContains(item,['Name','Type','Description','Benefits'],['financial aid','grant','bursary','need-based','need based']));
+  if (slug==='scholarship-guides') return items.filter(item=>routeContains(item,['Name','Type','Description'],['guide','how to apply','application']));
+  return items;
+}
+
+function loadOpportunities(slug='career') {
+  const requestVersion=navigationVersion;
   const content =
     document.getElementById('dynamicPageContent');
 
   const filters =
     document.getElementById('resourceFilters');
-
-  title.textContent = 'Career Opportunities';
 
   filters.innerHTML = '';
   filters.style.display = 'none';
@@ -2014,7 +2086,8 @@ function loadOpportunities() {
       );
     }
 
-    renderOpportunities(result.data);
+    if (requestVersion !== navigationVersion) return;
+    renderOpportunities(filterOpportunitiesForRoute(result.data || [],slug));
   })
   .catch(error => {
     console.error(
@@ -2022,22 +2095,27 @@ function loadOpportunities() {
       error
     );
 
-  showOpportunitiesError(error);
+  if (requestVersion === navigationVersion) showOpportunitiesError(error);
   });
   }
-  
-function loadAnnouncements() {
-  const title =
-    document.getElementById('dynamicPageTitle');
 
+function filterOpportunitiesForRoute(items,slug) {
+  const terms={
+    'career-guidance':['career guidance','career counselling','career counseling'],
+    internships:['internship'],competitions:['competition','contest','hackathon'],
+    'student-programs':['student program','fellowship','exchange program'],
+    'portfolio-guidance':['portfolio'],'mentors':['mentor','mentorship']
+  }[slug];
+  return terms ? items.filter(item=>routeContains(item,['Title','Type','Description'],terms)) : items;
+}
+
+function loadAnnouncements(slug='updates',parentSlug='') {
+  const requestVersion=navigationVersion;
   const content =
     document.getElementById('dynamicPageContent');
 
   const filters =
     document.getElementById('resourceFilters');
-
-  title.textContent =
-    'Updates & Announcements';
 
   filters.innerHTML = '';
   filters.style.display = 'none';
@@ -2065,7 +2143,8 @@ function loadAnnouncements() {
       );
     }
 
-    renderAnnouncements(result.data);
+    if (requestVersion !== navigationVersion) return;
+    renderAnnouncements(filterAnnouncementsForRoute(result.data || [],slug,parentSlug));
   })
   .catch(error => {
     console.error(
@@ -2073,22 +2152,25 @@ function loadAnnouncements() {
       error
     );
 
-  showAnnouncementsError(error);
+  if (requestVersion === navigationVersion) showAnnouncementsError(error);
   });
   }
-  
-function loadAITools() {
-  const title =
-    document.getElementById('dynamicPageTitle');
 
+function filterAnnouncementsForRoute(items,slug,parentSlug) {
+  const terms=slug==='exam-updates'?['exam','test']:
+    slug==='results'?['result']:
+    slug==='important-notices'?['important notice','notice']:
+    slug==='merit-lists'&&parentSlug==='updates'?['merit list']:null;
+  return terms ? items.filter(item=>routeContains(item,['Title','Category','Summary','Content'],terms)) : items;
+}
+
+function loadAITools(slug='ai-smart-tools') {
+  const requestVersion=navigationVersion;
   const content =
     document.getElementById('dynamicPageContent');
 
   const filters =
     document.getElementById('resourceFilters');
-
-  title.textContent =
-    'AI & Smart Tools';
 
   filters.innerHTML = '';
   filters.style.display = 'none';
@@ -2116,7 +2198,8 @@ function loadAITools() {
       );
     }
 
-    renderAITools(result.data);
+    if (requestVersion !== navigationVersion) return;
+    renderAITools(filterAIToolsForRoute(result.data || [],slug));
   })
   .catch(error => {
     console.error(
@@ -2124,9 +2207,16 @@ function loadAITools() {
       error
     );
 
-  showAIToolsError(error);
+  if (requestVersion === navigationVersion) showAIToolsError(error);
   });
   }
+
+function filterAIToolsForRoute(items,slug) {
+  const terms=slug==='ai-assistant'?['assistant','chatbot']:
+    slug==='smart-tools'?['smart','productivity','utility']:
+    slug==='study-tools'?['study','student','education','learning']:null;
+  return terms ? items.filter(item=>routeContains(item,['Name','Category','Description','BestFor'],terms)) : items;
+}
   
 function loadIslamicContent(slug) {
   const title =
@@ -2748,17 +2838,13 @@ function showEntryTestsError(error) {
   );
 }
 
-function loadBlog() {
-  const title =
-    document.getElementById('dynamicPageTitle');
-
+function loadBlog(slug='blog') {
+  const requestVersion=navigationVersion;
   const content =
     document.getElementById('dynamicPageContent');
 
   const filters =
     document.getElementById('resourceFilters');
-
-  title.textContent = 'Blog';
 
   filters.innerHTML = '';
   filters.style.display = 'none';
@@ -2786,7 +2872,9 @@ function loadBlog() {
         );
       }
 
-      renderBlog(result.data);
+      if (requestVersion !== navigationVersion) return;
+      const posts=result.data || [];
+      renderBlog(slug==='study-abroad' ? posts.filter(item=>routeContains(item,['Title','Category','Summary','Content'],['study abroad','international education'])) : posts);
     })
     .catch(error => {
       console.error(
@@ -2794,7 +2882,7 @@ function loadBlog() {
         error
       );
 
-      showBlogError(error);
+      if (requestVersion === navigationVersion) showBlogError(error);
     });
 }
 
