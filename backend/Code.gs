@@ -1564,6 +1564,71 @@ function adminArchive_(body,admin) {
   return adminSaveRecord_(table,record,admin);
 }
 
+function adminUploadText_(value,label,max,required) {
+  const text=String(value == null ? '' : value).replace(/\s+/g,' ').trim();
+  if (required && !text) mdcatError_('BAD_REQUEST',label+' is required.');
+  if (text.length>max) mdcatError_('BAD_REQUEST',label+' is too long.');
+  return text;
+}
+
+function adminPdfFolder_() {
+  const properties=PropertiesService.getScriptProperties();
+  const key='PORTAL_PDF_FOLDER_ID';
+  const existing=properties.getProperty(key);
+  if (existing) {
+    try { return DriveApp.getFolderById(existing); } catch (_) {}
+  }
+  const folder=DriveApp.createFolder('ICP YOUTH CIRCLE Portal PDFs');
+  properties.setProperty(key,folder.getId());
+  return folder;
+}
+
+function adminSlug_(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,120);
+}
+
+function adminUploadPdf_(body,admin) {
+  if (body.rightsConfirmed!==true) mdcatError_('BAD_REQUEST','Confirm that ICP YOUTH CIRCLE has permission to share this PDF.');
+  const table=adminTable_('RESOURCES');
+  const headers=adminHeaders_(table.sheetName);
+  ['Title','Category','FileURL','Status'].forEach(header=>{if(!headers.includes(header)) mdcatError_('SETUP_REQUIRED','Resources is missing required column: '+header+'.');});
+  const title=adminUploadText_(body.title,'Title',240,true);
+  const category=adminUploadText_(body.category,'Category',80,true);
+  if (!['Notes','Past Papers','Study Resources'].includes(category)) mdcatError_('BAD_REQUEST','Choose Notes, Past Papers or Study Resources.');
+  const originalName=adminUploadText_(body.fileName,'File name',180,true);
+  if (!/\.pdf$/i.test(originalName) || String(body.mimeType || 'application/pdf')!=='application/pdf') mdcatError_('BAD_REQUEST','Only PDF files are supported.');
+  const encoded=String(body.dataBase64 || '');
+  if (!encoded || encoded.length>11200000 || !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) mdcatError_('BAD_REQUEST','The PDF data is invalid or larger than 8 MB.');
+  let bytes;
+  try { bytes=Utilities.base64Decode(encoded); } catch (_) { mdcatError_('BAD_REQUEST','The PDF data could not be decoded.'); }
+  if (!bytes || bytes.length<5 || bytes.length>8*1024*1024 || bytes[0]!==37 || bytes[1]!==80 || bytes[2]!==68 || bytes[3]!==70 || bytes[4]!==45) mdcatError_('BAD_REQUEST','The selected file is not a valid PDF or is larger than 8 MB.');
+  const safeName=originalName.replace(/[^A-Za-z0-9._() -]/g,'_').replace(/\s+/g,' ').slice(0,170);
+  const now=new Date();
+  let file;
+  try {
+    file=adminPdfFolder_().createFile(Utilities.newBlob(bytes,MimeType.PDF,safeName));
+    file.setDescription('Published by '+admin.email+' through the ICP YOUTH CIRCLE admin dashboard.');
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK,DriveApp.Permission.VIEW);
+    const fileId=file.getId();
+    const resource=adminSaveRecord_(table,{
+      Title:title,Slug:adminSlug_(title),Category:category,
+      Subject:adminUploadText_(body.subject,'Subject',160,false),
+      Level:adminUploadText_(body.level,'Level',120,false),
+      Institution:adminUploadText_(body.institution,'Institution',180,false),
+      Year:adminUploadText_(body.year,'Year',20,false),ResourceType:'PDF',
+      Description:adminUploadText_(body.description,'Description',2000,false),
+      FileURL:file.getUrl(),Featured:'No',Status:'Active',CreatedAt:now,UpdatedAt:now
+    },admin);
+    let resourceKey='';
+    try { resourceKey=file.getResourceKey() || ''; } catch (_) {}
+    return {resourceId:resource.key,fileId:fileId,viewUrl:file.getUrl(),downloadUrl:'https://drive.google.com/uc?export=download&id='+encodeURIComponent(fileId)+(resourceKey?'&resourcekey='+encodeURIComponent(resourceKey):'')};
+  } catch (error) {
+    if (file) {try {file.setTrashed(true);} catch (_) {}}
+    if (error.mdcatCode) throw error;
+    mdcatError_('UPLOAD_FAILED','The PDF could not be stored or shared. Check the Apps Script Drive permission and sharing policy.');
+  }
+}
+
 function adminClearPublicCache_() {
   try {
     const cache=CacheService.getScriptCache();
@@ -1574,10 +1639,11 @@ function adminClearPublicCache_() {
 function doPost(e) {
   try {
     const raw = e && e.postData && e.postData.contents;
-    if (typeof raw !== 'string' || raw.length > 100000) mdcatError_('BAD_REQUEST','Invalid request.');
+    if (typeof raw !== 'string' || raw.length > 11500000) mdcatError_('BAD_REQUEST','Invalid request.');
     let body;
     try { body = JSON.parse(raw); } catch (_) { mdcatError_('BAD_REQUEST','Invalid request.'); }
     if (!body || Array.isArray(body) || typeof body !== 'object') mdcatError_('BAD_REQUEST','Invalid request.');
+    if (body.action!=='adminUploadPdf' && raw.length>100000) mdcatError_('BAD_REQUEST','Invalid request.');
     if (body.action==='publicSubmitResource' || body.action==='publicHelpRequest') {
       const publicLock=LockService.getScriptLock();
       if (!publicLock.tryLock(10000)) mdcatError_('BUSY','The service is busy. Please retry.');
@@ -1585,7 +1651,7 @@ function doPost(e) {
         return jsonResponse_(body.action==='publicSubmitResource' ? publicSubmitResource_(body) : publicHelpRequest_(body));
       } finally { publicLock.releaseLock(); }
     }
-    const adminActions=['adminSession','adminList','adminSave','adminBulk','adminArchive'];
+    const adminActions=['adminSession','adminList','adminSave','adminBulk','adminArchive','adminUploadPdf'];
     if (adminActions.includes(body.action)) {
       const admin=adminAuthenticate_(body.idToken);
       if (body.action==='adminSession') return jsonResponse_(adminManifest_(admin));
@@ -1597,6 +1663,7 @@ function doPost(e) {
         if (body.action==='adminSave') adminData=adminSave_(body,admin);
         if (body.action==='adminBulk') adminData=adminBulk_(body,admin);
         if (body.action==='adminArchive') adminData=adminArchive_(body,admin);
+        if (body.action==='adminUploadPdf') adminData=adminUploadPdf_(body,admin);
         adminClearPublicCache_();
         return jsonResponse_(adminData);
       } finally { adminLock.releaseLock(); }

@@ -16,6 +16,7 @@ const {pathToFileURL}=require('node:url');
         if(action==='adminSession') return session;
         if(action==='adminSave'){window.__adminSave={body};return {created:false};}
         if(action==='adminBulk'){window.__adminBulk={body};return {saved:1,created:1,updated:0};}
+        if(action==='adminUploadPdf'){window.__adminPdf={body};return {resourceId:'RES-003',viewUrl:'https://drive.google.com/file/d/file-1/view',downloadUrl:'https://drive.google.com/uc?export=download&id=file-1'};}
         return {};
       };
       adminRenderSession(session);
@@ -25,7 +26,13 @@ const {pathToFileURL}=require('node:url');
     await page.getByRole('button',{name:'New record',exact:true}).click();await page.locator('#adminEditor [data-field="Title"]').fill('New resource');await page.locator('#adminEditor').getByRole('button',{name:'Save record',exact:true}).click();
     await page.waitForFunction(()=>window.__adminSave);saves++;assert.equal(await page.evaluate(()=>window.__adminSave.body.record.Title),'New resource');
     await page.getByRole('button',{name:'Paste multiple rows',exact:true}).click();await page.locator('#adminBulkText').fill('ID\tTitle\tDescription\tStatus\nRES-002\tBulk resource\tBulk text\tInactive');await page.getByRole('button',{name:'Validate and save rows',exact:true}).click();await page.waitForFunction(()=>window.__adminBulk);assert.equal(await page.evaluate(()=>window.__adminBulk.body.records[0].Title),'Bulk resource');
+    await page.getByRole('button',{name:'Upload PDF',exact:true}).click();
+    await page.locator('#adminPdfFile').setInputFiles({name:'biology-notes.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF-1.4 demo')});
+    await page.locator('#adminPdfResourceTitle').fill('Biology Notes');await page.locator('#adminPdfCategory').selectOption('Notes');await page.locator('#adminPdfSubject').fill('Biology');await page.locator('#adminPdfRights').check();
+    await page.getByRole('button',{name:'Upload and publish PDF',exact:true}).click();await page.waitForFunction(()=>window.__adminPdf);
+    const pdf=await page.evaluate(()=>window.__adminPdf.body);assert.equal(pdf.title,'Biology Notes');assert.equal(pdf.category,'Notes');assert.equal(pdf.rightsConfirmed,true);assert.match(pdf.dataBase64,/^JVBER/);
+    await page.getByText('PDF published successfully as RES-003.',{exact:true}).waitFor();
     await page.setViewportSize({width:375,height:812});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.deepEqual(errors,[]);assert.equal(saves,1);
-    console.log('PASS admin dashboard: sign-in shell, safe table selector, record editor, bulk paste validation, private-column exclusion, and mobile layout.');
+    console.log('PASS admin dashboard: sign-in shell, safe table selector, record editor, bulk paste validation, PDF upload, private-column exclusion, and mobile layout.');
   } finally {await browser.close();}
 })().catch(error=>{console.error(error);process.exit(1);});

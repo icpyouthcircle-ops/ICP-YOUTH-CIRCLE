@@ -36,6 +36,7 @@
           <label for="adminTable">Portal section</label>
           <select id="adminTable"></select>
           <button id="adminNew" class="resource-button" type="button">New record</button>
+          <button id="adminPdfToggle" type="button">Upload PDF</button>
           <button id="adminBulkToggle" type="button">Paste multiple rows</button>
         </aside>
 
@@ -62,6 +63,25 @@
             <label for="adminBulkText">Tab-separated rows</label>
             <textarea id="adminBulkText" rows="12" spellcheck="false"></textarea>
             <button id="adminBulkSave" class="resource-button" type="button">Validate and save rows</button>
+          </section>
+
+          <section id="adminPdfPanel" class="admin-panel" hidden aria-labelledby="adminPdfTitle">
+            <div class="admin-panel-title"><h3 id="adminPdfTitle">Upload a student PDF</h3><button id="adminPdfClose" type="button">Close</button></div>
+            <p>The PDF will be stored in the portal's Google Drive folder and published in Resources.</p>
+            <form id="adminPdfForm">
+              <div class="admin-fields">
+                <label class="admin-field admin-field-wide"><span>PDF file *</span><input id="adminPdfFile" type="file" accept="application/pdf,.pdf" required><small>PDF only, maximum 8 MB.</small></label>
+                <label class="admin-field"><span>Title *</span><input id="adminPdfResourceTitle" maxlength="240" required></label>
+                <label class="admin-field"><span>Category *</span><select id="adminPdfCategory" required><option value="">Select one</option><option>Notes</option><option>Past Papers</option><option>Study Resources</option></select></label>
+                <label class="admin-field"><span>Subject</span><input id="adminPdfSubject" maxlength="160"></label>
+                <label class="admin-field"><span>Level or class</span><input id="adminPdfLevel" maxlength="120"></label>
+                <label class="admin-field"><span>Institution or board</span><input id="adminPdfInstitution" maxlength="180"></label>
+                <label class="admin-field"><span>Year</span><input id="adminPdfYear" maxlength="20"></label>
+                <label class="admin-field admin-field-wide"><span>Description</span><textarea id="adminPdfDescription" rows="4" maxlength="2000"></textarea></label>
+              </div>
+              <label class="admin-pdf-confirm"><input id="adminPdfRights" type="checkbox" required> I confirm that ICP YOUTH CIRCLE has permission to share this PDF publicly.</label>
+              <button id="adminPdfUpload" class="resource-button" type="submit">Upload and publish PDF</button>
+            </form>
           </section>
         </div>
       </div>

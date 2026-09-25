@@ -35,7 +35,7 @@ async function adminRequest(action,body={}) {
   const user=identity.auth.currentUser;
   const idToken=await user.getIdToken();
   const controller=new AbortController();
-  const timeout=setTimeout(()=>controller.abort(),60000);
+  const timeout=setTimeout(()=>controller.abort(),action==='adminUploadPdf'?120000:60000);
   try {
     const response=await fetch(ADMIN_API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({...body,action,idToken}),signal:controller.signal,redirect:'follow'});
     if (!response.ok) throw new Error('The server could not complete this request.');
@@ -180,8 +180,46 @@ async function adminBulkSave() {
   finally {button.disabled=false;}
 }
 
-async function adminRefreshSession() {
-  const key=adminCurrentTable && adminCurrentTable.key;
+function adminReadFileBase64(file) {
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(String(reader.result || '').split(',')[1] || '');
+    reader.onerror=()=>reject(new Error('The selected PDF could not be read.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function adminUploadPdf(event) {
+  event.preventDefault();
+  const form=document.getElementById('adminPdfForm');
+  if(!form.reportValidity()) return;
+  const file=document.getElementById('adminPdfFile').files[0];
+  if(!file) return;
+  if(!/\.pdf$/i.test(file.name) || (file.type && file.type!=='application/pdf')) {adminSetStatus('Choose a PDF file.','error');return;}
+  if(file.size<5 || file.size>8*1024*1024) {adminSetStatus('The PDF must be no larger than 8 MB.','error');return;}
+  const button=document.getElementById('adminPdfUpload');button.disabled=true;
+  adminSetStatus('Uploading and publishing the PDF… Keep this page open.');
+  try {
+    const dataBase64=await adminReadFileBase64(file);
+    const result=await adminRequest('adminUploadPdf',{
+      fileName:file.name,mimeType:file.type || 'application/pdf',dataBase64,
+      title:document.getElementById('adminPdfResourceTitle').value,
+      category:document.getElementById('adminPdfCategory').value,
+      subject:document.getElementById('adminPdfSubject').value,
+      level:document.getElementById('adminPdfLevel').value,
+      institution:document.getElementById('adminPdfInstitution').value,
+      year:document.getElementById('adminPdfYear').value,
+      description:document.getElementById('adminPdfDescription').value,
+      rightsConfirmed:document.getElementById('adminPdfRights').checked
+    });
+    form.reset();await adminRefreshSession('RESOURCES');
+    adminSetStatus('PDF published successfully as '+result.resourceId+'.','success');
+  } catch(error) {adminSetStatus(error.message || 'Unable to upload the PDF.','error');}
+  finally {button.disabled=false;}
+}
+
+async function adminRefreshSession(preferredKey) {
+  const key=preferredKey || (adminCurrentTable && adminCurrentTable.key);
   const session=await adminRequest('adminSession');adminSession=session;
   const select=document.getElementById('adminTable');select.replaceChildren();
   session.tables.forEach(table=>{const option=document.createElement('option');option.value=table.key;option.textContent=table.label+' ('+table.rowCount+')';select.appendChild(option);});
@@ -198,5 +236,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('adminBulkClose').onclick=()=>{document.getElementById('adminBulkPanel').hidden=true;};
   document.getElementById('adminCopyHeaders').onclick=async()=>{await navigator.clipboard.writeText(adminCurrentTable.headers.join('\t'));adminSetStatus('Headers copied.','success');};
   document.getElementById('adminBulkSave').onclick=adminBulkSave;
+  document.getElementById('adminPdfToggle').onclick=()=>{document.getElementById('adminPdfPanel').hidden=false;document.getElementById('adminPdfPanel').scrollIntoView({behavior:'smooth',block:'start'});};
+  document.getElementById('adminPdfClose').onclick=()=>{document.getElementById('adminPdfPanel').hidden=true;};
+  document.getElementById('adminPdfForm').onsubmit=adminUploadPdf;
   document.getElementById('adminSignOut').onclick=async()=>{const identity=await adminLoadIdentity();await identity.sdk.signOut(identity.auth);location.reload();};
 });

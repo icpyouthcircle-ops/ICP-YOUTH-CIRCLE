@@ -11,7 +11,7 @@ const {pathToFileURL}=require('node:url');
     page.on('pageerror',error=>errors.push(error.message));
     page.on('dialog',async dialog=>{dialogs++;await dialog.dismiss();});
     const data={
-      resources:[],mcqs:[],videos:[],
+      resources:[{ID:'R1',Title:'Biology PDF',Category:'Notes',ResourceType:'PDF',FileURL:'https://drive.google.com/file/d/demo-file-1/view?resourcekey=demo-key'}],mcqs:[],videos:[],
       admissions:[
         {ID:'A1',Institution:'KPK College',Program:'FSc',DegreeLevel:'Intermediate',Eligibility:'Matric',Deadline:'2026-10-01',MeritListDate:'2026-10-10'},
         {ID:'A2',Institution:'Example University',Program:'BS Computer Science',DegreeLevel:'Bachelor',Eligibility:'FSc',Deadline:'2026-11-01'}
@@ -57,6 +57,11 @@ const {pathToFileURL}=require('node:url');
       assert.ok((await page.locator('#dynamicPageContent').textContent()).trim());
     }
     assert.equal(dialogs,0);
+
+    await page.evaluate(()=>handleNavigation({Slug:'notes',Label:'Notes'}));
+    await page.getByText('Biology PDF',{exact:true}).waitFor();
+    assert.equal(await page.getByRole('link',{name:'View PDF',exact:true}).getAttribute('href'),'https://drive.google.com/file/d/demo-file-1/view?resourcekey=demo-key');
+    assert.match(await page.getByRole('link',{name:'Download PDF',exact:true}).getAttribute('href'),/drive\.google\.com\/uc\?export=download&id=demo-file-1&resourcekey=demo-key/);
 
     const navigation=await page.evaluate(()=>PORTAL_BOOTSTRAP_DATA.navigation);
     for(const item of navigation){

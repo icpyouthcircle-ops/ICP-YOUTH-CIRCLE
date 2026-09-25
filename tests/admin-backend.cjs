@@ -2,7 +2,7 @@ const assert=require('node:assert/strict');
 const {createBackend}=require('./scoring-harness.cjs');
 const backend=createBackend();
 backend.addSheet('Admins',[{ID:'ADMIN-001',Email:'owner@example.test',Role:'Super Admin',Status:'Active'}]);
-backend.addSheet('Resources',[{ID:'RES-001',Title:'Existing note',Description:'Keep this',Status:'Active',CreatedAt:'old',UpdatedAt:'old'}]);
+backend.addSheet('Resources',[{ID:'RES-001',Title:'Existing note',Slug:'existing-note',Category:'Notes',Level:'',Subject:'',Institution:'',Year:'',ResourceType:'PDF',Description:'Keep this',FileURL:'https://example.test/existing.pdf',ThumbnailURL:'',Featured:'No',DisplayOrder:'',Status:'Active',CreatedAt:'old',UpdatedAt:'old'}]);
 const adminSheetNames=['Categories','Subjects','Levels','Institutions','Entry_Tests','Admissions','Scholarships','Opportunities','Announcements','MCQs','Videos','AI_Tools','Islamic_Content','Blog','Navigation','Homepage','Social_Links','Submissions','Help_Desk','Activity_Log','Settings','MDCAT_Subjects','MDCAT_Units','MDCAT_Chapters','MDCAT_Topics','MDCAT_Question_Bank','MDCAT_Tests','MDCAT_Test_Questions','MDCAT_Daily_Practice','MDCAT_Updates'];
 for(const name of adminSheetNames){if(!backend.sheets.has(name)) backend.addSheet(name,[{ID:'SETUP-001',Status:'Inactive'}]);}
 const admin=backend.token('owner',{}, {email:'owner@example.test'});
@@ -34,4 +34,11 @@ const bulk=ok(backend.call('adminBulk',admin,{table:'RESOURCES',headers,records:
 assert.deepEqual(bulk,{saved:1,created:1,updated:0});
 bad(backend.call('adminBulk',admin,{table:'RESOURCES',headers:['Wrong'],records:[{Wrong:'x'}]}),'BAD_REQUEST');
 bad(backend.call('adminSave',admin,{table:'MDCAT_ATTEMPT_ANSWERS',record:{ID:'x'}}),'BAD_REQUEST');
-console.log('PASS admin backend: verified Google allowlist, safe table manifest, list/create/update/archive, exact-header bulk paste, and private-sheet exclusion.');
+const pdfBase64=Buffer.from('%PDF-1.4\nDemo PDF').toString('base64');
+bad(backend.call('adminUploadPdf',outsider,{fileName:'demo.pdf',mimeType:'application/pdf',dataBase64:pdfBase64,title:'Demo PDF',category:'Notes',rightsConfirmed:true}),'ADMIN_REQUIRED');
+bad(backend.call('adminUploadPdf',admin,{fileName:'demo.txt',mimeType:'text/plain',dataBase64:pdfBase64,title:'Demo PDF',category:'Notes',rightsConfirmed:true}),'BAD_REQUEST');
+const upload=ok(backend.call('adminUploadPdf',admin,{fileName:'Biology Notes.pdf',mimeType:'application/pdf',dataBase64:pdfBase64,title:'Biology Notes',category:'Notes',subject:'Biology',level:'Class 12',description:'Uploaded PDF',rightsConfirmed:true}));
+assert.match(upload.resourceId,/^RES-/);assert.match(upload.viewUrl,/drive\.google\.com\/file\/d\//);assert.match(upload.downloadUrl,/export=download/);
+const uploaded=backend.rows('Resources').find(row=>row.ID===upload.resourceId);assert.equal(uploaded.Status,'Active');assert.equal(uploaded.ResourceType,'PDF');assert.equal(uploaded.Subject,'Biology');
+assert.equal(backend.driveFiles.length,1);assert.deepEqual(backend.driveFiles[0].sharing,{access:'anyone',permission:'view'});assert.equal(backend.driveFiles[0].trashed,false);
+console.log('PASS admin backend: verified Google allowlist, safe table manifest, list/create/update/archive, exact-header bulk paste, PDF validation/Drive publishing, and private-sheet exclusion.');

@@ -85,6 +85,22 @@ function safePortalURL(value) {
   } catch (_) { return ''; }
 }
 
+function googleDriveDownloadURL(value) {
+  const safe=safePortalURL(value);
+  if (!safe) return '';
+  try {
+    const url=new URL(safe);
+    if (url.hostname!=='drive.google.com') return '';
+    const pathMatch=url.pathname.match(/\/file\/d\/([A-Za-z0-9_-]+)/);
+    const id=pathMatch ? pathMatch[1] : url.searchParams.get('id');
+    if (!id || !/^[A-Za-z0-9_-]+$/.test(id)) return '';
+    const download=new URL('https://drive.google.com/uc');
+    download.searchParams.set('export','download');download.searchParams.set('id',id);
+    const resourceKey=url.searchParams.get('resourcekey');if(resourceKey)download.searchParams.set('resourcekey',resourceKey);
+    return download.href;
+  } catch (_) { return ''; }
+}
+
 function publicModuleKey(action, params = {}) {
   const query = new URLSearchParams({ action, ...params });
   return query.toString();
@@ -1109,13 +1125,21 @@ function drawResourceCards(resources) {
       link.rel =
         'noopener noreferrer';
 
-      link.textContent =
-        'Open Resource';
+      const isPdf=String(resource.ResourceType || '').trim().toLowerCase()==='pdf';
+      link.textContent = isPdf ? 'View PDF' : 'Open Resource';
 
       link.className =
         'resource-button';
 
       body.appendChild(link);
+
+      const downloadURL=isPdf ? googleDriveDownloadURL(resourceFileURL) : '';
+      if (downloadURL) {
+        const download=document.createElement('a');
+        download.href=downloadURL;download.target='_blank';download.rel='noopener noreferrer';
+        download.textContent='Download PDF';download.className='resource-button';
+        body.appendChild(download);
+      }
     }
 
 
