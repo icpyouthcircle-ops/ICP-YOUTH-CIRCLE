@@ -28,6 +28,8 @@ const CONFIG = {
     SETTINGS: 'Settings',
     TEST_CATALOG: 'Test_Catalog',
     NOTIFICATIONS: 'Notifications',
+    NOTIFICATION_READS: 'Notification_Reads',
+    NOTIFICATION_PREFERENCES: 'Notification_Preferences',
     MDCAT_SUBJECTS: 'MDCAT_Subjects',
     MDCAT_UNITS: 'MDCAT_Units',
     MDCAT_CHAPTERS: 'MDCAT_Chapters',
@@ -1466,7 +1468,24 @@ function studentOwnedRows_(sheetName,email) {
   }).sort((a,b)=>new Date(b.UpdatedAt || b.SubmittedAt || b.CreatedAt || 0).getTime()-new Date(a.UpdatedAt || a.SubmittedAt || a.CreatedAt || 0).getTime()).slice(0,100);
 }
 
-function studentNotifications_() {
+function studentNotificationPreferences_(uid) {
+  const defaults={GeneralUpdates:true,TestNotices:true,DeadlineReminders:true,StudyPlanReminders:true};
+  const sheet=getSpreadsheet_().getSheetByName(CONFIG.SHEETS.NOTIFICATION_PREFERENCES);
+  if (!sheet) return defaults;
+  const rows=getSheetData_(CONFIG.SHEETS.NOTIFICATION_PREFERENCES).filter(row=>String(row.UserID)===String(uid) && String(row.Status || 'Active').toLowerCase()==='active');
+  if (!rows.length) return defaults;
+  const value=(row,key)=>String(row[key]).trim().toLowerCase()!=='false';
+  return Object.fromEntries(Object.keys(defaults).map(key=>[key,value(rows[0],key)]));
+}
+
+function studentNotificationReadIds_(uid) {
+  const sheet=getSpreadsheet_().getSheetByName(CONFIG.SHEETS.NOTIFICATION_READS);
+  if (!sheet) return [];
+  return getSheetData_(CONFIG.SHEETS.NOTIFICATION_READS).filter(row=>String(row.UserID)===String(uid) && String(row.Status || 'Active').toLowerCase()==='active')
+    .map(row=>String(row.NotificationID || '')).filter(Boolean).slice(-1000);
+}
+
+function studentNotifications_(preferences) {
   const now=Date.now();
   const timestamp=value=>{
     if (!value) return 0;
@@ -1479,16 +1498,59 @@ function studentNotifications_() {
     if (!['all','everyone','registered users','students'].includes(audience)) return false;
     const publishAt=timestamp(row.PublishAt || row.PublishDate);
     const expiresAt=timestamp(row.ExpiresAt || row.ExpiryDate);
-    return (!publishAt || publishAt<=now) && (!expiresAt || expiresAt>=now);
+    if ((publishAt && publishAt>now) || (expiresAt && expiresAt<now)) return false;
+    const category=String(row.Category || (row.TestID ? 'Test' : 'General')).trim().toLowerCase();
+    const reminder=String(row.ReminderType || '').trim().toLowerCase();
+    const pinned=/^(yes|true|1)$/i.test(String(row.IsPinned || '')) || /^(important|urgent)$/i.test(String(row.Priority || ''));
+    if (pinned || !preferences) return true;
+    if ((row.TestID || category==='test') && preferences.TestNotices===false) return false;
+    if ((reminder==='deadline' || category==='deadline') && preferences.DeadlineReminders===false) return false;
+    if ((reminder==='study plan' || reminder==='study-plan' || category==='study plan') && preferences.StudyPlanReminders===false) return false;
+    return preferences.GeneralUpdates!==false;
   }).sort((a,b)=>{
+    const pinnedA=/^(yes|true|1)$/i.test(String(a.IsPinned || '')) || /^(important|urgent)$/i.test(String(a.Priority || ''));
+    const pinnedB=/^(yes|true|1)$/i.test(String(b.IsPinned || '')) || /^(important|urgent)$/i.test(String(b.Priority || ''));
+    if (pinnedA!==pinnedB) return pinnedA ? -1 : 1;
     const order=Number(a.DisplayOrder || 0)-Number(b.DisplayOrder || 0);
     return order || timestamp(b.PublishAt || b.CreatedAt)-timestamp(a.PublishAt || a.CreatedAt);
   }).slice(0,50).map(row=>({
     ID:String(row.ID || '').slice(0,120),Title:String(row.Title || '').replace(/\s+/g,' ').trim().slice(0,240),
     Message:String(row.Message || row.Description || '').trim().slice(0,2000),
     TestID:String(row.TestID || '').slice(0,120),LinkURL:String(row.LinkURL || row.URL || '').trim().slice(0,1000),
-    PublishAt:row.PublishAt || row.PublishDate || row.CreatedAt || ''
+    Category:String(row.Category || (row.TestID ? 'Test' : 'General')).trim().slice(0,80) || 'General',
+    Priority:String(row.Priority || 'Normal').trim().slice(0,40) || 'Normal',
+    IsPinned:/^(yes|true|1)$/i.test(String(row.IsPinned || '')) || /^(important|urgent)$/i.test(String(row.Priority || '')),
+    ReminderType:String(row.ReminderType || '').trim().slice(0,80),ReminderAt:row.ReminderAt || '',
+    PublishAt:row.PublishAt || row.PublishDate || row.CreatedAt || '',ExpiresAt:row.ExpiresAt || row.ExpiryDate || ''
   })).filter(row=>row.ID && row.Title);
+}
+
+function studentDashboardMetrics_(uid) {
+  const empty={recentResults:[],questionsAttempted:0,overallAccuracy:0,accuracyBySubject:[],weakTopics:[]};
+  try {
+    const attempts=mdcatTable_(CONFIG.SHEETS.MDCAT_TEST_ATTEMPTS).rows.filter(row=>row.UserID===uid && row.Status==='Submitted')
+      .sort((a,b)=>new Date(b.SubmittedAt)-new Date(a.SubmittedAt));
+    const sessions=new Map(mdcatTable_(MDCAT_SCORING_.sessions).rows.map(row=>[String(row.ID),row]));
+    const recentResults=attempts.slice(0,5).map(row=>({
+      attemptId:String(row.ID),title:String((sessions.get(String(row.ID)) || {}).Title || 'MDCAT practice').slice(0,240),
+      percentage:Number(row.Percentage || 0),score:Number(row.Score || 0),totalQuestions:Number(row.TotalQuestions || 0),
+      attemptedQuestions:Number(row.AttemptedQuestions || 0),submittedAt:row.SubmittedAt || row.UpdatedAt || ''
+    }));
+    const progress=mdcatProgress_(uid,false);
+    const questionsAttempted=progress.reduce((sum,row)=>sum+Number(row.QuestionsAttempted || 0),0);
+    const correct=progress.reduce((sum,row)=>sum+Number(row.CorrectAnswers || 0),0);
+    const bySubject={};
+    progress.forEach(row=>{
+      const key=String(row.SubjectID || row.SubjectName || 'Other');
+      if(!bySubject[key])bySubject[key]={subjectId:String(row.SubjectID || ''),subjectName:String(row.SubjectName || 'Other'),questionsAttempted:0,correctAnswers:0};
+      bySubject[key].questionsAttempted+=Number(row.QuestionsAttempted || 0);bySubject[key].correctAnswers+=Number(row.CorrectAnswers || 0);
+    });
+    const accuracyBySubject=Object.values(bySubject).map(row=>Object.assign(row,{accuracy:row.questionsAttempted?Math.round(row.correctAnswers/row.questionsAttempted*10000)/100:0}))
+      .sort((a,b)=>b.questionsAttempted-a.questionsAttempted);
+    const weakTopics=progress.filter(row=>Number(row.QuestionsAttempted || 0)>0).sort((a,b)=>Number(a.AccuracyPercentage)-Number(b.AccuracyPercentage) || Number(b.QuestionsAttempted)-Number(a.QuestionsAttempted)).slice(0,5)
+      .map(row=>({topicId:String(row.TopicID || ''),topicName:String(row.TopicName || 'Topic'),subjectName:String(row.SubjectName || ''),questionsAttempted:Number(row.QuestionsAttempted || 0),accuracy:Number(row.AccuracyPercentage || 0)}));
+    return {recentResults:recentResults,questionsAttempted:questionsAttempted,overallAccuracy:questionsAttempted?Math.round(correct/questionsAttempted*10000)/100:0,accuracyBySubject:accuracyBySubject,weakTopics:weakTopics};
+  } catch (_) { return empty; }
 }
 
 function studentDashboard_(user) {
@@ -1505,7 +1567,34 @@ function studentDashboard_(user) {
     SubmittedAt:row.SubmittedAt || row.CreatedAt || '',UpdatedAt:row.UpdatedAt || '',
     Response:clean(row.AdminResponse || row.Response || row.Resolution,1000)
   }));
-  return {email:user.email,submissions:submissions,helpRequests:helpRequests,notifications:studentNotifications_()};
+  const preferences=studentNotificationPreferences_(user.uid);
+  const readNotificationIds=studentNotificationReadIds_(user.uid);
+  const readSet=new Set(readNotificationIds);
+  const notifications=studentNotifications_(preferences).map(row=>Object.assign({},row,{IsRead:readSet.has(String(row.ID))}));
+  return Object.assign({email:user.email,submissions:submissions,helpRequests:helpRequests,notifications:notifications,
+    unreadNotificationCount:notifications.filter(row=>!row.IsRead).length,readNotificationIds:readNotificationIds,notificationPreferences:preferences},studentDashboardMetrics_(user.uid));
+}
+
+function notificationDigest_(value) {
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,String(value)).map(byte=>('0'+(byte&255).toString(16)).slice(-2)).join('');
+}
+
+function studentMarkNotificationsRead_(user,body) {
+  if (!Array.isArray(body.notificationIds) || !body.notificationIds.length || body.notificationIds.length>100) mdcatError_('BAD_REQUEST','Choose between 1 and 100 notifications.');
+  const ids=[...new Set(body.notificationIds.map(value=>String(value || '').trim()))];
+  if(ids.some(id=>!id || id.length>120 || !/^[A-Za-z0-9_-]+$/.test(id))) mdcatError_('BAD_REQUEST','A notification reference is invalid.');
+  const now=new Date().toISOString();
+  mdcatPutMany_(CONFIG.SHEETS.NOTIFICATION_READS,ids.map(id=>({ID:'NREAD-'+notificationDigest_(user.uid+':'+id),UserID:user.uid,NotificationID:id,ReadAt:now,Status:'Active',CreatedAt:now,UpdatedAt:now})));
+  return {readNotificationIds:ids};
+}
+
+function studentSaveNotificationPreferences_(user,body) {
+  const keys=['GeneralUpdates','TestNotices','DeadlineReminders','StudyPlanReminders'];
+  if(!body.preferences || typeof body.preferences!=='object' || Array.isArray(body.preferences) || keys.some(key=>typeof body.preferences[key]!=='boolean')) mdcatError_('BAD_REQUEST','Choose valid notification preferences.');
+  const now=new Date().toISOString();
+  const preferences=Object.fromEntries(keys.map(key=>[key,body.preferences[key]]));
+  mdcatPut_(CONFIG.SHEETS.NOTIFICATION_PREFERENCES,Object.assign({ID:'NPREF-'+notificationDigest_(user.uid),UserID:user.uid,Status:'Active',CreatedAt:now,UpdatedAt:now},preferences));
+  return preferences;
 }
 
 const ADMIN_TABLES_ = [
@@ -1730,8 +1819,15 @@ function doPost(e) {
         return jsonResponse_(body.action==='publicSubmitResource' ? publicSubmitResource_(body) : publicHelpRequest_(body));
       } finally { publicLock.releaseLock(); }
     }
-    if (body.action==='studentDashboard') {
-      return jsonResponse_(studentDashboard_(firebaseAuthenticate_(body.idToken)));
+    if (['studentDashboard','studentMarkNotificationsRead','studentSaveNotificationPreferences'].includes(body.action)) {
+      const student=firebaseAuthenticate_(body.idToken);
+      if(body.action==='studentDashboard') return jsonResponse_(studentDashboard_(student));
+      const studentLock=LockService.getScriptLock();
+      if(!studentLock.tryLock(10000)) mdcatError_('BUSY','The service is busy. Please retry.');
+      try {
+        if(body.action==='studentMarkNotificationsRead') return jsonResponse_(studentMarkNotificationsRead_(student,body));
+        return jsonResponse_(studentSaveNotificationPreferences_(student,body));
+      } finally { studentLock.releaseLock(); }
     }
     const adminActions=['adminSession','adminList','adminSave','adminBulk','adminArchive','adminUploadPdf'];
     if (adminActions.includes(body.action)) {
@@ -1776,16 +1872,18 @@ function setupUniversalTestsAndNotifications_() {
   const spreadsheet=getSpreadsheet_();
   const definitions=[
     [CONFIG.SHEETS.TEST_CATALOG,['ID','Name','Slug','Description','TestType','Route','Engine','DisplayOrder','Status','CreatedAt','UpdatedAt']],
-    [CONFIG.SHEETS.NOTIFICATIONS,['ID','Title','Message','Audience','TestID','LinkURL','PublishAt','ExpiresAt','DisplayOrder','Status','CreatedAt','UpdatedAt']]
+    [CONFIG.SHEETS.NOTIFICATIONS,['ID','Title','Message','Audience','TestID','LinkURL','PublishAt','ExpiresAt','DisplayOrder','Status','CreatedAt','UpdatedAt','Category','Priority','IsPinned','ReminderType','ReminderAt']],
+    [CONFIG.SHEETS.NOTIFICATION_READS,['ID','UserID','NotificationID','ReadAt','Status','CreatedAt','UpdatedAt']],
+    [CONFIG.SHEETS.NOTIFICATION_PREFERENCES,['ID','UserID','GeneralUpdates','TestNotices','DeadlineReminders','StudyPlanReminders','Status','CreatedAt','UpdatedAt']]
   ];
   definitions.forEach(([name,headers])=>{
     let sheet=spreadsheet.getSheetByName(name);
     if (!sheet) sheet=spreadsheet.insertSheet(name);
     if (sheet.getLastRow()===0) sheet.getRange(1,1,1,headers.length).setValues([headers]);
     const actual=(sheet.getDataRange().getValues()[0] || []).map(value=>String(value).replace(/\uFEFF/g,'').trim()).filter(Boolean);
-    if (actual.length!==headers.length || headers.some((header,index)=>actual[index]!==header)) {
-      mdcatError_('SETUP_REQUIRED',name+' must use these headers in this order: '+headers.join(', '));
-    }
+    if(new Set(actual).size!==actual.length || !actual.includes('ID')) mdcatError_('SETUP_REQUIRED',name+' has missing or duplicate headers.');
+    const missing=headers.filter(header=>!actual.includes(header));
+    if(missing.length) sheet.getRange(1,actual.length+1,1,missing.length).setValues([missing]);
   });
   const catalog=getSheetData_(CONFIG.SHEETS.TEST_CATALOG);
   if (!catalog.some(row=>String(row.Slug).trim().toLowerCase()==='mdcat')) {

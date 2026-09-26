@@ -20,15 +20,19 @@ function runUniversalPortalSetup() {
 Save, select `runUniversalPortalSetup`, and run it once. It safely creates and validates:
 
 - `Test_Catalog` — tests shown under **My tests**
-- `Notifications` — updates shown to signed-in users
+- `Notifications` — administrator-published updates shown to signed-in users
+- `Notification_Reads` — private, account-synced read receipts
+- `Notification_Preferences` — private notification choices for each account
 
 It also adds MDCAT to the test catalog without changing MDCAT questions, attempts, or results. Delete the temporary wrapper and save before deploying the web app.
 
 Notification rows use these exact columns:
 
-`ID | Title | Message | Audience | TestID | LinkURL | PublishAt | ExpiresAt | DisplayOrder | Status | CreatedAt | UpdatedAt`
+`ID | Title | Message | Audience | TestID | LinkURL | PublishAt | ExpiresAt | DisplayOrder | Status | CreatedAt | UpdatedAt | Category | Priority | IsPinned | ReminderType | ReminderAt`
 
-Use `Registered Users` for `Audience` and `Active` for `Status`. `LinkURL`, `PublishAt`, `ExpiresAt`, and `TestID` may be left empty.
+Use `Registered Users` for `Audience` and `Active` for `Status`. Recommended category values are `General`, `Test`, `Deadline`, and `Study Plan`. Use `Important` for `Priority` or `Yes` for `IsPinned` to pin a notice. Use `Deadline` or `Study Plan` for `ReminderType`, with an optional `ReminderAt` date. `LinkURL`, `PublishAt`, `ExpiresAt`, and `TestID` may be left empty.
+
+The setup appends new notification columns to an existing sheet without removing rows. Never edit `Notification_Reads` or `Notification_Preferences` manually; the signed-in student actions maintain them.
 
 ## 1. Back up the current Apps Script
 
@@ -108,6 +112,7 @@ Then open the portal, choose **Sign in** from the main navigation, and test:
 3. Submit an answer.
 4. Open **My tests**, then confirm the result appears in **My test results** and the counts appear in **My test progress**.
 5. Confirm guest question-bank practice still works without signing in.
+6. Return to **My dashboard** and confirm the unread badge, notification categories, **Mark as read**, **Mark all as read**, and preferences work after a refresh.
 
 ## Operational limits
 

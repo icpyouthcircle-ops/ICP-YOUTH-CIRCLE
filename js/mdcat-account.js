@@ -9,7 +9,8 @@ let mdcatIdentity = null;
 let mdcatIdentityLoading = null;
 let mdcatGradeTimer = null;
 let mdcatGradeView = 0;
-const PORTAL_NOTIFICATION_SEEN_KEY = 'icp-notifications-seen-v1';
+let portalDashboardCache = null;
+let portalDashboardPromise = null;
 
 function resetMDCATGrading() {
   clearInterval(mdcatGradeTimer);
@@ -71,6 +72,116 @@ function showPortalAccountShell() {
   document.getElementById('mdcatHub').classList.add('portal-account-view');
 }
 
+function portalLocalStudentData() {
+  const empty={attempts:[],revision:[],plan:[]};
+  try {
+    const stored=JSON.parse(localStorage.getItem(MDCAT_LOCAL_KEY) || 'null');
+    return stored && ['attempts','revision','plan'].every(key=>Array.isArray(stored[key])) ? stored : empty;
+  } catch (_) { return empty; }
+}
+
+function portalStudyPlanNotifications(data) {
+  if(!data || !data.notificationPreferences || data.notificationPreferences.StudyPlanReminders===false)return [];
+  const read=new Set((data.readNotificationIds || []).map(String));
+  const today=new Date();today.setHours(0,0,0,0);
+  const limit=today.getTime()+7*86400000;
+  return portalLocalStudentData().plan.filter(task=>!task.done && task.date).map(task=>{
+    const due=new Date(task.date+'T00:00:00');
+    if(Number.isNaN(due.getTime()) || due.getTime()>limit)return null;
+    const overdue=due.getTime()<today.getTime();
+    const ID='PLAN-'+String(task.id || '').replace(/[^A-Za-z0-9_-]/g,'').slice(0,100);
+    return {ID,Title:overdue?'Study task overdue':'Study task due soon',Message:String(task.title || 'Study task'),Category:'Study Plan',Priority:overdue?'Important':'Normal',IsPinned:overdue,ReminderType:'Study Plan',ReminderAt:task.date,PublishAt:task.date,IsRead:read.has(ID),LocalTask:true};
+  }).filter(Boolean);
+}
+
+function portalAllNotifications(data) {
+  return [...portalStudyPlanNotifications(data),...(data.notifications || [])].sort((a,b)=>Number(Boolean(b.IsPinned))-Number(Boolean(a.IsPinned)) || new Date(b.PublishAt || 0)-new Date(a.PublishAt || 0));
+}
+
+function setPortalNotificationBadge(count) {
+  const button=document.getElementById('portalAccountButton');
+  if(!button)return;
+  let badge=button.querySelector('.nav-notification-badge');
+  if(!badge){badge=document.createElement('span');badge.className='nav-notification-badge';button.appendChild(badge);}
+  const value=Math.max(0,Number(count || 0));
+  badge.textContent=value>99?'99+':String(value);badge.hidden=!value;
+  button.setAttribute('aria-label',value?'My account, '+value+' unread notification'+(value===1?'':'s'):'My account');
+}
+
+async function loadStudentDashboard(force=false) {
+  if(!force && portalDashboardCache && Date.now()-portalDashboardCache.savedAt<60000)return portalDashboardCache.data;
+  if(!force && portalDashboardPromise)return portalDashboardPromise;
+  portalDashboardPromise=mdcatPrivateRequest('studentDashboard').then(data=>{
+    portalDashboardCache={savedAt:Date.now(),data};
+    setPortalNotificationBadge(portalAllNotifications(data).filter(row=>!row.IsRead).length);
+    return data;
+  }).finally(()=>{portalDashboardPromise=null;});
+  return portalDashboardPromise;
+}
+
+async function initializePortalAccountState() {
+  try {
+    const identity=await mdcatLoadIdentity();
+    const signedIn=Boolean(identity.auth.currentUser);
+    if(typeof setPortalAccountButton==='function')setPortalAccountButton(signedIn);
+    if(signedIn)await loadStudentDashboard();else setPortalNotificationBadge(0);
+  } catch (_) {}
+}
+
+function dashboardSection(title,description,className='') {
+  const section=mdcatElement('section',null,'student-dashboard-section '+className);
+  section.append(mdcatElement('h3',title),mdcatElement('p',description,'student-dashboard-section-copy'));
+  return section;
+}
+
+function dashboardEmpty(text) { return mdcatElement('p',text,'student-dashboard-empty'); }
+
+function renderStudentDashboard(grid,data,user,pending) {
+  const local=portalLocalStudentData();
+  const bookmarks=typeof getPortalBookmarks==='function'?getPortalBookmarks():[];
+  const upcoming=local.plan.filter(task=>!task.done).sort((a,b)=>String(a.date || '9999').localeCompare(String(b.date || '9999'))).slice(0,5);
+  const notifications=portalAllNotifications(data);const unread=notifications.filter(row=>!row.IsRead);
+  const requests=[...(data.submissions || []).map(row=>({...row,requestTitle:row.Title || 'Resource submission'})),...(data.helpRequests || []).map(row=>({...row,requestTitle:row.Subject || 'Help request'}))]
+    .sort((a,b)=>new Date(b.UpdatedAt || b.SubmittedAt || 0)-new Date(a.UpdatedAt || a.SubmittedAt || 0));
+  const welcome=mdcatElement('section',null,'mdcat-wide student-welcome-card');
+  const name=user.displayName || (user.email ? user.email.split('@')[0] : 'Student');
+  welcome.append(mdcatElement('span','STUDENT ACCOUNT','student-eyebrow'),mdcatElement('h3','Welcome, '+name),mdcatElement('p','Here is your latest study activity across ICP YOUTH CIRCLE.'));
+  const actions=mdcatElement('div',null,'student-quick-actions');
+  actions.append(mdcatButton('My tests',()=>openUserTests()),mdcatButton('Notifications',()=>openUserNotifications()),mdcatButton('Saved resources',()=>openStudentBookmarks()),mdcatButton('My requests',()=>openStudentRequests()),mdcatButton('Sign out',async()=>{await mdcatIdentity.sdk.signOut(mdcatIdentity.auth);portalDashboardCache=null;setPortalNotificationBadge(0);if(typeof setPortalAccountButton==='function')setPortalAccountButton(false);openUserAccount();}));
+  if(pending)actions.appendChild(mdcatButton('Continue to scored practice',()=>openMDCATGraded(pending.mode,pending.contextId)));
+  welcome.appendChild(actions);grid.appendChild(welcome);
+  const metrics=mdcatElement('section',null,'mdcat-wide student-metric-grid');
+  [['Questions attempted',data.questionsAttempted || 0,'Scored questions'],['Overall accuracy',(data.overallAccuracy || 0)+'%','Across scored answers'],['Unread notifications',unread.length,'Account synced'],['Saved resources',bookmarks.length,'Saved in this browser']].forEach(([label,value,note])=>{
+    const card=mdcatElement('article',null,'student-metric-card');card.append(mdcatElement('span',label),mdcatElement('strong',String(value)),mdcatElement('small',note));metrics.appendChild(card);
+  });grid.appendChild(metrics);
+  const layout=mdcatElement('div',null,'mdcat-wide student-dashboard-grid');
+  const tasks=dashboardSection('Upcoming study tasks','Your next browser-saved study plan items.');
+  if(!upcoming.length)tasks.appendChild(dashboardEmpty('No upcoming tasks. Add one from the MDCAT study plan.'));
+  upcoming.forEach(task=>{const row=mdcatElement('div',null,'student-list-row');row.append(mdcatElement('strong',task.title),mdcatElement('span',task.date?studentRequestDate(task.date):'No target date'));tasks.appendChild(row);});tasks.appendChild(mdcatButton('Open study plan',()=>openMDCATLocal('plan')));layout.appendChild(tasks);
+  const noticeSection=dashboardSection('Unread notifications','Important updates and reminders.');
+  if(!unread.length)noticeSection.appendChild(dashboardEmpty('You are all caught up.'));
+  unread.slice(0,4).forEach(row=>{const item=mdcatElement('div',null,'student-list-row');item.append(mdcatElement('strong',(row.IsPinned?'Pinned · ':'')+row.Title),mdcatElement('span',row.Category || 'General'));noticeSection.appendChild(item);});noticeSection.appendChild(mdcatButton('Open notification centre',()=>openUserNotifications()));layout.appendChild(noticeSection);
+  const results=dashboardSection('Recent test results','Your latest submitted scored attempts.');
+  if(!(data.recentResults || []).length)results.appendChild(dashboardEmpty('No scored test results yet.'));
+  (data.recentResults || []).slice(0,4).forEach(row=>{const item=mdcatElement('div',null,'student-list-row');item.append(mdcatElement('strong',row.title),mdcatElement('span',row.percentage+'% · '+studentRequestDate(row.submittedAt)));results.appendChild(item);});results.appendChild(mdcatButton('View all test results',()=>openMDCATSavedResults()));layout.appendChild(results);
+  const accuracy=dashboardSection('Accuracy by subject','Based on submitted, scored questions.');
+  if(!(data.accuracyBySubject || []).length)accuracy.appendChild(dashboardEmpty('Subject accuracy will appear after a scored test.'));
+  (data.accuracyBySubject || []).slice(0,6).forEach(row=>{const item=mdcatElement('div',null,'student-progress-row');item.append(mdcatElement('div',row.subjectName+' · '+row.questionsAttempted+' questions'),mdcatElement('strong',row.accuracy+'%'));const bar=mdcatElement('span',null,'student-progress-track');const fill=mdcatElement('span',null,'student-progress-fill');fill.style.width=Math.max(0,Math.min(100,row.accuracy))+'%';bar.appendChild(fill);item.appendChild(bar);accuracy.appendChild(item);});layout.appendChild(accuracy);
+  const weak=dashboardSection('Weak topics','Topics with the lowest current accuracy.');
+  if(!(data.weakTopics || []).length)weak.appendChild(dashboardEmpty('Weak-topic guidance will appear after scored practice.'));
+  (data.weakTopics || []).forEach(row=>{const item=mdcatElement('div',null,'student-list-row');item.append(mdcatElement('strong',row.topicName),mdcatElement('span',(row.subjectName?row.subjectName+' · ':'')+row.accuracy+'% accuracy'));weak.appendChild(item);});layout.appendChild(weak);
+  const saved=dashboardSection('Saved resources','Your latest browser bookmarks.');
+  if(!bookmarks.length)saved.appendChild(dashboardEmpty('No saved resources yet.'));
+  bookmarks.slice(0,4).forEach(row=>{const item=mdcatElement('div',null,'student-list-row');item.append(mdcatElement('strong',row.title),mdcatElement('span',[row.subject,row.category].filter(Boolean).join(' · ') || 'Resource'));saved.appendChild(item);});saved.appendChild(mdcatButton('View saved resources',()=>openStudentBookmarks()));layout.appendChild(saved);
+  const submitted=dashboardSection('Submitted requests','Latest resource and help-desk submissions.');
+  if(!requests.length)submitted.appendChild(dashboardEmpty('No submitted requests found for this email.'));
+  requests.slice(0,4).forEach(row=>{const item=mdcatElement('div',null,'student-list-row');item.append(mdcatElement('strong',row.requestTitle),mdcatElement('span',(row.Status || 'Pending Review')+' · '+studentRequestDate(row.SubmittedAt)));submitted.appendChild(item);});submitted.appendChild(mdcatButton('Track all requests',()=>openStudentRequests()));layout.appendChild(submitted);
+  const revision=dashboardSection('Revision reminders','Questions saved for another review.');
+  if(!local.revision.length)revision.appendChild(dashboardEmpty('No revision questions saved yet.'));
+  local.revision.slice(0,3).forEach(row=>{const item=mdcatElement('div',null,'student-list-row');item.append(mdcatElement('strong',row.Question || 'Saved question'),mdcatElement('span','Ready to practise'));revision.appendChild(item);});revision.appendChild(mdcatButton('Open revision',()=>openMDCATLocal('revision')));layout.appendChild(revision);
+  grid.appendChild(layout);
+}
+
 async function openUserAccount(pending) {
   const {grid}=mdcatStudyPage('My account','Use one Google account for your portal activity, resources, requests and every supported test.');
   showPortalAccountShell();
@@ -94,13 +205,12 @@ async function openUserAccount(pending) {
       panel.appendChild(signIn);grid.appendChild(panel);return;
     }
     document.getElementById('mdcatHubTitle').textContent='My dashboard';
-    document.getElementById('mdcatHubDescription').textContent='One account for your saved resources, requests and test activity across ICP YOUTH CIRCLE.';
-    const panel=mdcatElement('div',null,'mdcat-wide student-dashboard-card');
-    panel.appendChild(mdcatElement('h3',identity.auth.currentUser.displayName || 'My profile'));
-    panel.appendChild(mdcatElement('p','Signed in as '+(identity.auth.currentUser.email || 'portal user')));
-    panel.append(mdcatButton('My bookmarks',()=>openStudentBookmarks()),mdcatButton('My requests',()=>openStudentRequests()),mdcatButton('My tests',()=>openUserTests()),mdcatButton('Notifications',()=>openUserNotifications()),mdcatButton('Sign out',async()=>{await identity.sdk.signOut(identity.auth);if (typeof setPortalAccountButton === 'function') setPortalAccountButton(false);openUserAccount();}));
-    if(pending) panel.appendChild(mdcatButton('Continue to scored practice',()=>openMDCATGraded(pending.mode,pending.contextId)));
-    grid.appendChild(panel);
+    document.getElementById('mdcatHubDescription').textContent='Your study overview, test performance, saved items, requests and notifications in one place.';
+    document.getElementById('mdcatStatus').textContent='Loading your dashboard…';
+    const data=await loadStudentDashboard(true);
+    if(view!==mdcatGradeView)return;
+    document.getElementById('mdcatStatus').textContent='';
+    renderStudentDashboard(grid,data,identity.auth.currentUser,pending);
   } catch(error) {if(view===mdcatGradeView) mdcatAccountError(error,grid,()=>openUserAccount(pending));}
 }
 
@@ -140,32 +250,59 @@ async function openUserTests() {
   }
 }
 
-function portalSeenNotifications() {
-  try {const rows=JSON.parse(localStorage.getItem(PORTAL_NOTIFICATION_SEEN_KEY) || '[]');return Array.isArray(rows)?rows.map(String).slice(-500):[];}
-  catch(_){return [];}
+async function markStudentNotificationsRead(ids,category) {
+  await mdcatPrivateRequest('studentMarkNotificationsRead',{notificationIds:ids});
+  if(portalDashboardCache){
+    const data=portalDashboardCache.data;const read=new Set([...(data.readNotificationIds || []),...ids].map(String));data.readNotificationIds=[...read];
+    (data.notifications || []).forEach(row=>{if(read.has(String(row.ID)))row.IsRead=true;});portalDashboardCache.savedAt=Date.now();
+  }
+  return openUserNotifications(category,true);
 }
 
-function portalMarkNotificationsSeen(ids) {
-  try {localStorage.setItem(PORTAL_NOTIFICATION_SEEN_KEY,JSON.stringify([...new Set([...portalSeenNotifications(),...ids.map(String)])].slice(-500)));}
-  catch(_){}
+function notificationCategory(row) {
+  if(row.ReminderType==='Deadline')return 'Deadline';
+  if(row.ReminderType==='Study Plan' || row.Category==='Study Plan')return 'Study Plan';
+  if(row.TestID || String(row.Category).toLowerCase()==='test')return 'Test';
+  return row.Category || 'General';
 }
 
-async function openUserNotifications() {
-  const {grid}=mdcatStudyPage('Notifications','Updates published for registered ICP YOUTH CIRCLE users.');
+function renderNotificationPreferences(grid,data) {
+  const details=mdcatElement('details',null,'mdcat-wide notification-preferences');
+  details.appendChild(mdcatElement('summary','Notification preferences'));
+  const form=mdcatElement('form',null,'notification-preference-form');
+  const options=[['GeneralUpdates','General portal updates'],['TestNotices','Test-specific notices'],['DeadlineReminders','Deadline reminders'],['StudyPlanReminders','Study-plan reminders']];
+  options.forEach(([key,labelText])=>{const label=mdcatElement('label');const input=document.createElement('input');input.type='checkbox';input.name=key;input.checked=data.notificationPreferences ? data.notificationPreferences[key]!==false : true;label.append(input,document.createTextNode(' '+labelText));form.appendChild(label);});
+  const save=mdcatElement('button','Save preferences','resource-button');save.type='submit';const status=mdcatElement('p','');status.setAttribute('role','status');
+  form.append(save,status);form.onsubmit=async event=>{event.preventDefault();save.disabled=true;status.textContent='Saving…';try{const preferences=Object.fromEntries(options.map(([key])=>[key,form.elements[key].checked]));await mdcatPrivateRequest('studentSaveNotificationPreferences',{preferences});portalDashboardCache=null;status.textContent='Preferences saved. They will apply the next time this centre loads.';}catch(error){status.textContent=error.message || 'Unable to save preferences.';save.disabled=false;}};
+  details.appendChild(form);grid.appendChild(details);
+}
+
+async function openUserNotifications(category='All',force=false) {
+  const {grid}=mdcatStudyPage('Notification centre','Account-synced updates, test notices, deadlines and study reminders.');
   showPortalAccountShell();
   const view=mdcatGradeView;
-  const seen=new Set(portalSeenNotifications());
   document.getElementById('mdcatStatus').textContent='Loading notifications…';
   try {
-    const data=await mdcatPrivateRequest('studentDashboard');
+    const data=await loadStudentDashboard(force);
     if(view!==mdcatGradeView)return;
-    const rows=data.notifications || [];
+    const allRows=portalAllNotifications(data);
     document.getElementById('mdcatStatus').textContent='';
-    if(!rows.length){grid.appendChild(mdcatElement('p','No current notifications.','mdcat-wide'));return;}
+    const controls=mdcatElement('div',null,'mdcat-wide notification-toolbar');
+    const label=mdcatElement('label','Category');const select=document.createElement('select');
+    ['All',...new Set(allRows.map(notificationCategory))].forEach(value=>{const option=document.createElement('option');option.value=value;option.textContent=value;option.selected=value===category;select.appendChild(option);});
+    select.onchange=()=>openUserNotifications(select.value);label.appendChild(select);controls.appendChild(label);
+    const unread=allRows.filter(row=>!row.IsRead);
+    if(unread.length){const markAll=mdcatButton('Mark all as read',async()=>{markAll.disabled=true;try{await markStudentNotificationsRead(unread.map(row=>row.ID),category);}catch(error){document.getElementById('mdcatStatus').textContent=error.message;markAll.disabled=false;}});controls.appendChild(markAll);}
+    controls.appendChild(mdcatButton('Back to dashboard',()=>openUserAccount()));grid.appendChild(controls);
+    const rows=category==='All'?allRows:allRows.filter(row=>notificationCategory(row)===category);
+    if(!rows.length)grid.appendChild(mdcatElement('p','No current notifications in this category.','mdcat-wide student-dashboard-empty'));
     rows.forEach(row=>{
-      const card=mdcatElement('article',null,'card mdcat-study-card');
-      card.appendChild(mdcatElement('h3',(seen.has(String(row.ID))?'':'New — ')+row.Title));
-      if(row.PublishAt)card.appendChild(mdcatElement('p',studentRequestDate(row.PublishAt)));
+      const card=mdcatElement('article',null,'card mdcat-study-card notification-card '+(!row.IsRead?'is-unread ':'')+(row.IsPinned?'is-pinned':''));
+      const meta=mdcatElement('div',null,'notification-meta');meta.append(mdcatElement('span',notificationCategory(row),'notification-category'));
+      if(row.TestID)meta.appendChild(mdcatElement('span','Test notice','notification-category'));
+      if(row.IsPinned)meta.appendChild(mdcatElement('span','Pinned','notification-pinned'));card.appendChild(meta);
+      card.appendChild(mdcatElement('h3',(row.IsRead?'':'New — ')+row.Title));
+      const date=row.ReminderAt || row.PublishAt;if(date)card.appendChild(mdcatElement('p',(row.ReminderAt?'Reminder: ':'')+studentRequestDate(date),'notification-date'));
       if(row.Message)card.appendChild(mdcatElement('p',row.Message));
       const raw=String(row.LinkURL || '').trim();
       if(/^#[a-z0-9-]+$/i.test(raw))card.appendChild(mdcatButton('Open',()=>handleNavigation({Slug:raw.slice(1),Label:row.Title})));
@@ -173,10 +310,11 @@ async function openUserNotifications() {
         const url=typeof safePortalURL==='function'?safePortalURL(raw):'';
         if(url){const link=mdcatElement('a','Open link','resource-button');link.href=url;link.target='_blank';link.rel='noopener noreferrer';card.appendChild(link);}
       }
+      if(!row.IsRead){const mark=mdcatButton('Mark as read',async()=>{mark.disabled=true;try{await markStudentNotificationsRead([row.ID],category);}catch(error){document.getElementById('mdcatStatus').textContent=error.message;mark.disabled=false;}});card.appendChild(mark);}
       grid.appendChild(card);
     });
-    portalMarkNotificationsSeen(rows.map(row=>row.ID));
-  }catch(error){if(view===mdcatGradeView)mdcatAccountError(error,grid,()=>openUserNotifications());}
+    renderNotificationPreferences(grid,data);
+  }catch(error){if(view===mdcatGradeView)mdcatAccountError(error,grid,()=>openUserNotifications(category,true));}
 }
 
 function openStudentBookmarks() {

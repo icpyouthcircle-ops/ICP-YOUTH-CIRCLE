@@ -463,17 +463,23 @@ function renderNavigation(items) {
   accountButton.id = 'portalAccountButton';
   accountButton.type = 'button';
   accountButton.className = 'nav-account-button';
-  accountButton.textContent = 'Sign in';
+  const accountLabel=document.createElement('span');accountLabel.className='nav-account-label';accountLabel.textContent='Sign in';accountButton.appendChild(accountLabel);
   accountButton.onclick = () => {
     closeMobileNavigation();
     openPortalAccount();
   };
   nav.appendChild(accountButton);
+  if(typeof initializePortalAccountState==='function')initializePortalAccountState();
 }
 
 function setPortalAccountButton(signedIn) {
   const button = document.getElementById('portalAccountButton');
-  if (button) button.textContent = signedIn ? 'My account' : 'Sign in';
+  if (button) {
+    let label=button.querySelector('.nav-account-label');
+    if(!label){label=document.createElement('span');label.className='nav-account-label';button.prepend(label);}
+    label.textContent=signedIn ? 'My account' : 'Sign in';
+    if(!signedIn){const badge=button.querySelector('.nav-notification-badge');if(badge)badge.hidden=true;button.setAttribute('aria-label','Sign in');}
+  }
 }
 
 function openPortalAccount(pending) {

@@ -30,4 +30,17 @@ Choose a portal section from the dashboard. Use **New record** for one row, or *
 
 New records default to `Inactive` when the selected sheet has a `Status` column. Review the row and set it to `Active` only after checking the source, link, wording, dates and permissions. The dashboard archives records by changing `Status` to `Inactive`; it does not delete them.
 
-The dashboard deliberately excludes `Admins`, `MDCAT_Sessions`, `MDCAT_Session_Questions`, `MDCAT_Test_Attempts`, `MDCAT_Attempt_Answers`, and `MDCAT_Progress` from the editable list. Student attempts and answer keys remain protected by the authenticated scoring routes.
+The dashboard deliberately excludes `Admins`, `Notification_Reads`, `Notification_Preferences`, `MDCAT_Sessions`, `MDCAT_Session_Questions`, `MDCAT_Test_Attempts`, `MDCAT_Attempt_Answers`, and `MDCAT_Progress` from the editable list. Student notification state, preferences, attempts, and answer keys remain protected by authenticated routes.
+
+## Publishing notifications
+
+Use the **Notifications** dashboard section to publish an update. The advanced fields support:
+
+- `Category`: `General`, `Test`, `Deadline`, or `Study Plan`
+- `Priority`: use `Important` when the notice needs extra emphasis
+- `IsPinned`: use `Yes` to place the notice first
+- `TestID`: connect the notice to a test in `Test_Catalog`
+- `ReminderType`: `Deadline` or `Study Plan`
+- `ReminderAt`: the date shown as the reminder date
+
+Keep `Audience` as `Registered Users` and `Status` as `Active`. `PublishAt` controls when a notice starts showing, while `ExpiresAt` removes it after the deadline. The portal stores each student's read status and preferences in the protected sheets automatically.
