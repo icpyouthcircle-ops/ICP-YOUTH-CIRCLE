@@ -88,6 +88,7 @@ function renderMDCATBreadcrumb(items=[]) {
 function openMDCATHub(options={}) {
   document.getElementById('homeHero').style.display = 'none';
   document.getElementById('homeExplore').style.display = 'none';
+  const homeTools=document.getElementById('homeTools');if(homeTools)homeTools.hidden=true;
   document.getElementById('dynamicPage').style.display = 'none';
   document.getElementById('mdcatHub').hidden = false;
   if(!options.fromHistory && window.location.hash!=='#/entry-tests/mdcat')history.pushState({portal:true},'','#/entry-tests/mdcat');

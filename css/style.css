@@ -26,6 +26,53 @@
   align-items: center;
   margin-bottom: 24px;
 }
+
+/* Lightweight portal enhancements: PWA, countdown, tour, FAQ and public reminders. */
+.loading { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
+.loading img { border-radius: 18px; box-shadow: 0 12px 28px rgba(153,27,47,.2); }
+.loading strong { color: #172033; font-size: 20px; }
+.loading span { color: #64748b; }
+.home-tools { padding-top: 28px; padding-bottom: 0; }
+.home-tools[hidden] { display: none; }
+.home-tools-grid { display: grid; gap: 20px; }
+.home-tool-card { display: grid; grid-template-columns: minmax(0,1fr) minmax(300px,.85fr); gap: 28px; align-items: center; padding: 28px; border: 1px solid #e5e7eb; border-radius: 18px; background: #fff; box-shadow: 0 12px 32px rgba(15,23,42,.05); }
+.home-tool-card h3 { margin: 8px 0; font-size: 25px; }
+.home-tool-card p { margin: 0; color: #64748b; line-height: 1.55; }
+.home-tool-eyebrow { color: #991b2f; font-size: 11px; font-weight: 800; letter-spacing: .15em; }
+.countdown-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.countdown-form label { display: grid; gap: 7px; color: #475569; font-size: 13px; font-weight: 700; }
+.countdown-form input,.faq-search { width: 100%; padding: 12px 13px; border: 1px solid #dbe0e6; border-radius: 10px; background: #fff; color: #172033; font: inherit; }
+.countdown-form > div { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 10px; }
+.secondary-button,.footer-install-button { border: 1px solid #dbe0e6; border-radius: 9px; padding: 11px 15px; background: #fff; color: #334155; font: inherit; font-weight: 700; cursor: pointer; }
+.footer-install-button { margin-top: 12px; }
+.footer-install-button.is-ready { border-color: #fff; background: transparent; color: #fff; }
+.welcome-tour { position: fixed; inset: 0; z-index: 2000; display: grid; place-items: center; padding: 20px; background: rgba(15,23,42,.62); }
+.welcome-tour-card { width: min(520px,100%); padding: 32px; border-radius: 20px; background: #fff; box-shadow: 0 28px 70px rgba(0,0,0,.28); }
+.welcome-tour-card h2 { margin: 8px 0 12px; color: #172033; }
+.welcome-tour-card > p:not(.welcome-tour-progress) { color: #64748b; line-height: 1.65; }
+.welcome-tour-progress { margin: 0; color: #991b2f; font-size: 11px; font-weight: 800; letter-spacing: .15em; }
+.welcome-tour-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+.friday-reminder { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 16px max(24px,calc((100% - 1200px)/2)); background: #fdf6e7; border-bottom: 1px solid #eadcb8; color: #3f3520; }
+.friday-reminder div { display: grid; gap: 3px; }
+.friday-reminder span { color: #8a6414; font-size: 10px; font-weight: 800; letter-spacing: .14em; }
+.friday-reminder strong { font-size: 16px; }
+.friday-reminder p { margin: 0; color: #6b5a34; }
+.faq-panel { grid-column: 1 / -1; max-width: 900px; width: 100%; margin: 0 auto; }
+.faq-search { margin-bottom: 20px; padding: 15px 16px; }
+.faq-list { display: grid; gap: 12px; }
+.faq-item { padding: 18px 20px; border: 1px solid #e5e7eb; border-radius: 14px; background: #fff; }
+.faq-item summary { cursor: pointer; color: #172033; font-weight: 750; line-height: 1.45; }
+.faq-item .resource-badge { display: inline-block; margin-top: 14px; }
+.faq-item p { margin: 12px 0 0; color: #475569; line-height: 1.7; white-space: pre-wrap; }
+.portal-share-button { border: 1px solid #991b2f; background: transparent; color: #991b2f; }
+.portal-share-button:hover,.portal-share-button:focus-visible { background: #fceef0; }
+
+@media (max-width: 760px) {
+  .home-tool-card { grid-template-columns: 1fr; padding: 22px; }
+  .countdown-form { grid-template-columns: 1fr; }
+  .friday-reminder { align-items: flex-start; flex-direction: column; padding: 16px 20px; }
+  .welcome-tour-card { padding: 24px; }
+}
 .mdcat-actions[hidden] { display: none; }
 .mdcat-actions a { color: #991b2f; }
 .mdcat-actions .resource-button { color: white; margin-top: 0; }

@@ -10,6 +10,7 @@ function createBackend(){
  class Sheet {
   constructor(name,values=[]){this.name=name;this.values=values;}
   getLastRow(){return this.values.length;}
+  setFrozenRows(){}
   getDataRange(){return {getValues:()=>this.values.length?this.values.map(row=>row.slice()):[['']]};}
   getRange(start,column,height,width){return {setValues:rows=>{
    if(failSheet===this.name){failSheet='';throw new Error('Simulated interrupted write');}

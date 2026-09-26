@@ -9,8 +9,16 @@
     content="width=device-width, initial-scale=1.0"
   >
   <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta name="theme-color" content="#991b2f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="ICP Portal">
 
   <title>ICP YOUTH CIRCLE</title>
+
+  <link rel="manifest" href="manifest.webmanifest?v=20260926-portal-suite">
+  <link rel="icon" href="assets/icons/icon-192.png" sizes="192x192">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
 
   <link rel="preconnect" href="https://script.google.com" crossorigin>
   <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
@@ -19,14 +27,16 @@
 
   <link
     rel="stylesheet"
-    href="css/style.css?v=20260926-announcement-button"
+    href="css/style.css?v=20260926-portal-suite"
   >
 </head>
 
 <body>
 
     <div id="loading" class="loading">
-    Loading ICP YOUTH CIRCLE...
+    <img src="assets/icons/icon-192.png" alt="" width="72" height="72">
+    <strong>ICP YOUTH CIRCLE</strong>
+    <span>Preparing your student portal…</span>
   </div>
 
   <div id="app" style="display:none;">
@@ -186,10 +196,11 @@
 
   </div>
 
-  <script src="js/app.js?v=20260926-announcement-button"></script>
-  <script src="js/mdcat.js?v=20260926-announcement-button"></script>
-  <script src="js/mdcat-study.js?v=20260926-announcement-button"></script>
-  <script src="js/mdcat-account.js?v=20260926-announcement-button"></script>
+  <script src="js/app.js?v=20260926-portal-suite"></script>
+  <script src="js/mdcat.js?v=20260926-portal-suite"></script>
+  <script src="js/mdcat-study.js?v=20260926-portal-suite"></script>
+  <script src="js/mdcat-account.js?v=20260926-portal-suite"></script>
+  <script src="js/portal-extras.js?v=20260926-portal-suite"></script>
 
 </body>
 </html>

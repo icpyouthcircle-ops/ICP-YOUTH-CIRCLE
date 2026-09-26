@@ -37,7 +37,8 @@ const {createBackend}=require('./scoring-harness.cjs');
   });
   await page.goto(pathToFileURL(path.join(__dirname,'../index.html')).href);
   await page.locator('#app').waitFor({state:'visible'});
-  await page.evaluate(()=>{localStorage.setItem(PORTAL_BOOKMARKS_KEY,JSON.stringify([{key:'RES-BOOKMARK',title:'Saved Biology Notes',category:'Notes',subject:'Biology',level:'Class 12',fileURL:'https://example.test/biology.pdf',resourceType:'PDF'}]));localStorage.setItem(MDCAT_LOCAL_KEY,JSON.stringify({attempts:[],revision:[{ID:'MDQ-REV',Question:'Saved revision question'}],plan:[{id:'task-1',title:'Revise Biology chapter',date:'2026-09-26',done:false}]}));});
+  const upcomingDate=new Date(Date.now()+2*86400000).toISOString().slice(0,10);
+  await page.evaluate(date=>{localStorage.setItem(PORTAL_BOOKMARKS_KEY,JSON.stringify([{key:'RES-BOOKMARK',title:'Saved Biology Notes',category:'Notes',subject:'Biology',level:'Class 12',fileURL:'https://example.test/biology.pdf',resourceType:'PDF'}]));localStorage.setItem(MDCAT_LOCAL_KEY,JSON.stringify({attempts:[],revision:[{ID:'MDQ-REV',Question:'Saved revision question'}],plan:[{id:'task-1',title:'Revise Biology chapter',date:date,done:false}]}));},upcomingDate);
   // Inject a signed-in SDK test double; provider token verification still runs in the backend harness.
   await page.evaluate(token=>{mdcatIdentity={auth:{currentUser:{email:'student@example.test',getIdToken:async()=>token}},sdk:{signOut:async(auth)=>{auth.currentUser=null;}}};},token);
   await page.getByRole('button',{name:'Sign in',exact:true}).click();

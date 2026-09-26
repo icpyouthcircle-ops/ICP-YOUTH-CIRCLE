@@ -7,7 +7,7 @@
   <meta name="referrer" content="no-referrer">
   <title>Admin Dashboard | ICP YOUTH CIRCLE</title>
   <link rel="stylesheet" href="css/style.css?v=20260925-premium-portal">
-  <link rel="stylesheet" href="css/admin.css?v=20260925-premium-portal">
+  <link rel="stylesheet" href="css/admin.css?v=20260926-portal-suite">
 </head>
 <body class="admin-page">
   <header>
@@ -38,6 +38,7 @@
           <button id="adminNew" class="resource-button" type="button">New record</button>
           <button id="adminPdfToggle" type="button">Upload PDF</button>
           <button id="adminBulkToggle" type="button">Paste multiple rows</button>
+          <button id="adminPerformanceToggle" type="button">Performance check</button>
         </aside>
 
         <div class="admin-workspace">
@@ -83,10 +84,18 @@
               <button id="adminPdfUpload" class="resource-button" type="submit">Upload and publish PDF</button>
             </form>
           </section>
+
+          <section id="adminPerformancePanel" class="admin-panel" hidden aria-labelledby="adminPerformanceTitle">
+            <div class="admin-panel-title"><div><h3 id="adminPerformanceTitle">Performance dashboard</h3><p>On-demand checks from this device. Public visitors are not tracked.</p></div><button id="adminPerformanceClose" type="button">Close</button></div>
+            <button id="adminPerformanceRun" class="resource-button" type="button">Run performance check</button>
+            <p id="adminPerformanceStatus" role="status" aria-live="polite"></p>
+            <div id="adminPerformanceResults" class="performance-results"></div>
+          </section>
         </div>
       </div>
     </section>
   </main>
-  <script src="js/admin.js"></script>
+  <script src="js/admin.js?v=20260926-portal-suite"></script>
+  <script src="js/admin-performance.js?v=20260926-portal-suite"></script>
 </body>
 </html>

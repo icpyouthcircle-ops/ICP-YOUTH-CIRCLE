@@ -45,7 +45,8 @@ const PORTAL_BOOTSTRAP_DATA = {
     ['NAV-053','Hadith','hadith','NAV-010'],['NAV-054','Islamic Reminders','islamic-reminders','NAV-010'],
     ['NAV-055','Duas / Motivation','duas-motivation','NAV-010'],
     ['NAV-056','Study Abroad','study-abroad','NAV-011'],['NAV-057','Blog','blog','NAV-011'],
-    ['NAV-058','About','about','NAV-011'],['NAV-059','Contact','contact','NAV-011']
+    ['NAV-058','About','about','NAV-011'],['NAV-059','Contact','contact','NAV-011'],
+    ['NAV-060','Frequently Asked Questions','faq','NAV-008']
   ].map((row,index)=>({ID:row[0],Label:row[1],Slug:row[2],ParentID:row[3],DisplayOrder:index+1})),
   categories: [
     ['Study','study','Study materials and learning resources'],['Entry Tests','entry-tests','Entry test preparation and related content'],
@@ -314,17 +315,22 @@ function loadPortal() {
 function registerPortalServiceWorker() {
   if (!('serviceWorker' in navigator) || location.protocol !== 'https:') return;
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js?v=20260926-announcement-button').catch(() => {});
+    navigator.serviceWorker.register('sw.js?v=20260926-portal-suite').catch(() => {});
   }, {once: true});
 }
 
 
     function renderPortal(data) {
 
-      portalData = data;
+      const navigation=Array.isArray(data.navigation) ? data.navigation.slice() : [];
+      if(!navigation.some(item=>['faq','faqs','frequently-asked-questions'].includes(String(item.Slug)))){
+        const community=navigation.find(item=>String(item.Slug)==='community');
+        navigation.push({ID:'PORTAL-FAQ',Label:'Frequently Asked Questions',Slug:'faq',ParentID:community ? community.ID : '',DisplayOrder:999});
+      }
+      portalData = Object.assign({},data,{navigation:navigation});
 
       let fingerprint = '';
-      try { fingerprint = JSON.stringify({settings:data.settings || {},navigation:data.navigation || [],categories:data.categories || []}); } catch (_) {}
+      try { fingerprint = JSON.stringify({settings:portalData.settings || {},navigation:portalData.navigation || [],categories:portalData.categories || []}); } catch (_) {}
       if (fingerprint && fingerprint === portalRenderFingerprint) return;
       portalRenderFingerprint = fingerprint;
 
@@ -372,7 +378,7 @@ function registerPortalServiceWorker() {
 
 
       renderNavigation(
-        data.navigation || []
+        portalData.navigation || []
       );
 
 
@@ -956,7 +962,8 @@ function getRouteDescription(slug, label) {
     'videos':'Explore selected educational videos and learning material.',
     'submit-resource':'Recommend a useful student resource for administrator review.',
     'student-help-desk':'Send a question or request support from the portal administrators.',
-    'suggestions':'Share a suggestion to help improve the student portal.'
+    'suggestions':'Share anonymous feedback to help improve the student portal.',
+    'faq':'Search answers to frequently asked questions about the portal.'
   };
   return descriptions[slug] || 'Find published '+label.toLowerCase()+' information and resources from ICP YOUTH CIRCLE.';
 }
@@ -1048,15 +1055,19 @@ function renderPublicPortalForm(kind) {
   const content=document.getElementById('dynamicPageContent');
   const filters=document.getElementById('resourceFilters');filters.innerHTML='';filters.style.display='none';content.replaceChildren();
   const resource=kind==='resource';
+  const feedback=kind==='feedback';
   const card=document.createElement('article');card.className='card portal-form-card';
   const intro=document.createElement('p');
-  intro.textContent=resource ? 'Share a useful, legal student resource for administrator review. Submitting it does not publish it automatically.' : 'Send a question or support request to the ICP YOUTH CIRCLE administrators. Do not include passwords, identity documents or payment details.';
+  intro.textContent=resource ? 'Share a useful, legal student resource for administrator review. Submitting it does not publish it automatically.' : feedback ? 'Share an anonymous suggestion or portal experience. Do not include names, email addresses, passwords, identity documents or payment details.' : 'Send a question or support request to the ICP YOUTH CIRCLE administrators. Do not include passwords, identity documents or payment details.';
   const form=document.createElement('form');form.className='portal-form';form.noValidate=false;
   const fields=resource ? [
     ['Your name','name','text',true],['Email','email','email',true],['Resource title','title','text',true],
     ['Resource type','resourceType','select',true,['Notes','Past Paper','Book','Video','Course','Website','Tool','Other']],
     ['Subject','subject','text',false],['Level or class','level','text',false],['Resource link','url','url',true],
     ['Why is this useful?','description','textarea',false]
+  ] : feedback ? [
+    ['Feedback category','category','select',true,['Suggestion','Portal experience','Content correction','Accessibility','Technical problem','Other']],
+    ['Your feedback','message','textarea',true]
   ] : [
     ['Your name','name','text',true],['Email','email','email',true],
     ['Request type','requestType','select',true,['Resource request','Study guidance','Portal problem','Correction','Suggestion','Other']],
@@ -1067,8 +1078,8 @@ function renderPublicPortalForm(kind) {
   const trapInput=document.createElement('input');trapInput.name='website';trapInput.tabIndex=-1;trapInput.autocomplete='off';trap.appendChild(trapInput);form.appendChild(trap);
   const consent=document.createElement('label');consent.className='portal-form-consent';
   const consentInput=document.createElement('input');consentInput.type='checkbox';consentInput.required=true;
-  consent.append(consentInput,document.createTextNode(resource ? ' I confirm this link is safe to review and I have permission to share it.' : ' I agree that administrators may use my email to respond to this request.'));
-  const submit=document.createElement('button');submit.type='submit';submit.className='resource-button';submit.textContent=resource?'Send for review':'Send request';
+  consent.append(consentInput,document.createTextNode(resource ? ' I confirm this link is safe to review and I have permission to share it.' : feedback ? ' I confirm that this feedback contains no private or sensitive information.' : ' I agree that administrators may use my email to respond to this request.'));
+  const submit=document.createElement('button');submit.type='submit';submit.className='resource-button';submit.textContent=resource?'Send for review':feedback?'Send anonymous feedback':'Send request';
   const status=document.createElement('p');status.className='portal-form-status';status.setAttribute('role','status');status.setAttribute('aria-live','polite');
   form.append(consent,submit,status);
   form.addEventListener('submit',async event=>{
@@ -1076,9 +1087,13 @@ function renderPublicPortalForm(kind) {
     submit.disabled=true;status.className='portal-form-status';status.textContent='Sending…';
     const values=Object.fromEntries(new FormData(form).entries());
     try {
-      const result=await submitPublicPortalForm(resource?'publicSubmitResource':'publicHelpRequest',values);
+      if(feedback)values.pageURL=location.href;
+      const result=await submitPublicPortalForm(resource?'publicSubmitResource':feedback?'publicFeedback':'publicHelpRequest',values);
       form.reset();status.className='portal-form-status portal-form-success';
-      status.textContent=(resource?'Resource submitted':'Request submitted')+' successfully. Reference: '+result.id+'.';
+      status.textContent=(resource?'Resource submitted':feedback?'Feedback submitted':'Request submitted')+' successfully. Reference: '+result.id+'.';
+      if(!resource && !feedback){
+        let track=form.querySelector('.track-request-button');if(!track){track=document.createElement('button');track.type='button';track.className='secondary-button track-request-button';track.textContent='Track in My account';track.onclick=()=>openPortalAccount();form.appendChild(track);}
+      }
     } catch(error) { status.className='portal-form-status portal-form-error';status.textContent=error.message || 'Unable to submit the form.'; }
     finally { submit.disabled=false; }
   });
@@ -1180,8 +1195,12 @@ if (resourceCategories[item.Slug]) {
   renderSectionNotice('No public preparation tracker has been published yet. MDCAT students can use My activity and Study plan inside the MDCAT 2027 hub.');
 } else if (item.Slug === 'submit-resource') {
   renderPublicPortalForm('resource');
-} else if (item.Slug === 'student-help-desk' || item.Slug === 'suggestions') {
+} else if (item.Slug === 'student-help-desk') {
   renderPublicPortalForm('help');
+} else if (item.Slug === 'suggestions') {
+  renderPublicPortalForm('feedback');
+} else if (item.Slug === 'faq' || item.Slug === 'faqs' || item.Slug === 'frequently-asked-questions') {
+  loadPortalFAQs();
 } else if (item.Slug === 'forum') {
   renderSectionNotice(itemLabel+' is not publicly available yet. An official link will appear here when it is published.');
 } else {
@@ -1195,6 +1214,8 @@ if (resourceCategories[item.Slug]) {
   document.getElementById(
     'homeExplore'
   ).style.display = 'none';
+
+  const homeTools=document.getElementById('homeTools');if(homeTools)homeTools.hidden=true;
 
   document.getElementById(
     'dynamicPage'
@@ -1226,6 +1247,8 @@ function showHome(options={}) {
   document.getElementById(
     'homeExplore'
   ).style.display = 'block';
+
+  const homeTools=document.getElementById('homeTools');if(homeTools)homeTools.hidden=false;
 
   if(!options.fromHistory && (window.location.hash || window.location.search)) history.pushState({portal:true},'',window.location.pathname);
 
@@ -1580,6 +1603,7 @@ function drawResourceCards(resources) {
     bookmark.type='button';bookmark.className='resource-button';bookmark.textContent=bookmarked?'Saved ✓':'Save resource';
     bookmark.setAttribute('aria-pressed',String(bookmarked));bookmark.onclick=()=>togglePortalResourceBookmark(resource,bookmark);
     body.appendChild(bookmark);
+    appendPortalShareButton(body,resource,'resource');
 
 
     card.appendChild(body);
@@ -3383,6 +3407,7 @@ function drawEntryTestCards(items) {
 
       body.appendChild(link);
     }
+    appendPortalShareButton(body,item,'test');
 
     card.appendChild(body);
     content.appendChild(card);
@@ -4283,6 +4308,7 @@ function drawAnnouncementCards(announcements) {
 
       body.appendChild(link);
     }
+    appendPortalShareButton(body,item,'announcement');
 
 
     card.appendChild(body);
@@ -4351,6 +4377,7 @@ function buildOpportunityFilters(opportunities) {
       'All Locations',
       locations
     )}
+    <select id="opportunityClosing"><option value="">All deadlines</option><option value="closing">Closing in 30 days</option></select>
   `;
 
   filters
@@ -4380,6 +4407,8 @@ function displayFilteredOpportunities() {
       'opportunityLocation'
     )?.value || '';
 
+  const closing=document.getElementById('opportunityClosing')?.value || '';
+
   const filtered =
     currentOpportunities.filter(item => {
       return (
@@ -4390,7 +4419,8 @@ function displayFilteredOpportunities() {
           item.Type === type) &&
 
         (!location ||
-          item.Location === location)
+          item.Location === location) &&
+        (!closing || portalDeadlineIsClosingSoon(item.Deadline,30))
       );
     });
 
@@ -4615,6 +4645,7 @@ function buildScholarshipFilters(scholarships) {
       'All Countries',
       countries
     )}
+    <select id="scholarshipClosing"><option value="">All deadlines</option><option value="closing">Closing in 30 days</option></select>
   `;
 
   filters
@@ -4644,6 +4675,8 @@ function displayFilteredScholarships() {
       'scholarshipCountry'
     )?.value || '';
 
+  const closing=document.getElementById('scholarshipClosing')?.value || '';
+
   const filtered =
     currentScholarships.filter(item => {
       return (
@@ -4654,7 +4687,8 @@ function displayFilteredScholarships() {
           item.Type === type) &&
 
         (!country ||
-          item.Country === country)
+          item.Country === country) &&
+        (!closing || portalDeadlineIsClosingSoon(item.Deadline,30))
       );
     });
 
@@ -4832,6 +4866,7 @@ function drawScholarshipCards(scholarships) {
 
       body.appendChild(link);
     }
+    appendPortalShareButton(body,item,'scholarship');
 
     card.appendChild(body);
     content.appendChild(card);
@@ -4907,6 +4942,7 @@ function buildAdmissionsFilters(admissions) {
       'All Entry Tests',
       entryTests
     )}
+    <select id="admissionClosing"><option value="">All deadlines</option><option value="closing">Closing in 30 days</option></select>
   `;
 
   filters
@@ -4942,6 +4978,8 @@ function displayFilteredAdmissions() {
       'admissionEntryTest'
     )?.value || '';
 
+  const closing=document.getElementById('admissionClosing')?.value || '';
+
   const filtered =
     currentAdmissions.filter(item => {
 
@@ -4956,7 +4994,8 @@ function displayFilteredAdmissions() {
           item.AdmissionType === admissionType) &&
 
         (!entryTest ||
-          item.EntryTest === entryTest)
+          item.EntryTest === entryTest) &&
+        (!closing || portalDeadlineIsClosingSoon(item.Deadline,30))
       );
 
     });
@@ -5184,6 +5223,14 @@ function formatPortalDate(value) {
       year: 'numeric'
     }
   );
+}
+function portalDeadlineIsClosingSoon(value,days) {
+  if(!value)return false;
+  const deadline=new Date(value);
+  if(Number.isNaN(deadline.getTime()))return false;
+  deadline.setHours(23,59,59,999);
+  const remaining=deadline.getTime()-Date.now();
+  return remaining>=0 && remaining<=Number(days || 30)*86400000;
 }
 function showAdmissionsError(error) {
 

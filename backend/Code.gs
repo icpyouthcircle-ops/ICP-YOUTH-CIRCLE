@@ -30,6 +30,8 @@ const CONFIG = {
     NOTIFICATIONS: 'Notifications',
     NOTIFICATION_READS: 'Notification_Reads',
     NOTIFICATION_PREFERENCES: 'Notification_Preferences',
+    FAQS: 'FAQs',
+    FEEDBACK: 'Feedback',
     MDCAT_SUBJECTS: 'MDCAT_Subjects',
     MDCAT_UNITS: 'MDCAT_Units',
     MDCAT_CHAPTERS: 'MDCAT_Chapters',
@@ -842,6 +844,10 @@ function doGet(e) {
       return cachedPublicJsonResponse_('announcements',getPublicAnnouncements_,300);
     }
 
+    if (action === 'faqs') {
+      return cachedPublicJsonResponse_('faqs',getPublicFAQs_,300);
+    }
+
     if (action === 'aiTools') {
       return cachedPublicJsonResponse_('aiTools',getPublicAITools_,300);
     }
@@ -1127,9 +1133,21 @@ function getPublicAnnouncements_() {
     ExpiryDate: item.ExpiryDate,
     OfficialURL: item.OfficialURL,
     ButtonText: item.ButtonText,
+    DisplayOrder: item.DisplayOrder,
     Priority: item.Priority,
     Featured: item.Featured
   }));
+}
+function getPublicFAQs_() {
+  const rows=getOptionalSheetData_(CONFIG.SHEETS.FAQS).filter(item=>String(item.Status == null ? 'Active' : item.Status).trim().toLowerCase()==='active');
+  return rows.map(item=>({
+    ID:String(item.ID || '').slice(0,120),
+    Question:String(item.Question || '').slice(0,500),
+    Answer:String(item.Answer || '').slice(0,5000),
+    Category:String(item.Category || 'General').slice(0,120),
+    DisplayOrder:Number(item.DisplayOrder || 0)
+  })).filter(item=>item.ID && item.Question && item.Answer)
+    .sort((a,b)=>a.DisplayOrder-b.DisplayOrder || a.Question.localeCompare(b.Question));
 }
 function getPublicAITools_() {
   const rows =
@@ -1258,6 +1276,7 @@ function getPublicSearchIndex_() {
   searchRows_(getPublicIslamicContent_).forEach(row=>add('Islamic Content',row.Title,row.Description,String(row.Type||'').toLowerCase()==='hadith'?'hadith':'islamic',row,[row.Type,row.Reference,row.EnglishTranslation,row.UrduTranslation].join(' ')));
   searchRows_(getPublicBlog_).forEach(row=>add('Blog',row.Title,row.Summary || row.Content,'blog',row,[row.Category,row.Author].join(' ')));
   searchRows_(getPublicEntryTests_).forEach(row=>add('Entry Test',row.Name,row.Description,row.Slug || 'entry-tests',row,[row.Organization,row.Eligibility].join(' ')));
+  searchRows_(getPublicFAQs_).forEach(row=>add('FAQ',row.Question,row.Answer,'faq',row,row.Category));
 
   const subjects=searchRows_(getPublicMDCATSubjects_);
   const units=searchRows_(()=>getPublicMDCATUnits_(''));
@@ -1353,7 +1372,8 @@ function mdcatAuthenticate_(token) {
 
 const PUBLIC_FORM_LIMITS_ = {
   resource: {sheet:'SUBMISSIONS',prefix:'SUBM',required:[['Name','SubmittedBy','SubmitterName','FullName'],['Email','ContactEmail'],['Title','ResourceTitle'],['ResourceType','Type','Category'],['URL','ResourceURL','Link']]},
-  help: {sheet:'HELP_DESK',prefix:'HELP',required:[['Name','SubmittedBy','RequesterName','FullName'],['Email','ContactEmail'],['RequestType','Category','Type'],['Subject','Title'],['Message','Description','Request','Details']]}
+  help: {sheet:'HELP_DESK',prefix:'HELP',required:[['Name','SubmittedBy','RequesterName','FullName'],['Email','ContactEmail'],['RequestType','Category','Type'],['Subject','Title'],['Message','Description','Request','Details']]},
+  feedback: {sheet:'FEEDBACK',prefix:'FDBK',required:[['Category','Type'],['Message','Feedback','Suggestion']]}
 };
 
 function publicFormText_(value, label, maximum, required) {
@@ -1439,6 +1459,19 @@ function publicHelpRequest_(body) {
     Subject:subject,Title:subject,
     Message:message,Description:message,Request:message,Details:message,
     Consent:'Yes'
+  });
+}
+
+function publicFeedback_(body) {
+  if (String(body.website || '').trim()) mdcatError_('BAD_REQUEST','Unable to accept this feedback.');
+  publicFormToken_(body.submissionToken,'feedback');
+  const category=publicFormText_(body.category,'Category',80,true);
+  const message=publicFormText_(body.message,'Feedback',2000,true);
+  const pageURL=publicFormText_(body.pageURL,'Page',500,false);
+  return publicFormAppend_('feedback',{
+    Category:category,Type:category,
+    Message:message,Feedback:message,Suggestion:message,
+    PageURL:/^https?:\/\/[^\s]+$/i.test(pageURL) ? pageURL : ''
   });
 }
 
@@ -1606,6 +1639,7 @@ const ADMIN_TABLES_ = [
   ['AI_TOOLS','AI tools','AIT'],['ISLAMIC_CONTENT','Islamic content','ISL'],['BLOG','Blog','BLOG'],
   ['NAVIGATION','Navigation','NAV'],['HOMEPAGE','Homepage','HOME'],['SOCIAL_LINKS','Social links','SOC'],
   ['SETTINGS','Settings','SET'],['SUBMISSIONS','Resource submissions','SUBM'],['HELP_DESK','Help desk','HELP'],
+  ['FAQS','Frequently asked questions','FAQ'],['FEEDBACK','Anonymous feedback','FDBK'],
   ['TEST_CATALOG','Test catalog','TST'],['NOTIFICATIONS','Notifications','NTF'],
   ['MDCAT_SUBJECTS','MDCAT subjects','MDS'],['MDCAT_UNITS','MDCAT units','MDU'],
   ['MDCAT_CHAPTERS','MDCAT chapters','MDC'],['MDCAT_TOPICS','MDCAT topics','MDT'],
@@ -1643,7 +1677,7 @@ function adminAuthenticate_(token) {
 
 function adminManifest_(admin) {
   const spreadsheet=getSpreadsheet_();
-  const optional={TEST_CATALOG:true,NOTIFICATIONS:true};
+  const optional={TEST_CATALOG:true,NOTIFICATIONS:true,FAQS:true,FEEDBACK:true};
   return {
     email:admin.email,
     role:admin.role,
@@ -1801,7 +1835,7 @@ function adminUploadPdf_(body,admin) {
 function adminClearPublicCache_() {
   try {
     const cache=CacheService.getScriptCache();
-    cache.removeAll(['icp-public-v1-portalData','icp-public-v1-portalBundle','icp-public-v1-searchIndex','icp-public-v1-mcqs','icp-public-v1-videos','icp-public-v1-admissions','icp-public-v1-scholarships','icp-public-v1-opportunities','icp-public-v1-announcements','icp-public-v1-aiTools','icp-public-v1-islamicContent','icp-public-v1-blog','icp-public-v1-entryTests','icp-public-v1-testCatalog','icp-public-v1-mdcatSubjects','icp-public-v1-mdcatTests','icp-public-v1-mdcatDailyPractice','icp-public-v1-mdcatUpdates']);
+    cache.removeAll(['icp-public-v1-portalData','icp-public-v1-portalBundle','icp-public-v1-searchIndex','icp-public-v1-mcqs','icp-public-v1-videos','icp-public-v1-admissions','icp-public-v1-scholarships','icp-public-v1-opportunities','icp-public-v1-announcements','icp-public-v1-faqs','icp-public-v1-aiTools','icp-public-v1-islamicContent','icp-public-v1-blog','icp-public-v1-entryTests','icp-public-v1-testCatalog','icp-public-v1-mdcatSubjects','icp-public-v1-mdcatTests','icp-public-v1-mdcatDailyPractice','icp-public-v1-mdcatUpdates']);
   } catch (_) {}
 }
 
@@ -1813,11 +1847,11 @@ function doPost(e) {
     try { body = JSON.parse(raw); } catch (_) { mdcatError_('BAD_REQUEST','Invalid request.'); }
     if (!body || Array.isArray(body) || typeof body !== 'object') mdcatError_('BAD_REQUEST','Invalid request.');
     if (body.action!=='adminUploadPdf' && raw.length>100000) mdcatError_('BAD_REQUEST','Invalid request.');
-    if (body.action==='publicSubmitResource' || body.action==='publicHelpRequest') {
+    if (body.action==='publicSubmitResource' || body.action==='publicHelpRequest' || body.action==='publicFeedback') {
       const publicLock=LockService.getScriptLock();
       if (!publicLock.tryLock(10000)) mdcatError_('BUSY','The service is busy. Please retry.');
       try {
-        return jsonResponse_(body.action==='publicSubmitResource' ? publicSubmitResource_(body) : publicHelpRequest_(body));
+        return jsonResponse_(body.action==='publicSubmitResource' ? publicSubmitResource_(body) : body.action==='publicHelpRequest' ? publicHelpRequest_(body) : publicFeedback_(body));
       } finally { publicLock.releaseLock(); }
     }
     if (['studentDashboard','studentMarkNotificationsRead','studentSaveNotificationPreferences'].includes(body.action)) {
@@ -1896,6 +1930,25 @@ function setupUniversalTestsAndNotifications_() {
   }
   adminClearPublicCache_();
   return 'Test_Catalog and Notifications are ready. MDCAT is connected to the universal test catalog.';
+}
+
+// Run once after deploying the portal-enhancements version. Existing sheets and rows are preserved.
+function setupPortalEnhancements_() {
+  const spreadsheet=getSpreadsheet_();
+  const definitions=[
+    [CONFIG.SHEETS.FAQS,['ID','Question','Answer','Category','DisplayOrder','Status','CreatedAt','UpdatedAt']],
+    [CONFIG.SHEETS.FEEDBACK,['ID','Category','Message','PageURL','Status','SubmittedAt','CreatedAt','UpdatedAt']]
+  ];
+  definitions.forEach(([name,headers])=>{
+    let sheet=spreadsheet.getSheetByName(name);
+    if (!sheet) sheet=spreadsheet.insertSheet(name);
+    if (sheet.getLastRow()===0) sheet.getRange(1,1,1,headers.length).setValues([headers]);
+    const actual=(sheet.getDataRange().getValues()[0] || []).map(value=>String(value).replace(/\uFEFF/g,'').trim()).filter(Boolean);
+    const missing=headers.filter(header=>!actual.includes(header));
+    if (new Set(actual).size!==actual.length || missing.length) mdcatError_('SETUP_REQUIRED',name+' is missing required headers: '+missing.join(', ')+'.');
+    sheet.setFrozenRows(1);
+  });
+  return 'FAQs and Feedback are ready for the public portal and admin dashboard.';
 }
 
 // Run once from the Apps Script editor. Never called by the public website.

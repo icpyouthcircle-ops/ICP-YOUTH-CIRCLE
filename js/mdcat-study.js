@@ -150,6 +150,7 @@ async function openMDCATCollection(kind) {
         if (kind === 'tests' && (row.ID == null || !String(row.ID).trim())) {
           card.appendChild(mdcatElement('p', 'This test is awaiting setup.'));
         } else card.appendChild(mdcatButton('Open practice set', () => openMDCATSet(kind, row)));
+        if (typeof appendPortalShareButton === 'function') appendPortalShareButton(card,row,'test');
       }
       grid.appendChild(card);
     }
