@@ -44,7 +44,7 @@ const {createBackend}=require('./scoring-harness.cjs');
     await page.waitForFunction(()=>localStorage.getItem('icp-public-module-v2:action=announcements'),null,{timeout:5000});
     const clickStarted=Date.now();
     await page.evaluate(()=>handleNavigation({Slug:'announcements',Label:'Announcements'}));
-    await page.getByText('Cached announcement',{exact:true}).waitFor({timeout:400});
+    await page.getByRole('heading',{name:'Cached announcement',exact:true}).waitFor({timeout:400});
     assert.ok(Date.now()-clickStarted<450,'Cached section did not render immediately');
     assert.equal(requestCounts.get('portalBundle'),1,'Background warming did not request the portal bundle');
 
