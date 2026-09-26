@@ -6,6 +6,7 @@ const PUBLIC_MODULE_CACHE_TTL = 30 * 60 * 1000;
 const ANNOUNCEMENT_DISMISS_KEY = 'icp-announcement-dismissed-v1:';
 const publicModuleMemory = new Map();
 const publicModuleRequests = new Map();
+let announcementBannerRequest = null;
 const PORTAL_BOOKMARKS_KEY = 'icp-student-bookmarks-v1';
 const PORTAL_BOOTSTRAP_DATA = {
   settings: {
@@ -356,9 +357,11 @@ function loadPortal() {
         data.categories || []
       );
 
-      loadPublicModule('announcements')
-        .then(renderAnnouncementBanner)
-        .catch(() => {});
+      if (!announcementBannerRequest) {
+        announcementBannerRequest = loadPublicModule('announcements')
+          .then(renderAnnouncementBanner)
+          .catch(error => { announcementBannerRequest = null; throw error; });
+      }
 
 
       document.getElementById(
