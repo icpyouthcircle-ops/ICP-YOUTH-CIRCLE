@@ -67,12 +67,30 @@ function closeMDCATHub() {
   document.getElementById('mdcatHub').hidden = true;
 }
 
-function openMDCATHub() {
+function renderMDCATBreadcrumb(items=[]) {
+  const breadcrumb=document.getElementById('mdcatBreadcrumb');
+  if(!breadcrumb)return;
+  breadcrumb.replaceChildren();
+  const addSeparator=()=>{const separator=document.createElement('span');separator.setAttribute('aria-hidden','true');separator.textContent='/';breadcrumb.appendChild(separator);};
+  const addButton=(label,action)=>{const button=document.createElement('button');button.type='button';button.textContent=label;button.onclick=action;breadcrumb.appendChild(button);};
+  addButton('← Home',()=>showHome());addSeparator();
+  const entry=portalData && Array.isArray(portalData.navigation)?portalData.navigation.find(row=>row.Slug==='entry-tests'&&!row.ParentID):null;
+  addButton('Entry Tests',()=>handleNavigation(entry || {Slug:'entry-tests',Label:'Entry Tests'}));addSeparator();
+  if(items.length)addButton('MDCAT 2027',()=>openMDCATHub());
+  else {const current=document.createElement('span');current.className='breadcrumb-current';current.setAttribute('aria-current','page');current.textContent='MDCAT 2027';breadcrumb.appendChild(current);return;}
+  items.forEach((item,index)=>{
+    addSeparator();
+    if(index===items.length-1){const current=document.createElement('span');current.className='breadcrumb-current';current.setAttribute('aria-current','page');current.textContent=item.label;breadcrumb.appendChild(current);}
+    else addButton(item.label,item.action);
+  });
+}
+
+function openMDCATHub(options={}) {
   document.getElementById('homeHero').style.display = 'none';
   document.getElementById('homeExplore').style.display = 'none';
   document.getElementById('dynamicPage').style.display = 'none';
   document.getElementById('mdcatHub').hidden = false;
-  window.location.hash = 'mdcat';
+  if(!options.fromHistory && window.location.hash!=='#/entry-tests/mdcat')history.pushState({portal:true},'','#/entry-tests/mdcat');
   document.getElementById('mdcatHubTitle').focus({preventScroll: true});
   window.scrollTo({top: 0, behavior: 'smooth'});
   loadMDCATSubjects();
@@ -109,6 +127,11 @@ async function loadMDCATDirectory(subject = null, unit = null, chapter = null) {
   const status = document.getElementById('mdcatStatus');
   const retry = document.getElementById('mdcatRetry');
   const noun = chapter ? 'topics' : unit ? 'chapters' : subject ? 'units' : 'subjects';
+  const breadcrumbItems=[];
+  if(subject)breadcrumbItems.push({label:subject.Name,action:()=>openMDCATUnits(subject)});
+  if(unit)breadcrumbItems.push({label:unit.Name,action:()=>openMDCATChapters(subject,unit)});
+  if(chapter)breadcrumbItems.push({label:chapter.Name,action:()=>openMDCATTopics(subject,unit,chapter)});
+  renderMDCATBreadcrumb(breadcrumbItems);
   document.getElementById('mdcatHubTitle').textContent = chapter
     ? chapter.Name + ' — Topics' : unit
     ? unit.Name + ' — Chapters' : subject
@@ -118,14 +141,6 @@ async function loadMDCATDirectory(subject = null, unit = null, chapter = null) {
     ? subject.Name + ' · Browse the published chapters for ' + unit.Name + '.' : subject
     ? 'Browse the published units for ' + subject.Name + '.'
     : 'Explore the subjects for your MDCAT preparation.';
-  document.getElementById('mdcatBackToSubjects').hidden = !subject;
-  const backToUnits = document.getElementById('mdcatBackToUnits');
-  backToUnits.hidden = !unit;
-  backToUnits.textContent = unit ? '← ' + subject.Name + ' units' : '← Units';
-  backToUnits.onclick = unit ? () => openMDCATUnits(subject) : null;
-  const backToChapters = document.getElementById('mdcatBackToChapters');
-  backToChapters.hidden = !chapter;
-  backToChapters.onclick = chapter ? () => openMDCATChapters(subject, unit) : null;
   grid.setAttribute('aria-label', chapter ? chapter.Name + ' topics' : unit ? unit.Name + ' chapters' : subject ? subject.Name + ' units' : 'MDCAT subjects');
   grid.replaceChildren();
   grid.setAttribute('aria-busy', 'true');

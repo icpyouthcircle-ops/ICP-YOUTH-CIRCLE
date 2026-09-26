@@ -32,9 +32,7 @@ function mdcatStudyPage(title, description, back) {
   mdcatRequest = controller;
   document.getElementById('mdcatHubTitle').textContent = title;
   document.getElementById('mdcatHubDescription').textContent = description;
-  document.getElementById('mdcatBackToSubjects').hidden = false;
-  document.getElementById('mdcatBackToUnits').hidden = true;
-  document.getElementById('mdcatBackToChapters').hidden = true;
+  renderMDCATBreadcrumb([{label:title}]);
   const grid = document.getElementById('mdcatSubjects');
   grid.replaceChildren();
   grid.setAttribute('aria-label', title);

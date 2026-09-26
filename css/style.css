@@ -18,6 +18,7 @@
 .mdcat-plan-form label { display: flex; flex-direction: column; gap: 8px; max-width: 100%; }
 .mdcat-plan-form input { padding: 12px; font: inherit; border: 1px solid #dbe0e6; border-radius: 8px; max-width: 100%; }
 #mdcatHubTitle { overflow-wrap: anywhere; }
+#mdcatHubTitle:focus { outline: none; }
 .mdcat-actions {
   display: flex;
   flex-wrap: wrap;
@@ -28,6 +29,8 @@
 .mdcat-actions[hidden] { display: none; }
 .mdcat-actions a { color: #991b2f; }
 .mdcat-actions .resource-button { color: white; margin-top: 0; }
+.mdcat-information-action { justify-content: flex-end; margin-top: -66px; margin-bottom: 30px; }
+.mdcat-information-action .resource-button { text-decoration: none; }
 #mdcatHubTitle { margin: 0 0 8px; font-size: 32px; }
 .mdcat-note { color: #64748b; line-height: 1.6; text-align: center; }
 #mdcatStatus { margin: 24px 0; }
@@ -46,6 +49,7 @@
 .student-dashboard-card h3 { margin-top: 0; }
 .student-dashboard-card .resource-button { margin: 6px 8px 0 0; }
 .portal-account-view .mdcat-actions,
+.portal-account-view .mdcat-breadcrumb,
 .portal-account-view .mdcat-tools,
 .portal-account-view .mdcat-note { display: none; }
 .contact-panel { max-width: 960px; margin: 0 auto; padding: 8px 0 28px; }
@@ -537,7 +541,7 @@ section { padding: 72px 24px; }
 #dynamicPage { background: var(--portal-canvas); min-height: 620px; }
 #dynamicPage > .container { max-width: 1280px; }
 #dynamicPageContent { align-items: stretch; }
-.page-breadcrumb { display: flex; align-items: center; gap: 10px; margin: 0 0 30px; color: #98a2b3; font-size: 13px; }
+.page-breadcrumb { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 30px; color: #98a2b3; font-size: 13px; }
 .page-breadcrumb button { display: inline-flex; align-items: center; gap: 7px; border: 0; border-radius: 8px; background: transparent; color: var(--portal-brand); cursor: pointer; font-size: 13px; font-weight: 700; padding: 7px 8px; }
 .page-breadcrumb button:hover { background: #fff1f4; }
 .page-breadcrumb > span:last-child { color: #667085; font-weight: 600; }
@@ -622,6 +626,7 @@ footer p { color: #b8c2d4; margin: 6px 0; }
   .footer-inner { grid-template-columns: 1fr; gap: 34px; padding-top: 44px; }
   .footer-links { gap: 24px; }
   .page-breadcrumb { margin-bottom: 24px; }
+  .mdcat-information-action { justify-content: flex-start; margin-top: -12px; margin-bottom: 26px; }
 }
 
 @media (max-width: 480px) {

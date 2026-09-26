@@ -950,7 +950,7 @@ function handleNavigation(item,options={}) {
   item=resolveNavigationItem(item);
 
   if (item.Slug === 'mdcat' || item.Slug === 'mdcat-2027') {
-    openMDCATHub();
+    openMDCATHub(options);
     return;
   }
 

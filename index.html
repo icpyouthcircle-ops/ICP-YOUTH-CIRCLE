@@ -125,12 +125,9 @@
 
       <section id="mdcatHub" hidden aria-labelledby="mdcatHubTitle">
         <div class="container">
-          <div class="mdcat-actions">
-            <button id="mdcatBackToSubjects" class="mdcat-back" type="button" hidden onclick="openMDCATHub()">← All subjects</button>
-            <button id="mdcatBackToUnits" class="mdcat-back" type="button" hidden>← Units</button>
-            <button id="mdcatBackToChapters" class="mdcat-back" type="button" hidden>← Chapters</button>
-            <a href="#entry-tests" onclick="event.preventDefault(); handleNavigation({Slug: 'entry-tests', Label: 'Entry Tests'});">← Entry Tests</a>
-            <a href="#mdcat-info" onclick="event.preventDefault(); handleNavigation({Slug: 'mdcat-info', Label: 'MDCAT'});">MDCAT test information</a>
+          <nav id="mdcatBreadcrumb" class="page-breadcrumb mdcat-breadcrumb" aria-label="Breadcrumb"></nav>
+          <div class="mdcat-actions mdcat-information-action">
+            <a href="#/entry-tests/mdcat-info" class="resource-button" onclick="event.preventDefault(); handleNavigation({Slug: 'mdcat-info', Label: 'MDCAT test information', ParentID: 'NAV-003'});">MDCAT test information</a>
           </div>
           <div class="section-title">
             <h2 id="mdcatHubTitle" tabindex="-1">MDCAT 2027</h2>
@@ -185,8 +182,8 @@
   </div>
 
   <script src="js/app.js?v=20260926-navigation-history"></script>
-  <script src="js/mdcat.js?v=20260926-student-dashboard"></script>
-  <script src="js/mdcat-study.js?v=20260926-student-dashboard"></script>
+  <script src="js/mdcat.js?v=20260926-mdcat-breadcrumb"></script>
+  <script src="js/mdcat-study.js?v=20260926-mdcat-breadcrumb"></script>
   <script src="js/mdcat-account.js?v=20260926-student-dashboard"></script>
 
 </body>
