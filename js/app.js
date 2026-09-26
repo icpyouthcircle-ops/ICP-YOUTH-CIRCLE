@@ -314,7 +314,7 @@ function loadPortal() {
 function registerPortalServiceWorker() {
   if (!('serviceWorker' in navigator) || location.protocol !== 'https:') return;
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js?v=20260926-performance').catch(() => {});
+    navigator.serviceWorker.register('sw.js?v=20260926-mobile-nav').catch(() => {});
   }, {once: true});
 }
 
@@ -479,6 +479,7 @@ function togglePublicNotifications() {
   const open = !wrapper.classList.contains('is-open');
   closePublicNotifications();
   if (!open) return;
+  closeMobileNavigation();
   wrapper.classList.add('is-open');
   const button = wrapper.querySelector('.public-notification-button');
   const badge = wrapper.querySelector('.public-notification-badge');
@@ -494,11 +495,13 @@ function renderNavigation(items) {
 
   const nav = document.getElementById('mainNavigation');
   const menuToggle = document.getElementById('menuToggle');
+  const previousPublicNotifications = document.getElementById('publicNotifications');
+  if (previousPublicNotifications) previousPublicNotifications.remove();
 
   nav.innerHTML = '';
   nav.classList.remove('is-open');
   menuToggle.setAttribute('aria-expanded','false');
-  menuToggle.onclick=()=>setMobileNavigationOpen(!nav.classList.contains('is-open'));
+  menuToggle.onclick=()=>{closePublicNotifications();setMobileNavigationOpen(!nav.classList.contains('is-open'));};
   if (!nav.dataset.keyboardReady) {
     document.addEventListener('keydown',event=>{if(event.key==='Escape') closeMobileNavigation();});
     nav.dataset.keyboardReady='true';
@@ -598,7 +601,7 @@ function renderNavigation(items) {
     </div>`;
   publicNotifications.querySelector('.public-notification-button').onclick = togglePublicNotifications;
   publicNotifications.querySelector('.public-notification-all').onclick = event => { event.preventDefault(); closePublicNotifications(); handleNavigation({Slug: 'announcements', Label: 'Announcements', ParentID: 'NAV-009'}); closeMobileNavigation(); };
-  nav.appendChild(publicNotifications);
+  document.querySelector('.header-inner').appendChild(publicNotifications);
 
   const accountButton = document.createElement('button');
   accountButton.id = 'portalAccountButton';
