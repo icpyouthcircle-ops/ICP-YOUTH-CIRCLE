@@ -60,6 +60,15 @@ const {pathToFileURL}=require('node:url');
 
     await page.evaluate(()=>handleNavigation({Slug:'notes',Label:'Notes'}));
     await page.getByText('Biology PDF',{exact:true}).waitFor();
+    assert.equal((await page.locator('#pageBreadcrumb').innerText()).replace(/\s+/g,' ').trim(),'← Home / Study / Notes');
+    await page.locator('#pageBreadcrumb').getByRole('button',{name:'Study',exact:true}).click();
+    await page.getByRole('button',{name:'Open Notes',exact:true}).waitFor();
+    assert.equal((await page.locator('#pageBreadcrumb').innerText()).replace(/\s+/g,' ').trim(),'← Home / Study');
+    await page.getByRole('button',{name:'Open Notes',exact:true}).click();await page.getByText('Biology PDF',{exact:true}).waitFor();
+    await page.goBack();await page.getByRole('button',{name:'Open Notes',exact:true}).waitFor();
+    assert.equal(await page.locator('#dynamicPageTitle').textContent(),'Study');
+    await page.goForward();await page.getByText('Biology PDF',{exact:true}).waitFor();
+    assert.equal(await page.locator('#dynamicPageTitle').textContent(),'Notes');
     assert.equal(await page.getByRole('link',{name:'View PDF',exact:true}).getAttribute('href'),'https://drive.google.com/file/d/demo-file-1/view?resourcekey=demo-key');
     assert.match(await page.getByRole('link',{name:'Download PDF',exact:true}).getAttribute('href'),/drive\.google\.com\/uc\?export=download&id=demo-file-1&resourcekey=demo-key/);
     const saveResource=page.getByRole('button',{name:'Save resource',exact:true});await saveResource.click();
@@ -84,6 +93,7 @@ const {pathToFileURL}=require('node:url');
     const internship=navigation.find(item=>item.Slug==='internships');
     await page.evaluate(item=>handleNavigation(item),internship);
     await page.getByText('Student Internship',{exact:true}).waitFor();
+    assert.equal((await page.locator('#pageBreadcrumb').innerText()).replace(/\s+/g,' ').trim(),'← Home / Career / Internships');
     assert.equal(await page.getByText('Youth Competition',{exact:true}).count(),0);
 
     const admissionMerit=navigation.find(item=>item.ID==='NAV-028');
@@ -122,7 +132,10 @@ const {pathToFileURL}=require('node:url');
     assert.equal(await page.locator('#mainNavigation').isVisible(),false);
     await menuToggle.click();await page.keyboard.press('Escape');assert.equal(await page.locator('#mainNavigation').isVisible(),false);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+    await page.goto(pathToFileURL(path.join(__dirname,'../index.html')).href+'#/study/notes');
+    await page.getByText('Biology PDF',{exact:true}).waitFor();
+    assert.equal((await page.locator('#pageBreadcrumb').innerText()).replace(/\s+/g,' ').trim(),'← Home / Study / Notes');
     assert.deepEqual(errors,[]);
-    console.log('PASS portal navigation: all ten homepage cards and all 59 navigation records resolve without alerts or blank pages; duplicate merit-list routes, filtered modules, empty states, and mobile layout verified.');
+    console.log('PASS portal navigation: all ten homepage cards and all 59 navigation records resolve; parent breadcrumbs, Back/Forward history, direct nested URLs, duplicate routes, filtered modules, empty states, and mobile layout verified.');
   } finally { await browser.close(); }
 })().catch(error=>{console.error(error);process.exit(1);});

@@ -65,6 +65,7 @@ const PORTAL_BOOTSTRAP_DATA = {
     let portalSearchIndex = null;
     let portalSearchPromise = null;
     let navigationVersion = 0;
+    let portalInitialRouteApplied = false;
 
     let mcqScore = 0;
     let mcqAnswered = 0;
@@ -364,6 +365,11 @@ function loadPortal() {
         'app'
       ).style.display = 'block';
 
+      if (!portalInitialRouteApplied) {
+        portalInitialRouteApplied = true;
+        navigatePortalLocation();
+      }
+
     }
 
 function renderNavigation(items) {
@@ -599,11 +605,82 @@ function closeMobileNavigation() { setMobileNavigationOpen(false); }
       handleNavigation({Slug: category.Slug, Label: category.Name, TargetURL: category.TargetURL || ''});
     }
 
+function resolveNavigationItem(item) {
+  if (!item || !portalData || !Array.isArray(portalData.navigation)) return item || {};
+  const navigation=portalData.navigation;
+  let match=item.ID ? navigation.find(row=>String(row.ID)===String(item.ID)) : null;
+  const candidates=navigation.filter(row=>String(row.Slug)===String(item.Slug));
+  if(!match && item.ParentID)match=candidates.find(row=>String(row.ParentID)===String(item.ParentID));
+  if(!match && candidates.length>1){
+    const segments=String(item.TargetURL || window.location.hash || '').replace(/^#\/?/,'').split('/').filter(Boolean);
+    const parentHint=segments.length>1?segments[segments.length-2]:'';
+    match=candidates.find(row=>{
+      const parent=navigation.find(parentRow=>String(parentRow.ID)===String(row.ParentID));
+      return parent && parent.Slug===parentHint;
+    });
+  }
+  if(!match)match=candidates[0];
+  return match ? Object.assign({},match,item) : item;
+}
+
 function getNavigationParentSlug(item) {
-  if (!item || !item.ParentID || !portalData || !Array.isArray(portalData.navigation)) return '';
-  const parent = portalData.navigation.find(row=>String(row.ID)===String(item.ParentID));
+  const resolved=resolveNavigationItem(item);
+  if (!resolved || !resolved.ParentID || !portalData || !Array.isArray(portalData.navigation)) return '';
+  const parent = portalData.navigation.find(row=>String(row.ID)===String(resolved.ParentID));
   return parent ? String(parent.Slug || '') : '';
 }
+
+function getNavigationTrail(item) {
+  const navigation=portalData && Array.isArray(portalData.navigation)?portalData.navigation:[];
+  const trail=[];let current=resolveNavigationItem(item);const visited=new Set();
+  while(current && current.Slug && current.Slug!=='home' && !visited.has(String(current.ID || current.Slug))){
+    trail.unshift(current);visited.add(String(current.ID || current.Slug));
+    current=current.ParentID?navigation.find(row=>String(row.ID)===String(current.ParentID)):null;
+  }
+  return trail;
+}
+
+function renderPageBreadcrumb(item) {
+  const breadcrumb=document.getElementById('pageBreadcrumb');
+  if(!breadcrumb)return;
+  breadcrumb.replaceChildren();
+  const home=document.createElement('button');home.type='button';home.append(document.createTextNode('← Home'));home.onclick=()=>showHome();breadcrumb.appendChild(home);
+  const trail=getNavigationTrail(item);
+  trail.forEach((row,index)=>{
+    const separator=document.createElement('span');separator.setAttribute('aria-hidden','true');separator.textContent='/';breadcrumb.appendChild(separator);
+    const label=row.Label || row.Name || row.Slug;
+    if(index===trail.length-1){const current=document.createElement('span');current.className='breadcrumb-current';current.setAttribute('aria-current','page');current.textContent=label;breadcrumb.appendChild(current);}
+    else {const button=document.createElement('button');button.type='button';button.textContent=label;button.onclick=()=>handleNavigation(row);breadcrumb.appendChild(button);}
+  });
+}
+
+function portalRouteHash(item) {
+  const trail=getNavigationTrail(item);
+  const slugs=trail.map(row=>String(row.Slug || '')).filter(Boolean);
+  if(!slugs.length && item && item.Slug)slugs.push(String(item.Slug));
+  return '#/'+slugs.join('/');
+}
+
+function navigationItemForLocation() {
+  if(!portalData || !Array.isArray(portalData.navigation))return null;
+  const raw=decodeURIComponent(String(window.location.hash || '').replace(/^#\/?/,''));
+  if(!raw)return {Slug:'home',Label:'Home'};
+  if(raw==='account')return {Slug:'account',Label:'My account'};
+  if(raw.startsWith('search='))return {Slug:'search',Query:raw.slice(7)};
+  const segments=raw.split('/').filter(Boolean);const slug=segments[segments.length-1];const parentHint=segments.length>1?segments[segments.length-2]:'';
+  const candidates=portalData.navigation.filter(row=>String(row.Slug)===slug);
+  return candidates.find(row=>getNavigationParentSlug(row)===parentHint) || candidates[0] || null;
+}
+
+function navigatePortalLocation() {
+  const item=navigationItemForLocation();if(!item)return;
+  if(item.Slug==='home')return showHome({fromHistory:true});
+  if(item.Slug==='account')return openPortalAccount();
+  if(item.Slug==='search'){const input=document.getElementById('searchInput');input.value=item.Query || '';return portalSearch();}
+  handleNavigation(item,{fromHistory:true});
+}
+
+window.addEventListener('popstate',()=>{if(portalInitialRouteApplied)navigatePortalLocation();});
 
 function renderNavigationSection(parentSlug) {
   const content=document.getElementById('dynamicPageContent');
@@ -865,11 +942,12 @@ function renderPublicPortalForm(kind) {
   card.append(intro,form);content.appendChild(card);
 }
 
-function handleNavigation(item) {
+function handleNavigation(item,options={}) {
 
   navigationVersion += 1;
   closeMDCATHub();
   document.getElementById('mdcatEntryLink').hidden = true;
+  item=resolveNavigationItem(item);
 
   if (item.Slug === 'mdcat' || item.Slug === 'mdcat-2027') {
     openMDCATHub();
@@ -877,7 +955,7 @@ function handleNavigation(item) {
   }
 
   if (item.Slug === 'home') {
-    showHome();
+    showHome(options);
     return;
   }
 
@@ -895,8 +973,7 @@ function handleNavigation(item) {
   title.textContent = itemLabel;
 
   description.textContent = getRouteDescription(item.Slug, itemLabel);
-  const breadcrumb=document.getElementById('breadcrumbCurrent');
-  if (breadcrumb) breadcrumb.textContent=itemLabel;
+  renderPageBreadcrumb(item);
 
   content.innerHTML = '';
 
@@ -980,15 +1057,17 @@ if (resourceCategories[item.Slug]) {
     'dynamicPage'
   ).style.display = 'block';
 
-  window.location.hash =
-    item.TargetURL || item.Slug;
+  if(!options.fromHistory){
+    const target=portalRouteHash(item);
+    if(window.location.hash!==target)history.pushState({portal:true},'',target);
+  }
 
   window.scrollTo({
     top: 0,
     behavior: 'smooth'
   });
 }
-function showHome() {
+function showHome(options={}) {
 
   navigationVersion += 1;
   closeMDCATHub();
@@ -1005,11 +1084,7 @@ function showHome() {
     'homeExplore'
   ).style.display = 'block';
 
-  history.replaceState(
-    null,
-    '',
-    window.location.pathname
-  );
+  if(!options.fromHistory && (window.location.hash || window.location.search)) history.pushState({portal:true},'',window.location.pathname);
 
   window.scrollTo({
     top: 0,

@@ -101,14 +101,7 @@
 <section id="dynamicPage" style="display:none;">
   <div class="container">
 
-    <nav class="page-breadcrumb" aria-label="Breadcrumb">
-      <button type="button" onclick="showHome()">
-        <span aria-hidden="true">←</span>
-        <span>Home</span>
-      </button>
-      <span aria-hidden="true">/</span>
-      <span id="breadcrumbCurrent">Current page</span>
-    </nav>
+    <nav id="pageBreadcrumb" class="page-breadcrumb" aria-label="Breadcrumb"></nav>
 
     <div class="section-title">
       <h3 id="dynamicPageTitle"></h3>
@@ -191,7 +184,7 @@
 
   </div>
 
-  <script src="js/app.js?v=20260926-student-dashboard"></script>
+  <script src="js/app.js?v=20260926-navigation-history"></script>
   <script src="js/mdcat.js?v=20260926-student-dashboard"></script>
   <script src="js/mdcat-study.js?v=20260926-student-dashboard"></script>
   <script src="js/mdcat-account.js?v=20260926-student-dashboard"></script>
