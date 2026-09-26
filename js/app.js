@@ -8,6 +8,7 @@ const PUBLIC_NOTIFICATION_LIFETIME = 24 * 60 * 60 * 1000;
 const publicModuleMemory = new Map();
 const publicModuleRequests = new Map();
 let publicNotificationRequest = null;
+let portalRenderFingerprint = '';
 const PORTAL_BOOKMARKS_KEY = 'icp-student-bookmarks-v1';
 const PORTAL_BOOTSTRAP_DATA = {
   settings: {
@@ -164,11 +165,19 @@ function storePublicModuleCache(key, data) {
   } catch (_) {}
 }
 
+function fetchWithPortalTimeout(url, options = {}, timeoutMs = 15000) {
+  if (typeof AbortController === 'undefined') return fetch(url, options);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, {...options, signal: controller.signal})
+    .finally(() => clearTimeout(timeout));
+}
+
 function refreshPublicModule(action, params = {}) {
   const key = publicModuleKey(action, params);
   if (publicModuleRequests.has(key)) return publicModuleRequests.get(key);
   const url = API_BASE_URL + '?' + key;
-  const request = fetch(url)
+  const request = fetchWithPortalTimeout(url)
     .then(response => {
       if (!response.ok) throw new Error('HTTP error: ' + response.status);
       return response.json();
@@ -208,7 +217,7 @@ function storePublicBundle(bundle) {
 }
 
 function warmPublicBundle() {
-  return fetch(API_BASE_URL + '?action=portalBundle')
+  return fetchWithPortalTimeout(API_BASE_URL + '?action=portalBundle')
     .then(response => {
       if (!response.ok) throw new Error('HTTP error: ' + response.status);
       return response.json();
@@ -266,7 +275,7 @@ function loadPortal() {
   searchInput.addEventListener('input',()=>searchInput.setCustomValidity(''));
   searchInput.addEventListener('focus',()=>loadPortalSearchIndex().catch(()=>{}));
   searchInput.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();portalSearch();}});
-  fetch(API_BASE_URL + '?action=portalData')
+  fetchWithPortalTimeout(API_BASE_URL + '?action=portalData')
     .then(response => {
       if (!response.ok) {
         throw new Error(
@@ -299,12 +308,25 @@ function loadPortal() {
       // The already-rendered snapshot keeps the portal usable while the API recovers.
     });
   warmPublicModules();
+  registerPortalServiceWorker();
+}
+
+function registerPortalServiceWorker() {
+  if (!('serviceWorker' in navigator) || location.protocol !== 'https:') return;
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js?v=20260926-performance').catch(() => {});
+  }, {once: true});
 }
 
 
     function renderPortal(data) {
 
       portalData = data;
+
+      let fingerprint = '';
+      try { fingerprint = JSON.stringify({settings:data.settings || {},navigation:data.navigation || [],categories:data.categories || []}); } catch (_) {}
+      if (fingerprint && fingerprint === portalRenderFingerprint) return;
+      portalRenderFingerprint = fingerprint;
 
       const settings = data.settings || {};
 

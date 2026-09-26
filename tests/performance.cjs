@@ -51,6 +51,12 @@ const {createBackend}=require('./scoring-harness.cjs');
     const accountSource=fs.readFileSync(path.join(__dirname,'../js/mdcat-account.js'),'utf8');
     assert.equal(accountSource.includes('?action=mdcatAccountConfig'),false);
     assert.match(accountSource,/MDCAT_FIREBASE_WEB_CONFIG/);
+    const appSource=fs.readFileSync(path.join(__dirname,'../js/app.js'),'utf8');
+    assert.match(appSource,/fetchWithPortalTimeout/);
+    assert.match(appSource,/serviceWorker\.register/);
+    const serviceWorkerSource=fs.readFileSync(path.join(__dirname,'../sw.js'),'utf8');
+    assert.match(serviceWorkerSource,/caches\.open\(CACHE_NAME\)/);
+    assert.match(serviceWorkerSource,/request\.mode === 'navigate'/);
 
     const backend=createBackend();
     const readSubjects=()=>JSON.parse(backend.context.doGet({parameter:{action:'mdcatSubjects'}}).getContent()).data;

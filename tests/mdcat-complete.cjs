@@ -18,6 +18,7 @@ fs.mkdirSync(path.join(__dirname,'../test-results'),{recursive:true});
       const params=new URL(route.request().url()).searchParams;
       const action=params.get('action'); calls.push(action);
       if(action==='portalData') return route.fulfill({json:{success:true,data:{settings:{},navigation:[{ID:'home',Slug:'home',Label:'Home'},{ID:'entry',Slug:'entry-tests',Label:'Entry Tests'}],categories:[]}}});
+      if(action==='announcements') return route.fulfill({json:{success:true,data:[]}});
       if(action==='entryTests') return route.fulfill({json:{success:true,data:[]}});
       assert.ok(actions[action],'Unexpected route '+action);
       let rows=structuredClone(fixture[actions[action]]);
