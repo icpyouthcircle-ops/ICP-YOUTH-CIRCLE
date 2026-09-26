@@ -314,7 +314,7 @@ function loadPortal() {
 function registerPortalServiceWorker() {
   if (!('serviceWorker' in navigator) || location.protocol !== 'https:') return;
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js?v=20260926-responsive-v2').catch(() => {});
+    navigator.serviceWorker.register('sw.js?v=20260926-announcement-button').catch(() => {});
   }, {once: true});
 }
 
@@ -4273,6 +4273,9 @@ function drawAnnouncementCards(announcements) {
         'noopener noreferrer';
 
       link.textContent =
+        String(item.ButtonText || 'Official Details')
+          .trim()
+          .slice(0, 80) ||
         'Official Details';
 
       link.className =

@@ -1126,6 +1126,7 @@ function getPublicAnnouncements_() {
     PublishDate: item.PublishDate,
     ExpiryDate: item.ExpiryDate,
     OfficialURL: item.OfficialURL,
+    ButtonText: item.ButtonText,
     Priority: item.Priority,
     Featured: item.Featured
   }));

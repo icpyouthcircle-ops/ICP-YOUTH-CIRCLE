@@ -25,7 +25,7 @@ const {pathToFileURL}=require('node:url');
         {ID:'O2',Title:'Youth Competition',Type:'Competition'}
       ],
       announcements:[
-        {ID:'N1',Title:'Exam schedule',Category:'Exam Update',PublishDate:new Date().toISOString()},
+        {ID:'N1',Title:'Exam schedule',Category:'Exam Update',PublishDate:new Date().toISOString(),OfficialURL:'https://example.test/result',ButtonText:'Check result'},
         {ID:'N2',Title:'Results announced',Category:'Results'},
         {ID:'N3',Title:'University merit list',Category:'Merit List'}
       ],
@@ -114,6 +114,11 @@ const {pathToFileURL}=require('node:url');
     const updateMerit=navigation.find(item=>item.ID==='NAV-051');
     await page.evaluate(item=>handleNavigation(item),updateMerit);
     await page.getByText('University merit list',{exact:true}).waitFor();
+
+    await page.evaluate(()=>handleNavigation({Slug:'announcements',Label:'Announcements',ParentID:'NAV-009'}));
+    const announcementButton=page.getByRole('link',{name:'Check result',exact:true});
+    await announcementButton.waitFor();
+    assert.equal(await announcementButton.getAttribute('href'),'https://example.test/result');
 
     await page.evaluate(()=>{portalData.settings={contact_email:'icpyouthcircle@example.com',whatsapp_channel:'https://wa.me/923000000000',instagram_url:'https://instagram.com/icp.youth.circle',facebook_url:'https://facebook.com/icpyouthcircle',youtube_url:'https://youtube.com/@icpyouthcircle',linkedin_url:'https://linkedin.com/company/icpyouthcircle',x_url:'https://x.com/icpyouthcircle',tiktok_url:'https://tiktok.com/@icpyouthcircle',telegram_url:'https://t.me/icpyouthcircle'};handleNavigation({Slug:'contact',Label:'Contact'});});
     await page.getByRole('link',{name:'Send us an email',exact:true}).waitFor();
