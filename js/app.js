@@ -660,6 +660,56 @@ function renderAboutPage() {
   panel.append(intro,pillars);content.appendChild(panel);
 }
 
+function createContactIcon(type) {
+  const namespace='http://www.w3.org/2000/svg';
+  const icon=document.createElement('span');
+  icon.className='contact-icon contact-icon-'+type;
+  icon.setAttribute('aria-hidden','true');
+  const svg=document.createElementNS(namespace,'svg');
+  svg.setAttribute('viewBox','0 0 24 24');
+  svg.setAttribute('focusable','false');
+  svg.setAttribute('aria-hidden','true');
+  svg.setAttribute('fill','none');
+  svg.setAttribute('stroke','currentColor');
+  svg.setAttribute('stroke-width','1.8');
+  svg.setAttribute('stroke-linecap','round');
+  svg.setAttribute('stroke-linejoin','round');
+  const add=(name,attributes)=>{
+    const node=document.createElementNS(namespace,name);
+    Object.entries(attributes).forEach(([key,value])=>node.setAttribute(key,value));
+    svg.appendChild(node);
+  };
+  if(type==='email') {
+    add('rect',{x:'3',y:'5',width:'18',height:'14',rx:'2'});
+    add('path',{d:'m4 7 8 6 8-6'});
+  } else if(type==='whatsapp') {
+    add('path',{d:'M20.5 11.6a8.5 8.5 0 0 1-12.6 7.5L3.5 20.5l1.4-4.2a8.5 8.5 0 1 1 15.6-4.7Z'});
+    add('path',{d:'M8.2 7.8c.3-.5.6-.5.9-.5h.4c.2 0 .4.1.5.4l.8 2c.1.3.1.5-.1.7l-.6.8c-.2.2-.1.4 0 .6.5.9 1.3 1.7 2.2 2.2.2.1.4.2.6 0l.9-1.1c.2-.2.4-.3.7-.2l2 .9c.3.1.4.3.4.5 0 .4-.2 1.5-.7 2-.5.6-1.4.9-2.3.7-1.1-.2-2.7-.8-4.6-2.5-1.5-1.3-2.5-3-2.8-4.1-.3-1 .1-1.8.5-2.4Z'});
+  } else if(type==='instagram') {
+    add('rect',{x:'3',y:'3',width:'18',height:'18',rx:'5'});
+    add('circle',{cx:'12',cy:'12',r:'4'});
+    add('circle',{cx:'17.4',cy:'6.6',r:'.8',fill:'currentColor',stroke:'none'});
+  } else if(type==='facebook') {
+    add('path',{d:'M14 8h3V4h-3c-3 0-5 2-5 5v3H6v4h3v5h4v-5h3l1-4h-4V9c0-.6.4-1 1-1Z',fill:'currentColor',stroke:'none'});
+  } else if(type==='youtube') {
+    add('rect',{x:'2.5',y:'5.5',width:'19',height:'13',rx:'4'});
+    add('path',{d:'m10 9 5 3-5 3V9Z',fill:'currentColor',stroke:'none'});
+  } else if(type==='linkedin') {
+    add('rect',{x:'3',y:'3',width:'18',height:'18',rx:'2'});
+    add('circle',{cx:'7.2',cy:'8',r:'1',fill:'currentColor',stroke:'none'});
+    add('path',{d:'M7.2 11v6M11 17v-6m0 2.7c.7-1.7 5-2.2 5 1.3v2'});
+  } else if(type==='x') {
+    add('path',{d:'M5 4l14 16M19 4 5 20'});
+  } else if(type==='tiktok') {
+    add('path',{d:'M14 4v11.2a4.2 4.2 0 1 1-3.2-4.1'});
+    add('path',{d:'M14 4c.5 2.4 2 4 5 4.5'});
+  } else if(type==='telegram') {
+    add('path',{d:'m3 11 17-7-5 16-4-6-4 3 1-5 9-5-11 4Z'});
+  }
+  icon.appendChild(svg);
+  return icon;
+}
+
 function getRouteDescription(slug, label) {
   const descriptions={
     'study':'Access notes, past papers, MCQs, videos and study resources.',
@@ -697,10 +747,10 @@ function renderContactPage() {
   const description=document.createElement('p');description.textContent='Choose the official ICP YOUTH CIRCLE channel that suits you best.';
   intro.append(eyebrow,heading,description);panel.appendChild(intro);
   const cards=document.createElement('div');cards.className='contact-grid';
-  const addCard=(label,detail,href,icon)=>{
+  const addCard=(label,detail,href,iconType)=>{
     if(!detail || !href)return;
     const card=document.createElement('article');card.className='contact-card';
-    const mark=document.createElement('span');mark.className='contact-icon';mark.setAttribute('aria-hidden','true');mark.textContent=icon;
+    const mark=createContactIcon(iconType);
     const body=document.createElement('div');
     const title=document.createElement('h5');title.textContent=label;
     const link=document.createElement('a');link.href=href;link.textContent=detail;link.className='contact-link';
@@ -708,11 +758,22 @@ function renderContactPage() {
     body.append(title,link);card.append(mark,body);cards.appendChild(card);
   };
   const email=String(settings.contact_email || '').trim();
-  if(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))addCard('Email','Send us an email','mailto:'+email,'✉');
+  if(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))addCard('Email','Send us an email','mailto:'+email,'email');
   const whatsapp=safePortalURL(settings.whatsapp_channel);
-  addCard('WhatsApp channel','Follow our WhatsApp updates',whatsapp,'◌');
+  addCard('WhatsApp channel','Follow our WhatsApp updates',whatsapp,'whatsapp');
   const instagram=safePortalURL(settings.instagram_url);
-  addCard('Instagram','Follow ICP YOUTH CIRCLE',instagram,'◎');
+  addCard('Instagram','Follow ICP YOUTH CIRCLE',instagram,'instagram');
+  [
+    ['Facebook','Follow us on Facebook','facebook_url','facebook'],
+    ['YouTube','Watch us on YouTube','youtube_url','youtube'],
+    ['LinkedIn','Connect with us on LinkedIn','linkedin_url','linkedin'],
+    ['X','Follow us on X','x_url','x'],
+    ['TikTok','Follow us on TikTok','tiktok_url','tiktok'],
+    ['Telegram','Join us on Telegram','telegram_url','telegram']
+  ].forEach(([label,detail,key,iconType])=>{
+    const fallback=key==='x_url' ? settings.twitter_url : '';
+    addCard(label,detail,safePortalURL(settings[key] || fallback),iconType);
+  });
   if(!cards.children.length){
     const empty=document.createElement('p');empty.className='contact-empty';empty.textContent='Official contact details have not been published yet.';panel.appendChild(empty);
   }else panel.appendChild(cards);

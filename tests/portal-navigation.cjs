@@ -93,11 +93,19 @@ const {pathToFileURL}=require('node:url');
     await page.evaluate(item=>handleNavigation(item),updateMerit);
     await page.getByText('University merit list',{exact:true}).waitFor();
 
-    await page.evaluate(()=>{portalData.settings={contact_email:'icpyouthcircle@example.com',whatsapp_channel:'https://wa.me/923000000000',instagram_url:'https://instagram.com/icp.youth.circle'};handleNavigation({Slug:'contact',Label:'Contact'});});
+    await page.evaluate(()=>{portalData.settings={contact_email:'icpyouthcircle@example.com',whatsapp_channel:'https://wa.me/923000000000',instagram_url:'https://instagram.com/icp.youth.circle',facebook_url:'https://facebook.com/icpyouthcircle',youtube_url:'https://youtube.com/@icpyouthcircle',linkedin_url:'https://linkedin.com/company/icpyouthcircle',x_url:'https://x.com/icpyouthcircle',tiktok_url:'https://tiktok.com/@icpyouthcircle',telegram_url:'https://t.me/icpyouthcircle'};handleNavigation({Slug:'contact',Label:'Contact'});});
     await page.getByRole('link',{name:'Send us an email',exact:true}).waitFor();
     assert.equal(await page.getByRole('link',{name:'Send us an email',exact:true}).getAttribute('href'),'mailto:icpyouthcircle@example.com');
     assert.equal(await page.getByRole('link',{name:'Follow our WhatsApp updates',exact:true}).getAttribute('href'),'https://wa.me/923000000000');
     assert.equal(await page.getByRole('link',{name:'Follow ICP YOUTH CIRCLE',exact:true}).getAttribute('href'),'https://instagram.com/icp.youth.circle');
+    assert.equal(await page.locator('.contact-card').count(),9);
+    assert.equal(await page.locator('.contact-icon svg').count(),9);
+    assert.equal(await page.getByRole('link',{name:'Follow us on Facebook',exact:true}).getAttribute('href'),'https://facebook.com/icpyouthcircle');
+    assert.equal(await page.getByRole('link',{name:'Watch us on YouTube',exact:true}).getAttribute('href'),'https://youtube.com/@icpyouthcircle');
+    assert.equal(await page.getByRole('link',{name:'Connect with us on LinkedIn',exact:true}).getAttribute('href'),'https://linkedin.com/company/icpyouthcircle');
+    assert.equal(await page.getByRole('link',{name:'Follow us on X',exact:true}).getAttribute('href'),'https://x.com/icpyouthcircle');
+    assert.equal(await page.getByRole('link',{name:'Follow us on TikTok',exact:true}).getAttribute('href'),'https://tiktok.com/@icpyouthcircle');
+    assert.equal(await page.getByRole('link',{name:'Join us on Telegram',exact:true}).getAttribute('href'),'https://t.me/icpyouthcircle');
 
     await page.setViewportSize({width:375,height:812});
     await page.evaluate(()=>showHome());
