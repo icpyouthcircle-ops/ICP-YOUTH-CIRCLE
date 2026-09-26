@@ -495,6 +495,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 header { background: rgba(255,255,255,.96); border-bottom: 1px solid rgba(230,232,236,.9); box-shadow: 0 4px 20px rgba(16,24,40,.04); padding: 14px 28px; backdrop-filter: blur(14px); }
 .header-inner { max-width: 1440px; }
+.announcement-banner { background: #fff8e7; border-bottom: 1px solid #f2d48b; color: #513b08; }
+.announcement-banner-inner { display: flex; align-items: center; gap: 10px; max-width: 1440px; margin: 0 auto; min-height: 42px; padding: 8px 28px; }
+.announcement-banner-icon { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: #d6a84f; color: #fff; font-size: 13px; font-weight: 800; }
+.announcement-banner-label { color: #876719; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+.announcement-banner-link { min-width: 0; overflow: hidden; color: #513b08; font-size: 13px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.announcement-banner-link:hover { color: var(--portal-brand); }
+.announcement-banner-close { margin-left: auto; border: 0; background: transparent; color: #876719; cursor: pointer; font-size: 22px; line-height: 1; padding: 2px 6px; }
+.announcement-banner-close:hover { color: var(--portal-brand); }
 .brand h1 { color: var(--portal-ink); font-size: 21px; font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
 .brand p { color: #77839a; font-size: 10px; font-weight: 700; letter-spacing: .24em; }
 #mainNavigation { flex: 1; justify-content: flex-end; gap: 4px; }
@@ -614,6 +622,8 @@ footer p { color: #b8c2d4; margin: 6px 0; }
 }
 @media (max-width: 800px) {
   header { padding: 14px 18px; }
+  .announcement-banner-inner { padding: 8px 18px; }
+  .announcement-banner-label { display: none; }
   .hero { padding: 72px 20px 68px; }
   .hero-description { font-size: 15px; }
   section { padding: 54px 18px; }

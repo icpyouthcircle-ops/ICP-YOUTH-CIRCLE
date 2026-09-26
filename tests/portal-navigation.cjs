@@ -48,6 +48,8 @@ const {pathToFileURL}=require('node:url');
     });
     await page.goto(pathToFileURL(path.join(__dirname,'../index.html')).href);
     await page.locator('#app').waitFor({state:'visible'});
+    await page.locator('#announcementBanner').waitFor({state:'visible'});
+    assert.equal(await page.locator('.announcement-banner-link').textContent(),'Exam schedule');
     assert.equal(await page.locator('#categoryGrid .card').count(),10);
 
     for(let index=0;index<10;index++){

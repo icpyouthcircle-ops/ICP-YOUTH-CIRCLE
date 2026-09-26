@@ -3,6 +3,7 @@ const API_BASE_URL =
 const PORTAL_CACHE_KEY = 'icp-public-portal-v1';
 const PUBLIC_MODULE_CACHE_PREFIX = 'icp-public-module-v2:';
 const PUBLIC_MODULE_CACHE_TTL = 30 * 60 * 1000;
+const ANNOUNCEMENT_DISMISS_KEY = 'icp-announcement-dismissed-v1:';
 const publicModuleMemory = new Map();
 const publicModuleRequests = new Map();
 const PORTAL_BOOKMARKS_KEY = 'icp-student-bookmarks-v1';
@@ -355,6 +356,10 @@ function loadPortal() {
         data.categories || []
       );
 
+      loadPublicModule('announcements')
+        .then(renderAnnouncementBanner)
+        .catch(() => {});
+
 
       document.getElementById(
         'loading'
@@ -371,6 +376,36 @@ function loadPortal() {
       }
 
     }
+
+function announcementTimestamp(value) {
+  const raw = String(value == null ? '' : value).trim();
+  if (!raw) return 0;
+  const timestamp = Date.parse(raw);
+  if (!Number.isNaN(timestamp)) return timestamp;
+  const match = raw.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
+  return match ? Date.UTC(Number(match[3]), Number(match[2]) - 1, Number(match[1])) : 0;
+}
+
+function renderAnnouncementBanner(items) {
+  const banner = document.getElementById('announcementBanner');
+  if (!banner) return;
+  const priority = {high: 2, medium: 1, low: 0};
+  const announcement = (Array.isArray(items) ? items : [])
+    .filter(item => item && (item.Title || item.Summary || item.Content))
+    .sort((a, b) => ((priority[String(b.Priority || '').toLowerCase()] || 0) - (priority[String(a.Priority || '').toLowerCase()] || 0)) || (announcementTimestamp(b.PublishDate) - announcementTimestamp(a.PublishDate)))[0];
+  if (!announcement) { banner.hidden = true; banner.replaceChildren(); return; }
+  const id = String(announcement.ID || announcement.Title || '').trim();
+  try { if (id && localStorage.getItem(ANNOUNCEMENT_DISMISS_KEY + id) === '1') { banner.hidden = true; return; } } catch (_) {}
+  banner.replaceChildren();
+  const inner = document.createElement('div'); inner.className = 'announcement-banner-inner';
+  const icon = document.createElement('span'); icon.className = 'announcement-banner-icon'; icon.setAttribute('aria-hidden', 'true'); icon.textContent = '✦';
+  const label = document.createElement('span'); label.className = 'announcement-banner-label'; label.textContent = 'Latest update';
+  const link = document.createElement('a'); link.href = '#/announcements'; link.className = 'announcement-banner-link'; link.textContent = String(announcement.Title || announcement.Summary || 'View announcement').trim();
+  link.onclick = () => { handleNavigation({Slug: 'announcements', Label: 'Announcements', ParentID: 'NAV-009'}); };
+  const close = document.createElement('button'); close.type = 'button'; close.className = 'announcement-banner-close'; close.setAttribute('aria-label', 'Dismiss announcement'); close.textContent = '×';
+  close.onclick = () => { if (id) { try { localStorage.setItem(ANNOUNCEMENT_DISMISS_KEY + id, '1'); } catch (_) {} } banner.hidden = true; };
+  inner.append(icon, label, link, close); banner.appendChild(inner); banner.hidden = false;
+}
 
 function renderNavigation(items) {
 
