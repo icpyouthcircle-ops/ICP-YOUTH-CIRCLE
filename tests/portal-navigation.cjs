@@ -25,7 +25,7 @@ const {pathToFileURL}=require('node:url');
         {ID:'O2',Title:'Youth Competition',Type:'Competition'}
       ],
       announcements:[
-        {ID:'N1',Title:'Exam schedule',Category:'Exam Update'},
+        {ID:'N1',Title:'Exam schedule',Category:'Exam Update',PublishDate:new Date().toISOString()},
         {ID:'N2',Title:'Results announced',Category:'Results'},
         {ID:'N3',Title:'University merit list',Category:'Merit List'}
       ],
@@ -48,8 +48,15 @@ const {pathToFileURL}=require('node:url');
     });
     await page.goto(pathToFileURL(path.join(__dirname,'../index.html')).href);
     await page.locator('#app').waitFor({state:'visible'});
-    await page.locator('#announcementBanner').waitFor({state:'visible'});
-    assert.equal(await page.locator('.announcement-banner-link').textContent(),'Exam schedule');
+    await page.locator('#publicNotifications').waitFor({state:'visible'});
+    assert.equal(await page.locator('.public-notification-badge').textContent(),'1');
+    await page.locator('.public-notification-button').click();
+    await page.locator('.public-notification-panel').waitFor({state:'visible'});
+    assert.equal(await page.locator('.public-notification-item strong').textContent(),'Exam schedule');
+    await page.evaluate(()=>renderPublicNotifications([{ID:'OLD',Title:'Old notice',PublishDate:new Date(Date.now()-25*60*60*1000).toISOString()}]));
+    assert.equal(await page.locator('.public-notification-button').isDisabled(),true);
+    await page.evaluate(()=>renderPublicNotifications([{ID:'N1',Title:'Exam schedule',Category:'Exam Update',PublishDate:new Date().toISOString()}]));
+    await page.evaluate(()=>closePublicNotifications());
     assert.equal(await page.locator('#categoryGrid .card').count(),10);
 
     for(let index=0;index<10;index++){

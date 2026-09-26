@@ -3,10 +3,11 @@ const API_BASE_URL =
 const PORTAL_CACHE_KEY = 'icp-public-portal-v1';
 const PUBLIC_MODULE_CACHE_PREFIX = 'icp-public-module-v2:';
 const PUBLIC_MODULE_CACHE_TTL = 30 * 60 * 1000;
-const ANNOUNCEMENT_DISMISS_KEY = 'icp-announcement-dismissed-v1:';
+const PUBLIC_NOTIFICATION_SEEN_KEY = 'icp-public-notifications-seen-v1';
+const PUBLIC_NOTIFICATION_LIFETIME = 24 * 60 * 60 * 1000;
 const publicModuleMemory = new Map();
 const publicModuleRequests = new Map();
-let announcementBannerRequest = null;
+let publicNotificationRequest = null;
 const PORTAL_BOOKMARKS_KEY = 'icp-student-bookmarks-v1';
 const PORTAL_BOOTSTRAP_DATA = {
   settings: {
@@ -357,11 +358,11 @@ function loadPortal() {
         data.categories || []
       );
 
-      if (!announcementBannerRequest) {
-        announcementBannerRequest = loadPublicModule('announcements')
-          .then(renderAnnouncementBanner)
-          .catch(error => { announcementBannerRequest = null; throw error; });
+      if (!publicNotificationRequest) {
+        publicNotificationRequest = loadPublicModule('announcements')
+          .catch(error => { publicNotificationRequest = null; throw error; });
       }
+      publicNotificationRequest.then(renderPublicNotifications).catch(() => {});
 
 
       document.getElementById(
@@ -389,25 +390,82 @@ function announcementTimestamp(value) {
   return match ? Date.UTC(Number(match[3]), Number(match[2]) - 1, Number(match[1])) : 0;
 }
 
-function renderAnnouncementBanner(items) {
-  const banner = document.getElementById('announcementBanner');
-  if (!banner) return;
+function sortedPublicNotifications(items) {
   const priority = {high: 2, medium: 1, low: 0};
-  const announcement = (Array.isArray(items) ? items : [])
-    .filter(item => item && (item.Title || item.Summary || item.Content))
-    .sort((a, b) => ((priority[String(b.Priority || '').toLowerCase()] || 0) - (priority[String(a.Priority || '').toLowerCase()] || 0)) || (announcementTimestamp(b.PublishDate) - announcementTimestamp(a.PublishDate)))[0];
-  if (!announcement) { banner.hidden = true; banner.replaceChildren(); return; }
-  const id = String(announcement.ID || announcement.Title || '').trim();
-  try { if (id && localStorage.getItem(ANNOUNCEMENT_DISMISS_KEY + id) === '1') { banner.hidden = true; return; } } catch (_) {}
-  banner.replaceChildren();
-  const inner = document.createElement('div'); inner.className = 'announcement-banner-inner';
-  const icon = document.createElement('span'); icon.className = 'announcement-banner-icon'; icon.setAttribute('aria-hidden', 'true'); icon.textContent = '✦';
-  const label = document.createElement('span'); label.className = 'announcement-banner-label'; label.textContent = 'Latest update';
-  const link = document.createElement('a'); link.href = '#/announcements'; link.className = 'announcement-banner-link'; link.textContent = String(announcement.Title || announcement.Summary || 'View announcement').trim();
-  link.onclick = () => { handleNavigation({Slug: 'announcements', Label: 'Announcements', ParentID: 'NAV-009'}); };
-  const close = document.createElement('button'); close.type = 'button'; close.className = 'announcement-banner-close'; close.setAttribute('aria-label', 'Dismiss announcement'); close.textContent = '×';
-  close.onclick = () => { if (id) { try { localStorage.setItem(ANNOUNCEMENT_DISMISS_KEY + id, '1'); } catch (_) {} } banner.hidden = true; };
-  inner.append(icon, label, link, close); banner.appendChild(inner); banner.hidden = false;
+  const now = Date.now();
+  return (Array.isArray(items) ? items : [])
+    .filter(item => {
+      if (!item || !(item.Title || item.Summary || item.Content)) return false;
+      const publishedAt = announcementTimestamp(item.PublishDate);
+      return publishedAt > 0 && publishedAt <= now && now - publishedAt < PUBLIC_NOTIFICATION_LIFETIME;
+    })
+    .sort((a, b) => {
+      const featured = String(b.Featured || '').toLowerCase() === 'yes' ? 1 : 0;
+      const otherFeatured = String(a.Featured || '').toLowerCase() === 'yes' ? 1 : 0;
+      return (featured - otherFeatured) ||
+        ((priority[String(b.Priority || '').toLowerCase()] || 0) - (priority[String(a.Priority || '').toLowerCase()] || 0)) ||
+        (announcementTimestamp(b.PublishDate) - announcementTimestamp(a.PublishDate));
+    });
+}
+
+function renderPublicNotifications(items) {
+  const wrapper = document.getElementById('publicNotifications');
+  if (!wrapper) return;
+  const notifications = sortedPublicNotifications(items);
+  const button = wrapper.querySelector('.public-notification-button');
+  const badge = wrapper.querySelector('.public-notification-badge');
+  const list = wrapper.querySelector('.public-notification-list');
+  if (!button || !badge || !list) return;
+  list.replaceChildren();
+  if (!notifications.length) {
+    button.disabled = true;
+    badge.hidden = true;
+    const empty = document.createElement('p'); empty.className = 'public-notification-empty'; empty.textContent = 'No current announcements.';
+    list.appendChild(empty);
+    return;
+  }
+  button.disabled = false;
+  notifications.slice(0, 5).forEach(item => {
+    const link = document.createElement('a'); link.href = '#/announcements'; link.className = 'public-notification-item';
+    const meta = document.createElement('span'); meta.className = 'public-notification-meta'; meta.textContent = String(item.Category || 'Announcement');
+    const title = document.createElement('strong'); title.textContent = String(item.Title || item.Summary || 'Portal update');
+    link.append(meta, title);
+    link.onclick = event => { event.preventDefault(); closePublicNotifications(); handleNavigation({Slug: 'announcements', Label: 'Announcements', ParentID: 'NAV-009'}); closeMobileNavigation(); };
+    list.appendChild(link);
+  });
+  const latestId = String(notifications[0].ID || notifications[0].Title || 'latest');
+  let seen = null;
+  try { seen = JSON.parse(localStorage.getItem(PUBLIC_NOTIFICATION_SEEN_KEY) || 'null'); } catch (_) {}
+  const viewedRecently = seen && seen.latestId === latestId;
+  badge.textContent = String(Math.min(notifications.length, 9)) + (notifications.length > 9 ? '+' : '');
+  badge.hidden = Boolean(viewedRecently);
+  button.dataset.latestId = latestId;
+  button.dataset.notificationCount = String(notifications.length);
+}
+
+function closePublicNotifications() {
+  const wrapper = document.getElementById('publicNotifications');
+  if (!wrapper) return;
+  wrapper.classList.remove('is-open');
+  const button = wrapper.querySelector('.public-notification-button');
+  if (button) button.setAttribute('aria-expanded', 'false');
+}
+
+function togglePublicNotifications() {
+  const wrapper = document.getElementById('publicNotifications');
+  if (!wrapper) return;
+  const open = !wrapper.classList.contains('is-open');
+  closePublicNotifications();
+  if (!open) return;
+  wrapper.classList.add('is-open');
+  const button = wrapper.querySelector('.public-notification-button');
+  const badge = wrapper.querySelector('.public-notification-badge');
+  button.setAttribute('aria-expanded', 'true');
+  const latestId = button.dataset.latestId;
+  if (latestId) {
+    try { localStorage.setItem(PUBLIC_NOTIFICATION_SEEN_KEY, JSON.stringify({latestId, seenAt: Date.now()})); } catch (_) {}
+    badge.hidden = true;
+  }
 }
 
 function renderNavigation(items) {
@@ -503,6 +561,23 @@ function renderNavigation(items) {
     nav.appendChild(wrapper);
   });
 
+  const publicNotifications = document.createElement('div');
+  publicNotifications.id = 'publicNotifications';
+  publicNotifications.className = 'public-notifications';
+  publicNotifications.innerHTML = `
+    <button type="button" class="public-notification-button" aria-label="Public notifications" aria-expanded="false" aria-controls="publicNotificationPanel">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
+      <span class="public-notification-badge" hidden>0</span>
+    </button>
+    <div id="publicNotificationPanel" class="public-notification-panel" role="region" aria-label="Latest public notifications">
+      <div class="public-notification-heading"><strong>Notifications</strong><span>Public updates</span></div>
+      <div class="public-notification-list"><p class="public-notification-empty">Loading updates…</p></div>
+      <a class="public-notification-all" href="#/announcements">View all announcements</a>
+    </div>`;
+  publicNotifications.querySelector('.public-notification-button').onclick = togglePublicNotifications;
+  publicNotifications.querySelector('.public-notification-all').onclick = event => { event.preventDefault(); closePublicNotifications(); handleNavigation({Slug: 'announcements', Label: 'Announcements', ParentID: 'NAV-009'}); closeMobileNavigation(); };
+  nav.appendChild(publicNotifications);
+
   const accountButton = document.createElement('button');
   accountButton.id = 'portalAccountButton';
   accountButton.type = 'button';
@@ -513,6 +588,11 @@ function renderNavigation(items) {
     openPortalAccount();
   };
   nav.appendChild(accountButton);
+  if (!nav.dataset.publicNotificationsReady) {
+    document.addEventListener('click', event => { if (!event.target.closest('#publicNotifications')) closePublicNotifications(); });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') closePublicNotifications(); });
+    nav.dataset.publicNotificationsReady = 'true';
+  }
   if(typeof initializePortalAccountState==='function')initializePortalAccountState();
 }
 

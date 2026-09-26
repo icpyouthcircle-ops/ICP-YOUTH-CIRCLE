@@ -20,13 +20,13 @@ const {createBackend}=require('./scoring-harness.cjs');
       }
       if(action==='announcements'){
         await new Promise(resolve=>setTimeout(resolve,500));
-        return route.fulfill({json:{success:true,data:[{ID:'ANN-1',Title:'Cached announcement',Category:'Notice',Summary:'Ready immediately'}]}});
+        return route.fulfill({json:{success:true,data:[{ID:'ANN-1',Title:'Cached announcement',Category:'Notice',Summary:'Ready immediately',PublishDate:new Date().toISOString()}]}});
       }
       if(action==='portalBundle'){
         await new Promise(resolve=>setTimeout(resolve,250));
         return route.fulfill({json:{success:true,data:{
           resources:[],mcqs:[],videos:[],admissions:[],scholarships:[],opportunities:[],
-          announcements:[{ID:'ANN-1',Title:'Cached announcement',Category:'Notice',Summary:'Ready immediately'}],
+          announcements:[{ID:'ANN-1',Title:'Cached announcement',Category:'Notice',Summary:'Ready immediately',PublishDate:new Date().toISOString()}],
           aiTools:[],islamicContent:[],blog:[],entryTests:[]
         }}});
       }
