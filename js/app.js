@@ -314,7 +314,7 @@ function loadPortal() {
 function registerPortalServiceWorker() {
   if (!('serviceWorker' in navigator) || location.protocol !== 'https:') return;
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js?v=20260926-mobile-nav').catch(() => {});
+    navigator.serviceWorker.register('sw.js?v=20260926-responsive-v2').catch(() => {});
   }, {once: true});
 }
 
