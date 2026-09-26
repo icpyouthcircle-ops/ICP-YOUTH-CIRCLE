@@ -2,6 +2,13 @@ const assert=require('node:assert/strict');
 const {createBackend}=require('./scoring-harness.cjs');
 
 (()=>{
+  const setupBackend=createBackend();
+  assert.equal(typeof setupBackend.context.setupPortalEnhancements,'function');
+  assert.equal(typeof setupBackend.context.setupPortalEnhancements_,'undefined');
+  assert.match(setupBackend.context.setupPortalEnhancements(),/FAQs and Feedback/);
+  assert.equal(setupBackend.sheets.has('FAQs'),true);
+  assert.equal(setupBackend.sheets.has('Feedback'),true);
+
   const backend=createBackend();
   backend.addSheet('FAQs',[
     {ID:'FAQ-001',Question:'How do I sign in?',Answer:'Use My account.',Category:'Account',DisplayOrder:2,Status:'Active'},

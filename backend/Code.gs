@@ -1933,7 +1933,7 @@ function setupUniversalTestsAndNotifications_() {
 }
 
 // Run once after deploying the portal-enhancements version. Existing sheets and rows are preserved.
-function setupPortalEnhancements_() {
+function setupPortalEnhancements() {
   const spreadsheet=getSpreadsheet_();
   const definitions=[
     [CONFIG.SHEETS.FAQS,['ID','Question','Answer','Category','DisplayOrder','Status','CreatedAt','UpdatedAt']],

@@ -6,7 +6,7 @@ This release adds an installable portal, sharing, exam countdown, a first-visit 
 
 1. Replace the Apps Script `Code.gs` with the repository version.
 2. Save and deploy a **New version** of the web app.
-3. In the Apps Script editor, select `setupPortalEnhancements_` and click **Run** once.
+3. In the Apps Script editor, select `setupPortalEnhancements` and click **Run** once.
 4. Approve access if Google requests it.
 
 The setup function preserves existing sheets and creates:
