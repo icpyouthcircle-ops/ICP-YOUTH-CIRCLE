@@ -14,7 +14,7 @@
 
   <link
     rel="stylesheet"
-    href="css/style.css?v=20260925-premium-portal"
+    href="css/style.css?v=20260926-professional-refinement"
   >
 </head>
 
@@ -101,17 +101,14 @@
 <section id="dynamicPage" style="display:none;">
   <div class="container">
 
-    <button
-      onclick="showHome()"
-      style="
-        border:none;
-        background:none;
-        cursor:pointer;
-        margin-bottom:20px;
-        font-size:14px;
-      ">
-      ← Back to Home
-    </button>
+    <nav class="page-breadcrumb" aria-label="Breadcrumb">
+      <button type="button" onclick="showHome()">
+        <span aria-hidden="true">←</span>
+        <span>Home</span>
+      </button>
+      <span aria-hidden="true">/</span>
+      <span id="breadcrumbCurrent">Current page</span>
+    </nav>
 
     <div class="section-title">
       <h3 id="dynamicPageTitle"></h3>
@@ -166,23 +163,38 @@
     </main>
 
     <footer>
-      <p id="footerText">
-        ICP YOUTH CIRCLE
-      </p>
-
-      <p>
-        Learn • Connect • Grow
-      </p>
-
-      <p><a href="admin.html" style="color:#cbd5e1;">Admin</a></p>
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <p id="footerText">ICP YOUTH CIRCLE</p>
+          <p>Learn • Connect • Grow</p>
+          <p class="footer-summary">A student platform for learning resources, opportunities, guidance and community support.</p>
+        </div>
+        <div class="footer-links">
+          <div>
+            <h2>Explore</h2>
+            <a href="#study" onclick="event.preventDefault(); handleNavigation({Slug:'study',Label:'Study'});">Study</a>
+            <a href="#entry-tests" onclick="event.preventDefault(); handleNavigation({Slug:'entry-tests',Label:'Entry Tests'});">Entry Tests</a>
+            <a href="#scholarships" onclick="event.preventDefault(); handleNavigation({Slug:'scholarships',Label:'Scholarships'});">Scholarships</a>
+          </div>
+          <div>
+            <h2>ICP Youth Circle</h2>
+            <a href="#about" onclick="event.preventDefault(); handleNavigation({Slug:'about',Label:'About'});">About</a>
+            <a href="#contact" onclick="event.preventDefault(); handleNavigation({Slug:'contact',Label:'Contact'});">Contact</a>
+            <a href="admin.html">Admin portal</a>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>Built to help students find reliable opportunities and learning support.</p>
+      </div>
     </footer>
 
   </div>
 
-  <script src="js/app.js?v=20260925-premium-portal"></script>
-  <script src="js/mdcat.js?v=20260925-premium-portal"></script>
-  <script src="js/mdcat-study.js?v=20260925-premium-portal"></script>
-  <script src="js/mdcat-account.js?v=20260925-premium-portal"></script>
+  <script src="js/app.js?v=20260926-professional-refinement"></script>
+  <script src="js/mdcat.js?v=20260926-professional-refinement"></script>
+  <script src="js/mdcat-study.js?v=20260926-professional-refinement"></script>
+  <script src="js/mdcat-account.js?v=20260926-professional-refinement"></script>
 
 </body>
 </html>

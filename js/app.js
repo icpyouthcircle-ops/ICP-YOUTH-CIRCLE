@@ -520,7 +520,34 @@ function closeMobileNavigation() { setMobileNavigationOpen(false); }
         const card =
           document.createElement('div');
 
-        card.className = 'card';
+        card.className = 'card category-card';
+        card.tabIndex = 0;
+        card.setAttribute('role', 'link');
+        card.setAttribute('aria-label', 'Open ' + category.Name);
+
+        const categoryVisuals = {
+          'study': ['ST', 'Learning resources'],
+          'entry-tests': ['ET', 'Test preparation'],
+          'admissions': ['AD', 'Application guidance'],
+          'scholarships': ['SC', 'Funding opportunities'],
+          'career': ['CR', 'Career development'],
+          'ai-smart-tools': ['AI', 'Smart productivity'],
+          'community': ['CO', 'Student support'],
+          'updates': ['UP', 'Latest information'],
+          'islamic': ['IS', 'Faith and reflection'],
+          'explore': ['EX', 'Discover more']
+        };
+        const visual = categoryVisuals[category.Slug] || ['IC', 'Student portal'];
+        const top = document.createElement('div');
+        top.className = 'category-card-top';
+        const icon = document.createElement('span');
+        icon.className = 'category-icon';
+        icon.setAttribute('aria-hidden', 'true');
+        icon.textContent = visual[0];
+        const eyebrow = document.createElement('span');
+        eyebrow.className = 'category-eyebrow';
+        eyebrow.textContent = visual[1];
+        top.append(icon, eyebrow);
 
 
         const title =
@@ -537,11 +564,20 @@ function closeMobileNavigation() { setMobileNavigationOpen(false); }
           category.Description || '';
 
 
-        card.appendChild(title);
-        card.appendChild(description);
+        const action = document.createElement('span');
+        action.className = 'category-action';
+        action.innerHTML = 'Explore <span aria-hidden="true">→</span>';
+
+        card.append(top, title, description, action);
 
         card.onclick = function() {
           openCategory(category);
+        };
+        card.onkeydown = function(event) {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            openCategory(category);
+          }
         };
 
         grid.appendChild(card);
@@ -571,13 +607,14 @@ function renderNavigationSection(parentSlug) {
   const parent=navigation.find(row=>row.Slug===parentSlug && !row.ParentID);
   const children=parent ? navigation.filter(row=>String(row.ParentID)===String(parent.ID)) : [];
   children.sort((a,b)=>Number(a.DisplayOrder||0)-Number(b.DisplayOrder||0)).forEach(child=>{
-    const card=document.createElement('article');card.className='card resource-card';
+    const card=document.createElement('article');card.className='card resource-card section-link-card';
+    const meta=document.createElement('span');meta.className='section-link-meta';meta.textContent='ICP YOUTH CIRCLE';
     const heading=document.createElement('h4');heading.textContent=child.Label;
     const description=document.createElement('p');
     const category=portalData.categories && portalData.categories.find(row=>row.Slug===child.Slug);
     description.textContent=category && category.Description ? category.Description : 'Open '+child.Label+' from ICP YOUTH CIRCLE.';
     const button=document.createElement('button');button.type='button';button.className='resource-button';button.textContent='Open '+child.Label;
-    button.onclick=()=>handleNavigation(child);card.append(heading,description,button);content.appendChild(card);
+    button.onclick=()=>handleNavigation(child);card.append(meta,heading,description,button);content.appendChild(card);
   });
   if (!children.length) renderSectionNotice('No sections have been published here yet.');
 }
@@ -585,8 +622,12 @@ function renderNavigationSection(parentSlug) {
 function renderSectionNotice(message) {
   const filters=document.getElementById('resourceFilters');filters.innerHTML='';filters.style.display='none';
   const content=document.getElementById('dynamicPageContent');content.replaceChildren();
-  const card=document.createElement('div');card.className='card resource-card';
-  const text=document.createElement('p');text.textContent=message;card.appendChild(text);content.appendChild(card);
+  const card=document.createElement('div');card.className='empty-state';
+  const mark=document.createElement('span');mark.className='empty-state-mark';mark.setAttribute('aria-hidden','true');mark.textContent='○';
+  const heading=document.createElement('h4');heading.textContent='Content is being prepared';
+  const text=document.createElement('p');text.textContent=message;
+  const action=document.createElement('button');action.type='button';action.className='empty-state-action';action.textContent='Return to home';action.onclick=showHome;
+  card.append(mark,heading,text,action);content.appendChild(card);
 }
 
 function routeContains(item,fields,terms) {
@@ -596,7 +637,52 @@ function routeContains(item,fields,terms) {
 
 function renderAboutPage() {
   const settings=portalData && portalData.settings || {};
-  renderSectionNotice(settings.site_description || 'ICP YOUTH CIRCLE is a student resource, opportunity, guidance and community platform.');
+  const filters=document.getElementById('resourceFilters');filters.innerHTML='';filters.style.display='none';
+  const content=document.getElementById('dynamicPageContent');content.replaceChildren();
+  const panel=document.createElement('section');panel.className='about-panel';
+  const intro=document.createElement('div');intro.className='about-intro';
+  const eyebrow=document.createElement('p');eyebrow.className='about-eyebrow';eyebrow.textContent='OUR PURPOSE';
+  const heading=document.createElement('h4');heading.textContent='Helping students move forward with confidence';
+  const description=document.createElement('p');description.textContent=settings.site_description || 'ICP YOUTH CIRCLE is a student resource, opportunity, guidance and community platform.';
+  intro.append(eyebrow,heading,description);
+  const pillars=document.createElement('div');pillars.className='about-pillars';
+  [
+    ['01','Learn','Find study material, test preparation and practical guidance in one place.'],
+    ['02','Connect','Reach student support, community features and trusted opportunities.'],
+    ['03','Grow','Build knowledge, confidence and skills for education and career progress.']
+  ].forEach(item=>{
+    const card=document.createElement('article');card.className='about-pillar';
+    const number=document.createElement('span');number.textContent=item[0];
+    const title=document.createElement('h5');title.textContent=item[1];
+    const text=document.createElement('p');text.textContent=item[2];
+    card.append(number,title,text);pillars.appendChild(card);
+  });
+  panel.append(intro,pillars);content.appendChild(panel);
+}
+
+function getRouteDescription(slug, label) {
+  const descriptions={
+    'study':'Access notes, past papers, MCQs, videos and study resources.',
+    'entry-tests':'Prepare for major entry tests with focused information, practice and resources.',
+    'admissions':'Find admission requirements, deadlines, merit information and application guidance.',
+    'scholarships':'Discover scholarships, financial aid and guidance for stronger applications.',
+    'career':'Explore career guidance, internships, competitions and student development opportunities.',
+    'ai-smart-tools':'Use practical AI and digital tools to study, plan and work more effectively.',
+    'community':'Connect with student support, contribute useful resources and share suggestions.',
+    'updates':'Stay informed about exams, results, merit lists and important student notices.',
+    'islamic':'Read carefully presented Islamic reminders, hadith and duas for daily reflection.',
+    'explore':'Discover study-abroad guidance, articles, information about us and official contact channels.',
+    'about':'Learn about the purpose and student-focused direction of ICP YOUTH CIRCLE.',
+    'contact':'Contact ICP YOUTH CIRCLE through an official communication channel.',
+    'notes':'Browse published study notes by subject and level.',
+    'past-papers':'Find published past papers to support focused exam preparation.',
+    'mcqs':'Practice published multiple-choice questions and check your understanding.',
+    'videos':'Explore selected educational videos and learning material.',
+    'submit-resource':'Recommend a useful student resource for administrator review.',
+    'student-help-desk':'Send a question or request support from the portal administrators.',
+    'suggestions':'Share a suggestion to help improve the student portal.'
+  };
+  return descriptions[slug] || 'Find published '+label.toLowerCase()+' information and resources from ICP YOUTH CIRCLE.';
 }
 
 function renderContactPage() {
@@ -741,9 +827,9 @@ function handleNavigation(item) {
   const parentSlug=getNavigationParentSlug(item);
   title.textContent = itemLabel;
 
-  description.textContent =
-    'Explore ' + itemLabel +
-    ' content from ICP YOUTH CIRCLE.';
+  description.textContent = getRouteDescription(item.Slug, itemLabel);
+  const breadcrumb=document.getElementById('breadcrumbCurrent');
+  if (breadcrumb) breadcrumb.textContent=itemLabel;
 
   content.innerHTML = '';
 
