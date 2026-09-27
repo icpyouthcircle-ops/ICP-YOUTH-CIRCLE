@@ -8,11 +8,13 @@ A separate, private Streamlit app that turns posters and copied information into
 - Reads English poster text locally with OCR.
 - Suggests the appropriate portal sheet.
 - Creates one Admissions row per detected program.
-- Supports Admissions, Scholarships, Announcements, Countdowns, Notifications, Resources, and Opportunities.
+- Supports all 32 administrator-maintained content sheets, organized into six simple groups.
 - Produces an editable table and tab-separated output for direct Google Sheets pasting.
 - Generates unique IDs and Pakistan timestamps.
 - Defaults every generated record to `Draft`.
 - Never writes to Google Sheets automatically.
+
+The selector includes public updates, study content, directories, portal layout/settings, the universal test catalog, and administrator-maintained MDCAT content. System-managed account, submission, feedback, notification-read, preference, session, attempt, answer, progress, revision, and study-plan sheets are intentionally excluded.
 
 The extractor deliberately leaves uncertain fields blank. OCR cannot verify eligibility, fees, accreditation, legal claims, deadlines, or URLs.
 
@@ -34,7 +36,7 @@ python -m streamlit run app.py
 
 ## Recommended workflow
 
-1. Select the intended portal sheet.
+1. Select the content group and intended portal sheet.
 2. Paste or upload the official poster.
 3. Add the official application or source URL.
 4. Select **Read poster text**.
@@ -43,8 +45,8 @@ python -m streamlit run app.py
 7. Review every cell in the editable table.
 8. Keep `Status` as `Draft` until verification is complete.
 9. Copy the TSV block into Google Sheets:
-   - Paste into `A1` when the header row is included.
-   - Paste into `A2` when your sheet already has headers.
+   - Keep **Include header row** off for an existing sheet and paste into its first empty cell in column A.
+   - Include headers and paste into `A1` only when creating a completely new sheet.
 10. Change the record to `Active` or `Scheduled` only after checking the official source.
 
 ## Streamlit Community Cloud deployment

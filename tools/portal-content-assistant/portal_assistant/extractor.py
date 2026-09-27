@@ -188,6 +188,21 @@ def _first_title(lines: list[str], fallback: str) -> str:
     return fallback
 
 
+def _slug(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")[:180]
+
+
+def _labeled_values(text: str, headers: list[str]) -> dict[str, str]:
+    """Read explicit lines such as `SubjectID: MDS-001` without guessing."""
+    values: dict[str, str] = {}
+    for header in headers:
+        label = re.sub(r"(?<!^)(?=[A-Z])", r"[ _-]*", re.escape(header))
+        match = re.search(rf"(?im)^\s*{label}\s*[:=]\s*(.+?)\s*$", text)
+        if match:
+            values[header] = _clean(match.group(1), 4000)
+    return values
+
+
 def _timestamp() -> tuple[str, str]:
     now = datetime.now(ZoneInfo("Asia/Karachi"))
     unique = now.strftime("%Y%m%d-%H%M%S") + f"-{now.microsecond // 1000:03d}"
@@ -205,6 +220,12 @@ def suggest_sheet(text: str) -> str:
         "Resources": sum(term in value for term in ("notes", "past paper", "pdf", "study resource")),
         "Announcements": sum(term in value for term in ("result announced", "notice", "announcement", "update")),
         "Notifications": sum(term in value for term in ("reminder", "notification", "alert")),
+        "FAQs": sum(term in value for term in ("frequently asked", "faq", "question:", "answer:")),
+        "Videos": sum(term in value for term in ("youtube", "video tutorial", "watch video")),
+        "AI_Tools": sum(term in value for term in ("ai tool", "artificial intelligence tool")),
+        "Islamic_Content": sum(term in value for term in ("qur'an", "quran", "hadith", "dua")),
+        "MCQs": sum(term in value for term in ("option a", "option b", "correct option", "mcq")),
+        "Entry_Tests": sum(term in value for term in ("entry test", "registration deadline", "test date")),
     }
     best = max(scores, key=scores.get)
     return best if scores[best] else "Announcements"
@@ -214,7 +235,8 @@ def _base_row(sheet: str, index: int, status: str) -> dict[str, Any]:
     stamp, created = _timestamp()
     row = {header: "" for header in SHEET_SCHEMAS[sheet]}
     row["ID"] = f"{SHEET_PREFIXES[sheet]}-{stamp}-{index:02d}"
-    row["Status"] = status
+    if "Status" in row:
+        row["Status"] = status
     if "CreatedAt" in row:
         row["CreatedAt"] = created
     if "UpdatedAt" in row:
@@ -301,12 +323,69 @@ def build_rows(
     elif sheet == "Resources":
         row = _base_row(sheet, 1, status)
         title = _first_title(lines, "Student resource")
-        row.update({"Title": title, "Slug": re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-"), "Category": "Study Resources", "Description": _clean(extra_details or combined, 1500), "FileURL": official_url, "ResourceType": "Link"})
+        row.update({"Title": title, "Slug": _slug(title), "Category": "Study Resources", "Description": _clean(extra_details or combined, 1500), "FileURL": official_url, "ResourceType": "Link"})
         rows.append(row)
     elif sheet == "Opportunities":
         row = _base_row(sheet, 1, status)
         kind = "Internship" if re.search(r"\binternship\b", combined, re.I) else "Competition" if re.search(r"\bcompetition\b", combined, re.I) else "Student Program"
         row.update({"Title": _first_title(lines, "Student opportunity"), "Organization": institution, "Type": kind, "OpeningDate": opening, "Deadline": deadline, "OfficialURL": official_url, "Description": _clean(extra_details or combined, 1500)})
+        rows.append(row)
+    else:
+        row = _base_row(sheet, 1, status)
+        row.update(_labeled_values(combined, SHEET_SCHEMAS[sheet]))
+        title = _first_title(lines, "")
+        if "Title" in row and not row["Title"]:
+            row["Title"] = title
+        if "Name" in row and not row["Name"]:
+            row["Name"] = title
+        if "Label" in row and not row["Label"]:
+            row["Label"] = title
+        if "Slug" in row and not row["Slug"]:
+            row["Slug"] = _slug(row.get("Title") or row.get("Name") or row.get("Label") or "")
+        for header in ("OfficialURL", "FileURL", "VideoURL", "ToolURL", "SourceURL", "WebsiteURL", "URL", "ButtonURL"):
+            if header in row and not row[header]:
+                row[header] = official_url
+        description = _clean(extra_details or combined, 4000)
+        if "Description" in row and not row["Description"]:
+            row["Description"] = description
+        if "Content" in row and not row["Content"]:
+            row["Content"] = description
+        if "Summary" in row and not row["Summary"]:
+            row["Summary"] = _clean(description, 450)
+        if "Message" in row and not row["Message"]:
+            row["Message"] = _clean(description, 1200)
+        if "Deadline" in row and not row["Deadline"]:
+            row["Deadline"] = deadline
+        if "RegistrationDeadline" in row and not row["RegistrationDeadline"]:
+            row["RegistrationDeadline"] = deadline
+        if "OpeningDate" in row and not row["OpeningDate"]:
+            row["OpeningDate"] = opening
+        if "RegistrationStart" in row and not row["RegistrationStart"]:
+            row["RegistrationStart"] = opening
+        if "Featured" in row and not row["Featured"]:
+            row["Featured"] = "No"
+        if sheet == "FAQs":
+            question_line = next((line for line in lines if line.endswith("?")), title)
+            row["Question"] = row.get("Question") or question_line
+            remaining = [line for line in lines if line != question_line]
+            row["Answer"] = row.get("Answer") or _clean(" ".join(remaining), 5000)
+            row["Category"] = row.get("Category") or "General"
+        elif sheet in {"MCQs", "MDCAT_Question_Bank"}:
+            row["Question"] = row.get("Question") or title
+            for option in "ABCD":
+                option_match = re.search(rf"(?im)^\s*(?:option\s*)?{option}[).:\-]\s*(.+?)\s*$", combined)
+                key = f"Option{option}"
+                if key in row and not row[key] and option_match:
+                    row[key] = _clean(option_match.group(1), 1000)
+        elif sheet == "Videos":
+            row["Platform"] = row.get("Platform") or ("YouTube" if "youtube" in official_url.lower() or "youtu.be" in official_url.lower() else "")
+        elif sheet == "Notifications":
+            row["Audience"] = row.get("Audience") or "All"
+            row["Priority"] = row.get("Priority") or "Normal"
+            row["IsPinned"] = row.get("IsPinned") or "No"
+        elif sheet == "MDCAT_Updates":
+            row["Priority"] = row.get("Priority") or "Normal"
+            row["Category"] = row.get("Category") or "Update"
         rows.append(row)
 
     if not combined:

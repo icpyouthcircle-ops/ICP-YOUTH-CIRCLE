@@ -4,7 +4,7 @@ import io
 
 import pandas as pd
 import streamlit as st
-from portal_assistant import SHEET_SCHEMAS, build_rows, extract_text_from_image, suggest_sheet
+from portal_assistant import SHEET_GROUPS, SHEET_SCHEMAS, SYSTEM_MANAGED_SHEETS, build_rows, extract_text_from_image, suggest_sheet
 from portal_assistant.schemas import SHEET_HELP
 
 try:
@@ -54,6 +54,7 @@ for key, default in {
     "warnings": [],
     "detected": {},
     "prepared_sheet": "",
+    "prepared_headers": [],
     "rows_revision": 0,
     "upload_revision": 0,
 }.items():
@@ -62,12 +63,25 @@ for key, default in {
 
 with st.sidebar:
     st.header("Output settings")
-    selected_sheet = st.selectbox("Portal sheet", list(SHEET_SCHEMAS), index=0)
+    selected_group = st.selectbox("Content group", list(SHEET_GROUPS), index=0)
+    selected_sheet = st.selectbox("Portal sheet", SHEET_GROUPS[selected_group], index=0)
     st.caption(SHEET_HELP[selected_sheet])
     timed_sheets = {"Scholarships", "Announcements", "Countdowns", "Notifications", "Resources"}
     status_options = ["Draft", "Scheduled", "Active", "Archived"] if selected_sheet in timed_sheets else ["Draft", "Active", "Archived"]
     status = st.selectbox("Initial status", status_options, index=0)
-    include_headers = st.checkbox("Include header row", value=True)
+    include_headers = st.checkbox("Include header row", value=False, help="Leave this off when the sheet already has headings in Row 1.")
+    with st.expander("Use the exact Row 1 headers"):
+        exact_headers = st.text_area(
+            "Optional header row",
+            height=90,
+            placeholder="Copy Row 1 from Google Sheets and paste it here",
+            help="Use this only if your existing sheet headings differ from the built-in portal template.",
+        )
+    st.divider()
+    st.markdown(f"**{len(SHEET_SCHEMAS)} administrator sheets available**")
+    with st.expander("Sheets maintained automatically"):
+        st.caption(", ".join(SYSTEM_MANAGED_SHEETS))
+        st.caption("These are intentionally excluded to protect accounts, submissions, notifications, attempts and progress data.")
     st.divider()
     st.markdown("**Safe publishing rule**")
     st.caption("Keep the generated record as Draft until you compare every field with the original official source.")
@@ -144,15 +158,18 @@ if source_text and suggested != selected_sheet:
 prepare_col, reset_col = st.columns([1, 4])
 if prepare_col.button("Prepare sheet rows", type="primary", width="stretch"):
     result = build_rows(selected_sheet, source_text, source_url, extra_details, status)
-    st.session_state.rows = result.rows
+    custom_headers = [value.strip() for value in exact_headers.split("\t") if value.strip()]
+    prepared_headers = custom_headers or SHEET_SCHEMAS[selected_sheet]
+    st.session_state.rows = [{header: row.get(header, "") for header in prepared_headers} for row in result.rows]
     st.session_state.warnings = result.warnings
     st.session_state.detected = result.detected
     st.session_state.prepared_sheet = selected_sheet
+    st.session_state.prepared_headers = prepared_headers
     st.session_state.rows_revision += 1
 
 def reset_assistant():
-    for key in ["image_bytes", "review_text", "rows", "warnings", "detected", "prepared_sheet"]:
-        st.session_state[key] = None if key == "image_bytes" else [] if key in {"rows", "warnings"} else {} if key == "detected" else ""
+    for key in ["image_bytes", "review_text", "rows", "warnings", "detected", "prepared_sheet", "prepared_headers"]:
+        st.session_state[key] = None if key == "image_bytes" else [] if key in {"rows", "warnings", "prepared_headers"} else {} if key == "detected" else ""
     st.session_state.rows_revision += 1
     st.session_state.upload_revision += 1
 
@@ -163,11 +180,11 @@ if st.session_state.rows:
     st.markdown('<div class="privacy-note"><strong>Nothing is written to Google Sheets automatically.</strong> You remain in control and must approve the final rows.</div>', unsafe_allow_html=True)
     for warning in st.session_state.warnings:
         st.warning(warning, icon="⚠️")
-    frame = pd.DataFrame(st.session_state.rows, columns=SHEET_SCHEMAS[st.session_state.prepared_sheet])
+    frame = pd.DataFrame(st.session_state.rows, columns=st.session_state.prepared_headers)
     edited = st.data_editor(frame, width="stretch", hide_index=True, num_rows="dynamic", key=f"portal_rows_editor_{st.session_state.rows_revision}")
     output = edited.fillna("").astype(str).to_csv(sep="\t", index=False, header=include_headers, lineterminator="\n")
     st.markdown("#### Copy-ready Google Sheets data")
-    st.caption("Use the copy icon in the top-right of this box. If headers are included, paste into A1; otherwise paste into A2.")
+    st.caption("Use the copy icon in the top-right of this box. With headers off, paste into the first empty cell in column A. Use A1 only when creating a completely new sheet with headers included.")
     st.code(output, language=None)
     filename = f"{st.session_state.prepared_sheet.lower()}-portal-import.tsv"
     st.download_button("Download TSV file", output.encode("utf-8"), file_name=filename, mime="text/tab-separated-values", width="stretch")

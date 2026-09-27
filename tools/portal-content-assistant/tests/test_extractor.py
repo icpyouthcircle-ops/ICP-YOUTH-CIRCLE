@@ -2,7 +2,7 @@ import re
 import unittest
 
 from portal_assistant.extractor import build_rows, suggest_sheet
-from portal_assistant.schemas import SHEET_SCHEMAS
+from portal_assistant.schemas import SHEET_GROUPS, SHEET_SCHEMAS, SYSTEM_MANAGED_SHEETS
 
 
 POSTER = """
@@ -60,6 +60,28 @@ class ExtractorTests(unittest.TestCase):
         rows = build_rows("Admissions", POSTER).rows
         self.assertTrue(all(re.match(r"^ADM-\d{8}-\d{6}-\d{3}-\d{2}$", row["ID"]) for row in rows))
         self.assertEqual(len({row["ID"] for row in rows}), len(rows))
+
+    def test_every_admin_content_sheet_builds_an_exact_schema_row(self):
+        text = "Sample official item\nSubjectID: MDS-001\nhttps://example.edu/item"
+        for sheet, headers in SHEET_SCHEMAS.items():
+            with self.subTest(sheet=sheet):
+                result = build_rows(sheet, text, "https://example.edu/item")
+                self.assertTrue(result.rows)
+                self.assertEqual(list(result.rows[0]), headers)
+
+    def test_groups_cover_content_sheets_without_system_managed_tables(self):
+        grouped = [sheet for sheets in SHEET_GROUPS.values() for sheet in sheets]
+        self.assertEqual(set(grouped), set(SHEET_SCHEMAS))
+        self.assertEqual(len(grouped), len(set(grouped)))
+        self.assertFalse(set(grouped).intersection(SYSTEM_MANAGED_SHEETS))
+
+    def test_explicit_linked_ids_are_preserved_for_mdcat_rows(self):
+        row = build_rows(
+            "MDCAT_Chapters",
+            "Cell structure\nSubjectID: MDS-001\nUnitID: MDU-001",
+        ).rows[0]
+        self.assertEqual(row["SubjectID"], "MDS-001")
+        self.assertEqual(row["UnitID"], "MDU-001")
 
 
 if __name__ == "__main__":
