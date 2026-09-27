@@ -29,6 +29,11 @@ const {pathToFileURL}=require('node:url');
         {ID:'N2',Title:'Results announced',Category:'Results'},
         {ID:'N3',Title:'University merit list',Category:'Merit List'}
       ],
+      publicNotifications:[
+        {ID:'Announcement-N1',Type:'Announcement',Title:'Exam schedule',Category:'Announcement',PublishedAt:new Date().toISOString(),Route:'announcements',Label:'Announcements',ParentID:'NAV-009'},
+        {ID:'Admission-A1',Type:'Admission',Title:'FSc — KPK College',Category:'Admission',PublishedAt:new Date().toISOString(),Route:'admissions',Label:'Admissions',ParentID:'NAV-004'},
+        {ID:'Scholarship-S1',Type:'Scholarship',Title:'Pakistan Need-Based Grant',Category:'Scholarship',PublishedAt:new Date().toISOString(),Route:'scholarships',Label:'Scholarships',ParentID:'NAV-005'}
+      ],
       aiTools:[
         {ID:'T1',Name:'Study Assistant',Category:'Assistant',BestFor:'Students'},
         {ID:'T2',Name:'Smart Planner',Category:'Productivity',BestFor:'Study planning'}
@@ -52,10 +57,10 @@ const {pathToFileURL}=require('node:url');
     const desktopBellBox=await page.locator('.public-notification-button').boundingBox();
     assert.ok(desktopBellBox.x+desktopBellBox.width<=1280,'Desktop notification button must stay inside the viewport');
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);
-    assert.equal(await page.locator('.public-notification-badge').textContent(),'1');
+    assert.equal(await page.locator('.public-notification-badge').textContent(),'3');
     await page.locator('.public-notification-button').click();
     await page.locator('.public-notification-panel').waitFor({state:'visible'});
-    assert.equal(await page.locator('.public-notification-item strong').textContent(),'Exam schedule');
+    assert.deepEqual(await page.locator('.public-notification-item strong').allTextContents(),['Exam schedule','FSc — KPK College','Pakistan Need-Based Grant']);
     await page.evaluate(()=>renderPublicNotifications([{ID:'OLD',Title:'Old notice',PublishDate:new Date(Date.now()-25*60*60*1000).toISOString()}]));
     assert.equal(await page.locator('.public-notification-button').isDisabled(),true);
     await page.evaluate(()=>renderPublicNotifications([{ID:'N1',Title:'Exam schedule',Category:'Exam Update',PublishDate:new Date().toISOString()}]));

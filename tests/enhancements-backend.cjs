@@ -34,12 +34,16 @@ const {createBackend}=require('./scoring-harness.cjs');
     {ID:'RES-EXPIRED',Title:'Expired',Category:'Notes',Status:'Active',ExpiresAt:'2026-09-24T16:30:00'}
   ]);
   assert.deepEqual(Array.from(backend.context.getPublicResources_('').map(row=>row.ID)),['RES-ACTIVE','RES-LIVE']);
-  backend.addSheet('Scholarships',[{ID:'SCH-LIVE',Name:'Live scholarship',Status:'Scheduled',PublishAt:'2026-09-24T16:00:00'},{ID:'SCH-HIDDEN',Name:'Hidden',Status:'Archived'}]);
+  backend.addSheet('Scholarships',[{ID:'SCH-LIVE',Name:'Live scholarship',Description:'Apply now.',Status:'Scheduled',PublishAt:'2026-09-24T16:00:00'},{ID:'SCH-HIDDEN',Name:'Hidden',Status:'Archived'}]);
   assert.deepEqual(Array.from(backend.context.getPublicScholarships_().map(row=>row.ID)),['SCH-LIVE']);
   backend.addSheet('Announcements',[{ID:'ANN-LIVE',Title:'Live notice',Status:'Active'},{ID:'ANN-FUTURE',Title:'Future notice',Status:'Scheduled',PublishAt:'2026-09-24T18:00:00'}]);
   assert.deepEqual(Array.from(backend.context.getPublicAnnouncements_().map(row=>row.ID)),['ANN-LIVE']);
   backend.addSheet('Notifications',[{ID:'NTF-LIVE',Title:'Live notification',Audience:'All',Status:'Scheduled',PublishAt:'2026-09-24T16:00:00'},{ID:'NTF-EXPIRED',Title:'Expired notification',Audience:'All',Status:'Active',ExpiresAt:'2026-09-24T16:30:00'}]);
   assert.deepEqual(Array.from(backend.context.studentNotifications_().map(row=>row.ID)),['NTF-LIVE']);
+  backend.addSheet('Admissions',[{ID:'ADM-LIVE',Institution:'City University',Program:'BS English',Description:'Fall admissions.',CreatedAt:'2026-09-24T16:30:00',Status:'Active'},{ID:'ADM-OLD',Institution:'Old University',Program:'Old program',CreatedAt:'2026-09-22T10:00:00',Status:'Active'}]);
+  const bell=Array.from(backend.context.getPublicBellNotifications_());
+  assert.deepEqual(bell.map(row=>row.Type),['Admission','Scholarship']);
+  assert.equal(bell[0].Route,'admissions');assert.equal(bell[1].Route,'scholarships');
   const feedback=backend.call('publicFeedback','',{submissionToken:'abcdefghijklmnopqrstuvwx',category:'Suggestion',message:'Please add more study guides.',pageURL:'https://example.test/#suggestions'});
   assert.equal(feedback.success,true);assert.equal(feedback.data.id,'FDBK-002');
   const saved=backend.rows('Feedback').find(row=>row.ID==='FDBK-002');assert.equal(saved.Message,'Please add more study guides.');assert.equal(saved.Status,'Pending Review');

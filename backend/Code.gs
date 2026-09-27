@@ -871,6 +871,10 @@ function doGet(e) {
       return cachedPublicJsonResponse_('announcements',getPublicAnnouncements_,60);
     }
 
+    if (action === 'publicNotifications') {
+      return cachedPublicJsonResponse_('publicNotifications',getPublicBellNotifications_,60);
+    }
+
     if (action === 'countdowns') {
       return cachedPublicJsonResponse_('countdowns',getPublicCountdowns_,60);
     }
@@ -1108,7 +1112,9 @@ function getPublicAdmissions_() {
       MeritListDate: item.MeritListDate || '',
       OfficialURL: item.OfficialURL || '',
       Description: item.Description || '',
-      Featured: item.Featured || ''
+      Featured: item.Featured || '',
+      CreatedAt: item.CreatedAt || '',
+      UpdatedAt: item.UpdatedAt || ''
     }));
 }
 
@@ -1129,7 +1135,9 @@ function getPublicScholarships_() {
     Description: item.Description,
     Featured: item.Featured,
     PublishAt: item.PublishAt || item.PublishDate || '',
-    ExpiresAt: item.ExpiresAt || item.ExpiryDate || ''
+    ExpiresAt: item.ExpiresAt || item.ExpiryDate || '',
+    CreatedAt: item.CreatedAt || '',
+    UpdatedAt: item.UpdatedAt || ''
   }));
 }
 function getPublicOpportunities_() {
@@ -1174,6 +1182,25 @@ function getPublicAnnouncements_() {
     PublishAt: item.PublishAt || item.PublishDate || '',
     ExpiresAt: item.ExpiresAt || item.ExpiryDate || ''
   }));
+}
+function getPublicBellNotifications_() {
+  const lifetime=24*60*60*1000;
+  const now=Date.now();
+  const clean=(value,max)=>String(value == null ? '' : value).replace(/\s+/g,' ').trim().slice(0,max);
+  const rows=[];
+  const add=(type,item,title,summary,publishedAt,route,label,parentId)=>{
+    const timestamp=portalScheduleTimestamp_(publishedAt);
+    if (!timestamp || timestamp>now || now-timestamp>=lifetime) return;
+    rows.push({
+      ID:type+'-'+clean(item.ID || title,120),Type:type,Title:clean(title,240),Summary:clean(summary,500),
+      Category:type,PublishedAt:publishedAt,Route:route,Label:label,ParentID:parentId || '',
+      Priority:clean(item.Priority || '',40),Featured:clean(item.Featured || '',20)
+    });
+  };
+  getPublicAnnouncements_().forEach(item=>add('Announcement',item,item.Title,item.Summary || item.Content,item.PublishAt || item.PublishDate,'announcements','Announcements','NAV-009'));
+  getPublicAdmissions_().forEach(item=>add('Admission',item,(item.Program || 'Admission')+' — '+(item.Institution || 'Admission update'),item.Description,item.CreatedAt || item.UpdatedAt || item.OpeningDate,'admissions','Admissions','NAV-004'));
+  getPublicScholarships_().forEach(item=>add('Scholarship',item,item.Name || 'Scholarship opportunity',item.Description,item.PublishAt || item.CreatedAt || item.UpdatedAt || item.OpeningDate,'scholarships','Scholarships','NAV-005'));
+  return rows.sort((a,b)=>portalScheduleTimestamp_(b.PublishedAt)-portalScheduleTimestamp_(a.PublishedAt)).slice(0,20);
 }
 function getPublicCountdowns_() {
   return getOptionalSheetData_(CONFIG.SHEETS.COUNTDOWNS)
@@ -1909,7 +1936,7 @@ function adminUploadPdf_(body,admin) {
 function adminClearPublicCache_() {
   try {
     const cache=CacheService.getScriptCache();
-    cache.removeAll(['icp-public-v1-portalData','icp-public-v1-portalBundle','icp-public-v1-searchIndex','icp-public-v1-mcqs','icp-public-v1-videos','icp-public-v1-admissions','icp-public-v1-scholarships','icp-public-v1-opportunities','icp-public-v1-announcements','icp-public-v1-countdowns','icp-public-v1-faqs','icp-public-v1-aiTools','icp-public-v1-islamicContent','icp-public-v1-blog','icp-public-v1-entryTests','icp-public-v1-testCatalog','icp-public-v1-mdcatSubjects','icp-public-v1-mdcatTests','icp-public-v1-mdcatDailyPractice','icp-public-v1-mdcatUpdates']);
+    cache.removeAll(['icp-public-v1-portalData','icp-public-v1-portalBundle','icp-public-v1-searchIndex','icp-public-v1-mcqs','icp-public-v1-videos','icp-public-v1-admissions','icp-public-v1-scholarships','icp-public-v1-opportunities','icp-public-v1-announcements','icp-public-v1-publicNotifications','icp-public-v1-countdowns','icp-public-v1-faqs','icp-public-v1-aiTools','icp-public-v1-islamicContent','icp-public-v1-blog','icp-public-v1-entryTests','icp-public-v1-testCatalog','icp-public-v1-mdcatSubjects','icp-public-v1-mdcatTests','icp-public-v1-mdcatDailyPractice','icp-public-v1-mdcatUpdates']);
   } catch (_) {}
 }
 
