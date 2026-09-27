@@ -22,6 +22,23 @@
 .admin-field-wide { grid-column: 1 / -1; }
 .admin-field span { font-weight: bold; font-size: 13px; }
 .admin-field small { color: #64748b; }
+.admin-editor-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.admin-editor-actions > button:not(.resource-button) { padding: 12px 16px; border: 1px solid #d0d5dd; border-radius: 9px; background: #fff; color: #344054; font: inherit; font-weight: 700; cursor: pointer; }
+.admin-preview-panel { background: linear-gradient(145deg,#fff 0%,#fff8fa 100%); }
+.admin-preview-panel .admin-panel-title p { margin: 5px 0 0; color: #667085; }
+#adminPreviewBody { display: grid; place-items: center; padding: 28px 0 4px; }
+.admin-preview-card { width: min(100%,680px); padding: 30px; border: 1px solid #ead6dc; border-radius: 18px; background: #fff; box-shadow: 0 18px 48px rgba(16,24,40,.09); }
+.admin-preview-card h4 { margin: 8px 0 12px; color: #101828; font-size: clamp(22px,3vw,30px); line-height: 1.2; }
+.admin-preview-card > p { color: #5d6b82; line-height: 1.65; }
+.admin-preview-card > p strong { color: #344054; }
+.admin-preview-eyebrow { margin: 16px 0 0; color: #9d1834 !important; font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.admin-preview-description { font-size: 16px; }
+.admin-preview-state { display: inline-flex; align-items: center; padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; }
+.admin-preview-state.is-draft { background: #f2f4f7; color: #475467; }
+.admin-preview-state.is-scheduled { background: #fff3d6; color: #8a4b0f; }
+.admin-preview-state.is-active { background: #dcfae6; color: #067647; }
+.admin-preview-state.is-archived { background: #fee4e2; color: #b42318; }
+.admin-preview-button { display: inline-flex; margin-top: 12px; pointer-events: none; }
 .admin-pdf-confirm { display: flex; align-items: flex-start; gap: 9px; margin: 0 0 18px; color: #334155; }
 .admin-pdf-confirm input { margin-top: 3px; }
 #adminHeaders { overflow: auto; padding: 12px; border-radius: 8px; background: #f1f5f9; white-space: pre; }

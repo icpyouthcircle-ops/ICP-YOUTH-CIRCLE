@@ -10,6 +10,22 @@ let adminIdentityLoading=null;
 let adminSession=null;
 let adminCurrentTable=null;
 let adminCurrentRows=[];
+const ADMIN_PUBLISHING_TABLES=new Set(['RESOURCES','SCHOLARSHIPS','ANNOUNCEMENTS','COUNTDOWNS','NOTIFICATIONS']);
+const ADMIN_PREVIEW_TABLES=new Set(['RESOURCES','ANNOUNCEMENTS','COUNTDOWNS','NOTIFICATIONS']);
+
+function adminDateTimeValue(value) {
+  if(!value) return '';
+  const text=String(value).trim();
+  if(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(text) && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(text)) return text.slice(0,19);
+  const parsed=new Date(value);
+  return Number.isNaN(parsed.getTime()) ? text.slice(0,19) : new Date(parsed.getTime()-parsed.getTimezoneOffset()*60000).toISOString().slice(0,19);
+}
+
+function adminEditorRecord() {
+  const record={};
+  document.querySelectorAll('#adminEditor [data-field]').forEach(input=>{record[input.dataset.field]=input.value;});
+  return record;
+}
 
 async function adminLoadIdentity() {
   if (adminIdentity) return adminIdentity;
@@ -114,6 +130,7 @@ function adminRenderRows(headers,rows) {
     const tr=document.createElement('tr');const actions=document.createElement('td');actions.className='admin-table-actions';
     const edit=document.createElement('button');edit.type='button';edit.textContent='Edit';edit.onclick=()=>adminOpenEditor(row);
     actions.appendChild(edit);
+    if(ADMIN_PREVIEW_TABLES.has(adminCurrentTable.key)){const preview=document.createElement('button');preview.type='button';preview.textContent='Preview';preview.onclick=()=>adminShowPreview(row);actions.appendChild(preview);}
     if (headers.includes('Status')) {const archive=document.createElement('button');archive.type='button';archive.textContent='Archive';archive.onclick=()=>adminArchiveRow(row);actions.appendChild(archive);}
     tr.appendChild(actions);
     headers.forEach(header=>{const td=document.createElement('td');td.textContent=row[header] == null ? '' : String(row[header]);td.title=td.textContent;tr.appendChild(td);});body.appendChild(tr);
@@ -129,30 +146,31 @@ function adminOpenEditor(record={}) {
     const label=document.createElement('label');label.className='admin-field';
     if (/description|content|summary|question|eligibility|benefits|notes|text|details|answer|address/i.test(header)) label.classList.add('admin-field-wide');
     const caption=document.createElement('span');caption.textContent=header;
-    const countdownStatus=header==='Status' && adminCurrentTable.key==='COUNTDOWNS';
-    const long=label.classList.contains('admin-field-wide');const input=document.createElement(countdownStatus?'select':long?'textarea':'input');
-    if(countdownStatus){
-      ['Inactive','Active'].forEach(value=>{const option=document.createElement('option');option.value=value;option.textContent=value;input.appendChild(option);});
-      input.value=String(record[header] || 'Inactive');
+    const publishingStatus=header==='Status' && ADMIN_PUBLISHING_TABLES.has(adminCurrentTable.key);
+    const long=label.classList.contains('admin-field-wide');const input=document.createElement(publishingStatus?'select':long?'textarea':'input');
+    if(publishingStatus){
+      ['Draft','Scheduled','Active','Archived'].forEach(value=>{const option=document.createElement('option');option.value=value;option.textContent=value;input.appendChild(option);});
+      const saved=String(record[header] || 'Draft');input.value=saved==='Inactive'?'Archived':saved;
     }else{
       if (long) input.rows=4;
-      if(header==='TargetDateTime'){
+      if(['TargetDateTime','PublishAt','ExpiresAt'].includes(header)){
         input.type='datetime-local';input.step='1';
-        const parsed=new Date(record[header] || '');
-        input.value=Number.isNaN(parsed.getTime()) ? String(record[header] || '').slice(0,19) : new Date(parsed.getTime()-parsed.getTimezoneOffset()*60000).toISOString().slice(0,19);
+        input.value=adminDateTimeValue(record[header]);
       }else input.value=record[header] == null ? '' : String(record[header]);
     }
     input.dataset.field=header;
     if (header==='ID' && input.value) input.readOnly=true;
     label.append(caption,input);fields.appendChild(label);
-    if(header==='TargetDateTime'){const hint=document.createElement('small');hint.textContent='Enter the public date and time in Pakistan Standard Time.';label.appendChild(hint);}
+    if(['TargetDateTime','PublishAt','ExpiresAt'].includes(header)){const hint=document.createElement('small');hint.textContent='Pakistan Standard Time (PKT).';label.appendChild(hint);}
   });
   const save=document.createElement('button');save.type='submit';save.className='resource-button';save.textContent='Save record';
-  form.append(fields,save);form.onsubmit=event=>{event.preventDefault();adminSaveEditor(save);};panel.hidden=false;panel.scrollIntoView({behavior:'smooth',block:'start'});
+  const actions=document.createElement('div');actions.className='admin-editor-actions';actions.appendChild(save);
+  if(ADMIN_PREVIEW_TABLES.has(adminCurrentTable.key)){const preview=document.createElement('button');preview.type='button';preview.textContent='Preview draft';preview.onclick=()=>adminShowPreview(adminEditorRecord());actions.appendChild(preview);}
+  form.append(fields,actions);form.onsubmit=event=>{event.preventDefault();adminSaveEditor(save);};panel.hidden=false;panel.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 async function adminSaveEditor(button) {
-  const record={};document.querySelectorAll('#adminEditor [data-field]').forEach(input=>{record[input.dataset.field]=input.value;});
+  const record=adminEditorRecord();
   button.disabled=true;adminSetStatus('Saving record…');
   try {await adminRequest('adminSave',{table:adminCurrentTable.key,record});adminSetStatus('Record saved. Public caches were refreshed.','success');await adminRefreshSession();}
   catch(error){adminSetStatus(error.message,'error');button.disabled=false;}
@@ -160,10 +178,45 @@ async function adminSaveEditor(button) {
 
 async function adminArchiveRow(row) {
   const keyField=adminCurrentTable.headers.includes('ID')?'ID':(adminCurrentTable.headers.includes('Key')?'Key':adminCurrentTable.headers[0]);
-  const key=String(row[keyField] || '');if (!key || !confirm('Set '+key+' to Inactive?')) return;
+  const key=String(row[keyField] || '');if (!key || !confirm('Archive '+key+'? It will no longer appear publicly.')) return;
   adminSetStatus('Archiving '+key+'…');
-  try {await adminRequest('adminArchive',{table:adminCurrentTable.key,key});adminSetStatus(key+' is now Inactive.','success');await adminRefreshSession();}
+  try {await adminRequest('adminArchive',{table:adminCurrentTable.key,key});adminSetStatus(key+' is now archived.','success');await adminRefreshSession();}
   catch(error){adminSetStatus(error.message,'error');}
+}
+
+function adminPreviewState(record) {
+  const status=String(record.Status || 'Draft');
+  const now=Date.now();
+  const publishAt=new Date(record.PublishAt || record.PublishDate || '').getTime();
+  const expiresAt=new Date(record.ExpiresAt || record.ExpiryDate || '').getTime();
+  if(status==='Archived' || status==='Inactive') return {label:'Archived',className:'is-archived'};
+  if(status==='Draft') return {label:'Draft preview',className:'is-draft'};
+  if(Number.isFinite(expiresAt) && expiresAt<=now) return {label:'Expired',className:'is-archived'};
+  if((status==='Scheduled' && (!Number.isFinite(publishAt) || publishAt>now)) || (status==='Active' && Number.isFinite(publishAt) && publishAt>now)) return {label:'Scheduled',className:'is-scheduled'};
+  return {label:'Public now',className:'is-active'};
+}
+
+function adminPreviewLine(label,value) {
+  if(value == null || String(value).trim()==='') return null;
+  const p=document.createElement('p');const strong=document.createElement('strong');strong.textContent=label+': ';
+  p.append(strong,document.createTextNode(String(value)));return p;
+}
+
+function adminShowPreview(record) {
+  const panel=document.getElementById('adminPreviewPanel');const body=document.getElementById('adminPreviewBody');body.replaceChildren();
+  const state=adminPreviewState(record);const badge=document.createElement('span');badge.className='admin-preview-state '+state.className;badge.textContent=state.label;
+  const eyebrow=document.createElement('p');eyebrow.className='admin-preview-eyebrow';eyebrow.textContent=adminCurrentTable.label;
+  const title=document.createElement('h4');title.textContent=record.Title || record.Name || 'Untitled preview';
+  const description=document.createElement('p');description.className='admin-preview-description';description.textContent=record.Description || record.Summary || record.Message || record.Content || 'No description has been added.';
+  const card=document.createElement('article');card.className='admin-preview-card';card.append(badge,eyebrow,title,description);
+  [
+    adminPreviewLine('Category',record.Category),adminPreviewLine('Target date',record.TargetDateTime),
+    adminPreviewLine('Publishes',record.PublishAt || record.PublishDate),adminPreviewLine('Expires',record.ExpiresAt || record.ExpiryDate),
+    adminPreviewLine('After countdown',record.AfterMessage)
+  ].filter(Boolean).forEach(line=>card.appendChild(line));
+  const url=record.OfficialURL || record.FileURL || record.LinkURL;
+  if(url){const button=document.createElement('span');button.className='resource-button admin-preview-button';button.textContent=record.ButtonText || (adminCurrentTable.key==='RESOURCES'?'Open resource':'View details');card.appendChild(button);}
+  body.appendChild(card);panel.hidden=false;panel.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 function adminParseTSV(text) {
@@ -245,6 +298,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('adminQuery').onkeydown=event=>{if(event.key==='Enter'){event.preventDefault();adminLoadTable();}};
   document.getElementById('adminNew').onclick=()=>adminOpenEditor({});
   document.getElementById('adminEditorClose').onclick=()=>{document.getElementById('adminEditorPanel').hidden=true;};
+  document.getElementById('adminPreviewClose').onclick=()=>{document.getElementById('adminPreviewPanel').hidden=true;};
   document.getElementById('adminBulkToggle').onclick=()=>{document.getElementById('adminBulkPanel').hidden=false;document.getElementById('adminHeaders').textContent=adminCurrentTable.headers.join('\t');};
   document.getElementById('adminBulkClose').onclick=()=>{document.getElementById('adminBulkPanel').hidden=true;};
   document.getElementById('adminCopyHeaders').onclick=async()=>{await navigator.clipboard.writeText(adminCurrentTable.headers.join('\t'));adminSetStatus('Headers copied.','success');};

@@ -142,6 +142,32 @@ function testGetActiveCategories_() {
   const data = getActiveSheetData_(CONFIG.SHEETS.CATEGORIES);
   Logger.log(JSON.stringify(data, null, 2));
 }
+function portalScheduleTimestamp_(value) {
+  if (!value) return 0;
+  if (value instanceof Date) return value.getTime();
+  let text=String(value).trim();
+  // Dashboard date-time values have no suffix. Treat them as Pakistan time.
+  if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2})?$/.test(text)) text=text.replace(' ','T')+'+05:00';
+  const timestamp=new Date(text).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function isPortalRowPublished_(item,now) {
+  const status=String(item.Status == null ? 'Active' : item.Status).trim().toLowerCase();
+  const publishAt=portalScheduleTimestamp_(item.PublishAt || item.PublishDate);
+  const expiresAt=portalScheduleTimestamp_(item.ExpiresAt || item.ExpiryDate);
+  const current=Number(now) || Date.now();
+  if (status==='scheduled') {
+    if (!publishAt || publishAt>current) return false;
+  } else if (status!=='active') return false;
+  if (publishAt && publishAt>current) return false;
+  if (expiresAt && expiresAt<=current) return false;
+  return true;
+}
+
+function getPublishedSheetData_(sheetName) {
+  return getSheetData_(sheetName).filter(item=>isPortalRowPublished_(item));
+}
 function getFeaturedSheetData_(sheetName) {
   const data = getActiveSheetData_(sheetName);
 
@@ -811,14 +837,14 @@ function doGet(e) {
 
     if (action === 'mdcatAccountConfig') return jsonResponse_(mdcatAuthConfig_());
 
-    if (action === 'searchIndex') return cachedPublicJsonResponse_('searchIndex',getPublicSearchIndex_,300);
+    if (action === 'searchIndex') return cachedPublicJsonResponse_('searchIndex',getPublicSearchIndex_,60);
 
     if (action === 'portalData') {
       return cachedPublicJsonResponse_('portalData',getPublicPortalData_,300);
     }
 
     if (action === 'portalBundle') {
-      return cachedPublicJsonResponse_('portalBundle',getPublicPortalBundle_,300);
+      return cachedPublicJsonResponse_('portalBundle',getPublicPortalBundle_,60);
     }
 
     if (action === 'mcqs') {
@@ -834,7 +860,7 @@ function doGet(e) {
     }
 
     if (action === 'scholarships') {
-      return cachedPublicJsonResponse_('scholarships',getPublicScholarships_,300);
+      return cachedPublicJsonResponse_('scholarships',getPublicScholarships_,60);
     }
 
     if (action === 'opportunities') {
@@ -842,7 +868,7 @@ function doGet(e) {
     }
 
     if (action === 'announcements') {
-      return cachedPublicJsonResponse_('announcements',getPublicAnnouncements_,300);
+      return cachedPublicJsonResponse_('announcements',getPublicAnnouncements_,60);
     }
 
     if (action === 'countdowns') {
@@ -873,7 +899,7 @@ function doGet(e) {
       const category =
         e.parameter.category || '';
 
-      return cachedPublicJsonResponse_('resources-' + category,function(){return getPublicResources_(category);},300);
+      return cachedPublicJsonResponse_('resources-' + category,function(){return getPublicResources_(category);},60);
     }
     // ==========================================
 // MDCAT 2027 API ROUTES
@@ -976,7 +1002,7 @@ function testDoGet_() {
   Logger.log(response.getContent());
 }
 function getPublicResources_(categoryName) {
-  const resources = getActiveSheetData_(
+  const resources = getPublishedSheetData_(
     CONFIG.SHEETS.RESOURCES
   );
 
@@ -1010,7 +1036,9 @@ function getPublicResources_(categoryName) {
       FileURL: resource.FileURL || '',
       ThumbnailURL: resource.ThumbnailURL || '',
       Featured: resource.Featured || '',
-      DisplayOrder: resource.DisplayOrder || ''
+      DisplayOrder: resource.DisplayOrder || '',
+      PublishAt: resource.PublishAt || resource.PublishDate || '',
+      ExpiresAt: resource.ExpiresAt || resource.ExpiryDate || ''
     }))
     .sort(
       (a, b) =>
@@ -1085,7 +1113,7 @@ function getPublicAdmissions_() {
 }
 
 function getPublicScholarships_() {
-  const rows = getActiveSheetData_(CONFIG.SHEETS.SCHOLARSHIPS);
+  const rows = getPublishedSheetData_(CONFIG.SHEETS.SCHOLARSHIPS);
 
   return rows.map(item => ({
     ID: item.ID,
@@ -1099,7 +1127,9 @@ function getPublicScholarships_() {
     Deadline: item.Deadline,
     OfficialURL: item.OfficialURL,
     Description: item.Description,
-    Featured: item.Featured
+    Featured: item.Featured,
+    PublishAt: item.PublishAt || item.PublishDate || '',
+    ExpiresAt: item.ExpiresAt || item.ExpiryDate || ''
   }));
 }
 function getPublicOpportunities_() {
@@ -1124,7 +1154,7 @@ function getPublicOpportunities_() {
 }
 function getPublicAnnouncements_() {
   const rows =
-    getActiveSheetData_(
+    getPublishedSheetData_(
       CONFIG.SHEETS.ANNOUNCEMENTS
     );
 
@@ -1140,12 +1170,14 @@ function getPublicAnnouncements_() {
     ButtonText: item.ButtonText,
     DisplayOrder: item.DisplayOrder,
     Priority: item.Priority,
-    Featured: item.Featured
+    Featured: item.Featured,
+    PublishAt: item.PublishAt || item.PublishDate || '',
+    ExpiresAt: item.ExpiresAt || item.ExpiryDate || ''
   }));
 }
 function getPublicCountdowns_() {
   return getOptionalSheetData_(CONFIG.SHEETS.COUNTDOWNS)
-    .filter(item=>String(item.Status || '').trim().toLowerCase()==='active')
+    .filter(item=>isPortalRowPublished_(item))
     .map(item=>({
       ID:String(item.ID || '').slice(0,120),
       Title:String(item.Title || '').slice(0,240),
@@ -1154,7 +1186,9 @@ function getPublicCountdowns_() {
       AfterMessage:String(item.AfterMessage || 'Result announced').slice(0,240),
       OfficialURL:String(item.OfficialURL || '').slice(0,2000),
       ButtonText:String(item.ButtonText || '').slice(0,80),
-      DisplayOrder:Number(item.DisplayOrder || 0)
+      DisplayOrder:Number(item.DisplayOrder || 0),
+      PublishAt:item.PublishAt || item.PublishDate || '',
+      ExpiresAt:item.ExpiresAt || item.ExpiryDate || ''
     }))
     .filter(item=>item.ID && item.Title && item.TargetDateTime)
     .sort((a,b)=>a.DisplayOrder-b.DisplayOrder || a.Title.localeCompare(b.Title));
@@ -1541,19 +1575,15 @@ function studentNotificationReadIds_(uid) {
 }
 
 function studentNotifications_(preferences) {
-  const now=Date.now();
   const timestamp=value=>{
     if (!value) return 0;
     const parsed=new Date(value).getTime();
     return Number.isFinite(parsed) ? parsed : 0;
   };
   return getOptionalSheetData_(CONFIG.SHEETS.NOTIFICATIONS).filter(row=>{
-    if (String(row.Status == null ? 'Active' : row.Status).trim().toLowerCase()!=='active') return false;
+    if (!isPortalRowPublished_(row)) return false;
     const audience=String(row.Audience || 'All').trim().toLowerCase();
     if (!['all','everyone','registered users','students'].includes(audience)) return false;
-    const publishAt=timestamp(row.PublishAt || row.PublishDate);
-    const expiresAt=timestamp(row.ExpiresAt || row.ExpiryDate);
-    if ((publishAt && publishAt>now) || (expiresAt && expiresAt<now)) return false;
     const category=String(row.Category || (row.TestID ? 'Test' : 'General')).trim().toLowerCase();
     const reminder=String(row.ReminderType || '').trim().toLowerCase();
     const pinned=/^(yes|true|1)$/i.test(String(row.IsPinned || '')) || /^(important|urgent)$/i.test(String(row.Priority || ''));
@@ -1729,6 +1759,23 @@ function adminCell_(value) {
   return (/^[=+@]/.test(text) || (/^-/.test(text) && !/^-\d+(\.\d+)?$/.test(text))) ? "'"+text : text;
 }
 
+const ADMIN_PUBLISHING_TABLES_=['RESOURCES','SCHOLARSHIPS','ANNOUNCEMENTS','COUNTDOWNS','NOTIFICATIONS'];
+
+function adminValidatePublishingRecord_(table,record) {
+  if (!ADMIN_PUBLISHING_TABLES_.includes(table.key)) return;
+  const status=String(record.Status || 'Draft').trim();
+  const allowed=['Draft','Scheduled','Active','Archived','Inactive'];
+  if (!allowed.includes(status)) mdcatError_('BAD_REQUEST','Status must be Draft, Scheduled, Active or Archived.');
+  const publishText=String(record.PublishAt || record.PublishDate || '').trim();
+  const expiresText=String(record.ExpiresAt || record.ExpiryDate || '').trim();
+  const publishAt=portalScheduleTimestamp_(publishText);
+  const expiresAt=portalScheduleTimestamp_(expiresText);
+  if (publishText && !publishAt) mdcatError_('BAD_REQUEST','PublishAt must contain a valid date and time.');
+  if (expiresText && !expiresAt) mdcatError_('BAD_REQUEST','ExpiresAt must contain a valid date and time.');
+  if (status==='Scheduled' && !publishAt) mdcatError_('BAD_REQUEST','Scheduled content requires PublishAt.');
+  if (publishAt && expiresAt && expiresAt<=publishAt) mdcatError_('BAD_REQUEST','ExpiresAt must be later than PublishAt.');
+}
+
 function adminSaveRecord_(table, input, admin) {
   if (!input || Array.isArray(input) || typeof input!=='object') mdcatError_('BAD_REQUEST','A record is required.');
   const sheet=getSheet_(table.sheetName);
@@ -1745,10 +1792,15 @@ function adminSaveRecord_(table, input, admin) {
   if (!key) mdcatError_('BAD_REQUEST',keyField+' is required.');
   const keyIndex=headers.indexOf(keyField);
   const existingIndex=values.findIndex((row,index)=>index>0 && String(row[keyIndex] || '').trim()===key);
+  const effective={};
+  headers.forEach((header,index)=>{effective[header]=Object.prototype.hasOwnProperty.call(record,header) ? record[header] : (existingIndex>=0 ? values[existingIndex][index] : '');});
+  if (headers.includes('Status') && !String(effective.Status || '').trim()) effective.Status=ADMIN_PUBLISHING_TABLES_.includes(table.key) ? 'Draft' : 'Inactive';
+  adminValidatePublishingRecord_(table,effective);
+  Object.keys(effective).forEach(header=>{if (!Object.prototype.hasOwnProperty.call(record,header) && existingIndex<0) record[header]=effective[header];});
   const now=new Date();
   if (headers.includes('UpdatedAt')) record.UpdatedAt=now;
   if (existingIndex<0 && headers.includes('CreatedAt') && !record.CreatedAt) record.CreatedAt=now;
-  if (existingIndex<0 && headers.includes('Status') && !String(record.Status || '').trim()) record.Status='Inactive';
+  if (existingIndex<0 && headers.includes('Status') && !String(record.Status || '').trim()) record.Status=ADMIN_PUBLISHING_TABLES_.includes(table.key) ? 'Draft' : 'Inactive';
   if (existingIndex>=0) {
     const updated=headers.map((header,index)=>{
       if (header==='CreatedAt' && values[existingIndex][index]) return values[existingIndex][index];
@@ -1784,7 +1836,7 @@ function adminArchive_(body,admin) {
   if (!headers.includes('Status')) mdcatError_('BAD_REQUEST','This section cannot be archived because it has no Status column.');
   const record={};
   const keyField=headers.includes('ID') ? 'ID' : (headers.includes('Key') ? 'Key' : headers[0]);
-  record[keyField]=String(body.key || '').trim();record.Status='Inactive';
+  record[keyField]=String(body.key || '').trim();record.Status=ADMIN_PUBLISHING_TABLES_.includes(table.key) ? 'Archived' : 'Inactive';
   if (!record[keyField]) mdcatError_('BAD_REQUEST','A record key is required.');
   return adminSaveRecord_(table,record,admin);
 }
@@ -1960,7 +2012,11 @@ function setupPortalEnhancements() {
   const definitions=[
     [CONFIG.SHEETS.FAQS,['ID','Question','Answer','Category','DisplayOrder','Status','CreatedAt','UpdatedAt']],
     [CONFIG.SHEETS.FEEDBACK,['ID','Category','Message','PageURL','Status','SubmittedAt','CreatedAt','UpdatedAt']],
-    [CONFIG.SHEETS.COUNTDOWNS,['ID','Title','Description','TargetDateTime','AfterMessage','OfficialURL','ButtonText','DisplayOrder','Status','CreatedAt','UpdatedAt']]
+    [CONFIG.SHEETS.RESOURCES,['ID','Title','Slug','Category','Level','Subject','Institution','Year','ResourceType','Description','FileURL','ThumbnailURL','Featured','DisplayOrder','Status','CreatedAt','UpdatedAt','PublishAt','ExpiresAt']],
+    [CONFIG.SHEETS.SCHOLARSHIPS,['ID','Name','Provider','Type','Country','Eligibility','Benefits','OpeningDate','Deadline','OfficialURL','Description','Featured','Status','CreatedAt','UpdatedAt','PublishAt','ExpiresAt']],
+    [CONFIG.SHEETS.ANNOUNCEMENTS,['ID','Title','Category','Summary','Content','PublishDate','ExpiryDate','OfficialURL','ButtonText','DisplayOrder','Priority','Featured','Status','CreatedAt','UpdatedAt','PublishAt','ExpiresAt']],
+    [CONFIG.SHEETS.COUNTDOWNS,['ID','Title','Description','TargetDateTime','AfterMessage','OfficialURL','ButtonText','DisplayOrder','Status','CreatedAt','UpdatedAt','PublishAt','ExpiresAt']],
+    [CONFIG.SHEETS.NOTIFICATIONS,['ID','Title','Message','Audience','TestID','LinkURL','PublishAt','ExpiresAt','DisplayOrder','Status','CreatedAt','UpdatedAt','Category','Priority','IsPinned','ReminderType','ReminderAt']]
   ];
   definitions.forEach(([name,headers])=>{
     let sheet=spreadsheet.getSheetByName(name);
@@ -1968,10 +2024,12 @@ function setupPortalEnhancements() {
     if (sheet.getLastRow()===0) sheet.getRange(1,1,1,headers.length).setValues([headers]);
     const actual=(sheet.getDataRange().getValues()[0] || []).map(value=>String(value).replace(/\uFEFF/g,'').trim()).filter(Boolean);
     const missing=headers.filter(header=>!actual.includes(header));
-    if (new Set(actual).size!==actual.length || missing.length) mdcatError_('SETUP_REQUIRED',name+' is missing required headers: '+missing.join(', ')+'.');
+    if (new Set(actual).size!==actual.length) mdcatError_('SETUP_REQUIRED',name+' has duplicate headers.');
+    if (missing.length) sheet.getRange(1,actual.length+1,1,missing.length).setValues([missing]);
     sheet.setFrozenRows(1);
   });
-  return 'FAQs, Feedback and Public Countdowns are ready for the public portal and admin dashboard.';
+  adminClearPublicCache_();
+  return 'Scheduled publishing, previews, FAQs, Feedback and Public Countdowns are ready. Existing rows were preserved.';
 }
 
 // Run once from the Apps Script editor. Never called by the public website.

@@ -2,9 +2,9 @@ const assert=require('node:assert/strict');
 const {createBackend}=require('./scoring-harness.cjs');
 const backend=createBackend();
 assert.match(backend.context.setupUniversalTestsAndNotifications_(),/ready/i);
-assert.match(backend.context.setupPortalEnhancements(),/Public Countdowns/i);
+assert.match(backend.context.setupPortalEnhancements(),/Scheduled publishing/i);
 backend.addSheet('Admins',[{ID:'ADMIN-001',Email:'owner@example.test',Role:'Super Admin',Status:'Active'}]);
-backend.addSheet('Resources',[{ID:'RES-001',Title:'Existing note',Slug:'existing-note',Category:'Notes',Level:'',Subject:'',Institution:'',Year:'',ResourceType:'PDF',Description:'Keep this',FileURL:'https://example.test/existing.pdf',ThumbnailURL:'',Featured:'No',DisplayOrder:'',Status:'Active',CreatedAt:'old',UpdatedAt:'old'}]);
+backend.addSheet('Resources',[{ID:'RES-001',Title:'Existing note',Slug:'existing-note',Category:'Notes',Level:'',Subject:'',Institution:'',Year:'',ResourceType:'PDF',Description:'Keep this',FileURL:'https://example.test/existing.pdf',ThumbnailURL:'',Featured:'No',DisplayOrder:'',Status:'Active',CreatedAt:'old',UpdatedAt:'old',PublishAt:'',ExpiresAt:''}]);
 const adminSheetNames=['Categories','Subjects','Levels','Institutions','Entry_Tests','Admissions','Scholarships','Opportunities','Announcements','MCQs','Videos','AI_Tools','Islamic_Content','Blog','Navigation','Homepage','Social_Links','Submissions','Help_Desk','Activity_Log','Settings','MDCAT_Subjects','MDCAT_Units','MDCAT_Chapters','MDCAT_Topics','MDCAT_Question_Bank','MDCAT_Tests','MDCAT_Test_Questions','MDCAT_Daily_Practice','MDCAT_Updates'];
 for(const name of adminSheetNames){if(!backend.sheets.has(name)) backend.addSheet(name,[{ID:'SETUP-001',Status:'Inactive'}]);}
 const admin=backend.token('owner',{}, {email:'owner@example.test'});
@@ -31,10 +31,12 @@ assert.equal(listed.total,1);assert.equal(listed.rows[0].Title,'Existing note');
 ok(backend.call('adminSave',admin,{table:'RESOURCES',record:{ID:'RES-001',Title:'Updated note',Description:'Keep this',Status:'Active'}}));
 assert.equal(backend.rows('Resources')[0].Title,'Updated note');
 ok(backend.call('adminArchive',admin,{table:'RESOURCES',key:'RES-001'}));
-const archived=backend.rows('Resources')[0];assert.equal(archived.Status,'Inactive');assert.equal(archived.Title,'Updated note');assert.equal(archived.Description,'Keep this');
+const archived=backend.rows('Resources')[0];assert.equal(archived.Status,'Archived');assert.equal(archived.Title,'Updated note');assert.equal(archived.Description,'Keep this');
 
-const created=ok(backend.call('adminSave',admin,{table:'RESOURCES',record:{Title:'New note',Description:'New',Status:'Inactive'}}));
+const created=ok(backend.call('adminSave',admin,{table:'RESOURCES',record:{Title:'New note',Description:'New'}}));
 assert.equal(created.created,true);assert.match(created.key,/^RES-/);
+assert.equal(backend.rows('Resources').find(row=>row.ID===created.key).Status,'Draft');
+bad(backend.call('adminSave',admin,{table:'RESOURCES',record:{Title:'Bad schedule',Status:'Scheduled'}}),'BAD_REQUEST');
 const headers=session.tables.find(table=>table.key==='RESOURCES').headers;
 const row=Object.fromEntries(headers.map(header=>[header,'']));row.ID='RES-099';row.Title='Bulk note';row.Status='Inactive';
 const bulk=ok(backend.call('adminBulk',admin,{table:'RESOURCES',headers,records:[row]}));
@@ -48,4 +50,4 @@ const upload=ok(backend.call('adminUploadPdf',admin,{fileName:'Biology Notes.pdf
 assert.match(upload.resourceId,/^RES-/);assert.match(upload.viewUrl,/drive\.google\.com\/file\/d\//);assert.match(upload.downloadUrl,/export=download/);
 const uploaded=backend.rows('Resources').find(row=>row.ID===upload.resourceId);assert.equal(uploaded.Status,'Active');assert.equal(uploaded.ResourceType,'PDF');assert.equal(uploaded.Subject,'Biology');
 assert.equal(backend.driveFiles.length,1);assert.deepEqual(backend.driveFiles[0].sharing,{access:'anyone',permission:'view'});assert.equal(backend.driveFiles[0].trashed,false);
-console.log('PASS admin backend: verified Google allowlist, safe table manifest, list/create/update/archive, exact-header bulk paste, PDF validation/Drive publishing, and private-sheet exclusion.');
+console.log('PASS admin backend: verified allowlist, Draft defaults, schedule validation, archive state, bulk paste, PDF publishing, and private-sheet exclusion.');

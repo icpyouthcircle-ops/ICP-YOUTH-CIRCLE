@@ -6,8 +6,8 @@
   <meta name="robots" content="noindex,nofollow">
   <meta name="referrer" content="no-referrer">
   <title>Admin Dashboard | ICP YOUTH CIRCLE</title>
-  <link rel="stylesheet" href="css/style.css?v=20260927-countdown-suite">
-  <link rel="stylesheet" href="css/admin.css?v=20260927-countdown-suite">
+  <link rel="stylesheet" href="css/style.css?v=20260927-publishing-suite">
+  <link rel="stylesheet" href="css/admin.css?v=20260927-publishing-suite">
 </head>
 <body class="admin-page">
   <header>
@@ -56,6 +56,11 @@
             <form id="adminEditor"></form>
           </section>
 
+          <section id="adminPreviewPanel" class="admin-panel admin-preview-panel" hidden aria-labelledby="adminPreviewTitle">
+            <div class="admin-panel-title"><div><h3 id="adminPreviewTitle">Public preview</h3><p>This preview is visible only to you until the record is published.</p></div><button id="adminPreviewClose" type="button">Close</button></div>
+            <div id="adminPreviewBody"></div>
+          </section>
+
           <section id="adminBulkPanel" class="admin-panel" hidden aria-labelledby="adminBulkTitle">
             <div class="admin-panel-title"><h3 id="adminBulkTitle">Paste rows from Google Sheets</h3><button id="adminBulkClose" type="button">Close</button></div>
             <p>Include the header row. Its names and order must exactly match:</p>
@@ -95,7 +100,7 @@
       </div>
     </section>
   </main>
-  <script src="js/admin.js?v=20260927-countdown-suite"></script>
-  <script src="js/admin-performance.js?v=20260927-countdown-suite"></script>
+  <script src="js/admin.js?v=20260927-publishing-suite"></script>
+  <script src="js/admin-performance.js?v=20260927-publishing-suite"></script>
 </body>
 </html>

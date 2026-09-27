@@ -3,6 +3,8 @@ const API_BASE_URL =
 const PORTAL_CACHE_KEY = 'icp-public-portal-v1';
 const PUBLIC_MODULE_CACHE_PREFIX = 'icp-public-module-v2:';
 const PUBLIC_MODULE_CACHE_TTL = 30 * 60 * 1000;
+const SCHEDULED_MODULE_CACHE_TTL = 60 * 1000;
+const SCHEDULED_PUBLIC_MODULES = new Set(['resources','scholarships','announcements','countdowns']);
 const PUBLIC_NOTIFICATION_SEEN_KEY = 'icp-public-notifications-seen-v1';
 const PUBLIC_NOTIFICATION_LIFETIME = 24 * 60 * 60 * 1000;
 const publicModuleMemory = new Map();
@@ -147,21 +149,28 @@ function publicModuleKey(action, params = {}) {
 }
 
 function readPublicModuleCache(key, allowStale = false) {
-  if (publicModuleMemory.has(key)) return publicModuleMemory.get(key);
+  const action=new URLSearchParams(key).get('action') || '';
+  const maxAge=SCHEDULED_PUBLIC_MODULES.has(action) ? SCHEDULED_MODULE_CACHE_TTL : PUBLIC_MODULE_CACHE_TTL;
+  if (publicModuleMemory.has(key)) {
+    const cached=publicModuleMemory.get(key);
+    if (allowStale || Date.now()-cached.savedAt<=maxAge) return cached.data;
+    publicModuleMemory.delete(key);
+  }
   try {
     const cached = JSON.parse(localStorage.getItem(PUBLIC_MODULE_CACHE_PREFIX + key));
     if (!cached || !Array.isArray(cached.data)) return null;
-    if (!allowStale && Date.now() - Number(cached.savedAt || 0) > PUBLIC_MODULE_CACHE_TTL) return null;
-    publicModuleMemory.set(key, cached.data);
+    if (!allowStale && Date.now() - Number(cached.savedAt || 0) > maxAge) return null;
+    publicModuleMemory.set(key, {savedAt:Number(cached.savedAt || 0),data:cached.data});
     return cached.data;
   } catch (_) { return null; }
 }
 
 function storePublicModuleCache(key, data) {
   if (!Array.isArray(data)) return;
-  publicModuleMemory.set(key, data);
+  const savedAt=Date.now();
+  publicModuleMemory.set(key, {savedAt,data});
   try {
-    const value = JSON.stringify({ savedAt: Date.now(), data });
+    const value = JSON.stringify({ savedAt, data });
     if (value.length <= 500000) localStorage.setItem(PUBLIC_MODULE_CACHE_PREFIX + key, value);
   } catch (_) {}
 }
@@ -197,7 +206,7 @@ function refreshPublicModule(action, params = {}) {
 
 function loadPublicModule(action, params = {}) {
   const key = publicModuleKey(action, params);
-  const cached = readPublicModuleCache(key, true);
+  const cached = readPublicModuleCache(key, !SCHEDULED_PUBLIC_MODULES.has(action));
   if (cached) {
     refreshPublicModule(action, params).catch(() => {});
     return Promise.resolve(cached);
@@ -969,6 +978,19 @@ function getRouteDescription(slug, label) {
   return descriptions[slug] || 'Find published '+label.toLowerCase()+' information and resources from ICP YOUTH CIRCLE.';
 }
 
+function updatePortalMetadata(title,description) {
+  const pageTitle=title && title!=='ICP YOUTH CIRCLE' ? title+' | ICP YOUTH CIRCLE' : 'ICP YOUTH CIRCLE | Learn, Connect, Grow';
+  const cleanDescription=String(description || 'Student resources, opportunities, guidance and community support in one accessible portal.').replace(/\s+/g,' ').trim().slice(0,200);
+  document.title=pageTitle;
+  const set=(selector,attribute,value)=>{const node=document.querySelector(selector);if(node)node.setAttribute(attribute,value);};
+  set('meta[name="description"]','content',cleanDescription);
+  set('meta[property="og:title"]','content',pageTitle);
+  set('meta[property="og:description"]','content',cleanDescription);
+  set('meta[property="og:url"]','content',location.href);
+  set('meta[name="twitter:title"]','content',pageTitle);
+  set('meta[name="twitter:description"]','content',cleanDescription);
+}
+
 function renderContactPage() {
   const settings=portalData && portalData.settings || {};
   const content=document.getElementById('dynamicPageContent');
@@ -1132,6 +1154,7 @@ function handleNavigation(item,options={}) {
   title.textContent = itemLabel;
 
   description.textContent = getRouteDescription(item.Slug, itemLabel);
+  updatePortalMetadata(itemLabel,description.textContent);
   renderPageBreadcrumb(item);
 
   content.innerHTML = '';
@@ -1236,6 +1259,7 @@ function showHome(options={}) {
 
   navigationVersion += 1;
   closeMDCATHub();
+  updatePortalMetadata('ICP YOUTH CIRCLE','Student resources, opportunities, guidance and community support in one accessible portal.');
 
   document.getElementById(
     'dynamicPage'
