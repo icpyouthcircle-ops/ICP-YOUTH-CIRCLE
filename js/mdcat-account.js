@@ -105,7 +105,8 @@ function setPortalNotificationBadge(count) {
   if(!badge){badge=document.createElement('span');badge.className='nav-notification-badge';button.appendChild(badge);}
   const value=Math.max(0,Number(count || 0));
   badge.textContent=value>99?'99+':String(value);badge.hidden=!value;
-  button.setAttribute('aria-label',value?'My account, '+value+' unread notification'+(value===1?'':'s'):'My account');
+  const signedIn=button.querySelector('.nav-account-label') && button.querySelector('.nav-account-label').textContent==='My account';
+  button.setAttribute('aria-label',signedIn ? (value?'My account, '+value+' unread notification'+(value===1?'':'s'):'My account') : 'Sign in');
 }
 
 async function loadStudentDashboard(force=false) {

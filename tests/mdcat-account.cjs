@@ -8,10 +8,11 @@ const {createBackend}=require('./scoring-harness.cjs');
  const browser=await chromium.launch({headless:true,...(process.env.MDCAT_BROWSER_CHANNEL?{channel:process.env.MDCAT_BROWSER_CHANNEL}:{})});
  try {
   const backend=createBackend();
+  backend.advance(Date.now()-Date.parse('2026-09-24T12:00:00Z'));
   backend.addSheet('Submissions',[{ID:'SUBM-OWN',Email:'student@example.test',Title:'My Biology Resource',ResourceType:'Notes',Subject:'Biology',Status:'Pending Review',SubmittedAt:'2026-09-24T10:00:00Z'},{ID:'SUBM-OTHER',Email:'other@example.test',Title:'Other Student Resource',Status:'Active'}]);
   backend.addSheet('Help_Desk',[{ID:'HELP-OWN',Email:'student@example.test',RequestType:'Study guidance',Subject:'My Physics Plan',Status:'Resolved',AdminResponse:'Plan shared.',SubmittedAt:'2026-09-24T11:00:00Z'},{ID:'HELP-OTHER',Email:'other@example.test',Subject:'Other Student Request',Status:'Pending Review'}]);
   backend.addSheet('Test_Catalog',[{ID:'TST-MDCAT',Name:'MDCAT',Slug:'mdcat',Description:'Medical entry test',TestType:'Entry Test',Route:'mdcat',Engine:'MDCAT',DisplayOrder:1,Status:'Active'},{ID:'TST-NUMS',Name:'NUMS',Slug:'nums',Description:'NUMS information',TestType:'Entry Test',Route:'nums',DisplayOrder:2,Status:'Active'}]);
-  backend.addSheet('Notifications',[{ID:'NTF-001',Title:'New scholarship update',Message:'Applications are now open.',Audience:'Registered Users',Category:'Deadline',Priority:'Important',IsPinned:'Yes',ReminderType:'Deadline',ReminderAt:'2026-09-28',LinkURL:'#scholarships',PublishAt:'2026-09-24T09:00:00Z',Status:'Active'},{ID:'NTF-OLD',Title:'Expired update',Message:'Old',Audience:'All',ExpiresAt:'2026-09-23T09:00:00Z',Status:'Active'}]);
+  backend.addSheet('Notifications',[{ID:'NTF-001',Title:'New scholarship update',Message:'Applications are now open.',Audience:'Registered Users',Category:'Deadline',Priority:'Important',IsPinned:'Yes',ReminderType:'Deadline',ReminderAt:new Date(Date.now()+86400000).toISOString(),LinkURL:'#scholarships',PublishAt:new Date(Date.now()-3600000).toISOString(),Status:'Active'},{ID:'NTF-OLD',Title:'Expired update',Message:'Old',Audience:'All',ExpiresAt:new Date(Date.now()-86400000).toISOString(),Status:'Active'}]);
   backend.context.setupUniversalTestsAndNotifications_();
   const token=backend.token('student',{}, {email:'student@example.test'});
   const otherToken=backend.token('other-student',{}, {email:'other@example.test'});
@@ -31,6 +32,7 @@ const {createBackend}=require('./scoring-harness.cjs');
    }
    const action=new URL(request.url()).searchParams.get('action');
    if(action==='portalData')return route.fulfill({json:{success:true,data:{settings:{},navigation:[],categories:[]}}});
+   if(action==='countdowns')return route.fulfill({json:{success:true,data:[]}});
    if(action==='mdcatAccountConfig'){configRequests++;return route.fulfill({json:{success:true,data:{enabled:true}}});}
    const response=backend.context.doGet({parameter:{action}});
    await route.fulfill({json:JSON.parse(response.getContent())});

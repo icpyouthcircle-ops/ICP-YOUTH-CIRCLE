@@ -1,6 +1,6 @@
-const PORTAL_COUNTDOWN_KEY='icp-exam-countdown-v1';
 const PORTAL_TOUR_KEY='icp-welcome-tour-v1';
 let portalInstallPrompt=null;
+let portalCountdownTimer=null;
 
 window.addEventListener('beforeinstallprompt',event=>{
   event.preventDefault();portalInstallPrompt=event;portalUpdateInstallButton();
@@ -18,8 +18,15 @@ function portalShareURL(item){
 function appendPortalShareButton(container,item,kind){
   if(!container)return;
   const title=portalText(item && (item.Title || item.Name || item.Program || item.Question) || 'ICP YOUTH CIRCLE',200);
-  const button=document.createElement('button');button.type='button';button.className='resource-button portal-share-button';
-  button.textContent='Share';button.setAttribute('aria-label','Share '+title);
+  let actions=Array.from(container.children).find(child=>child.classList && child.classList.contains('portal-card-actions'));
+  if(!actions){
+    actions=document.createElement('div');actions.className='portal-card-actions';
+    Array.from(container.children).filter(child=>child.matches && child.matches('a.resource-button,button.resource-button')).forEach(child=>actions.appendChild(child));
+    container.appendChild(actions);
+  }
+  const button=document.createElement('button');button.type='button';button.className='portal-share-button';
+  button.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 10.5 6.8-4M8.6 13.5l6.8 4"/></svg><span>Share</span>';
+  button.setAttribute('aria-label','Share '+title);button.title='Share';
   button.onclick=async()=>{
     const url=portalShareURL(item);const text='View this '+portalText(kind || 'item',40)+' from ICP YOUTH CIRCLE.';
     if(navigator.share){
@@ -28,7 +35,7 @@ function appendPortalShareButton(container,item,kind){
     const whatsapp='https://wa.me/?text='+encodeURIComponent(title+'\n'+url);
     window.open(whatsapp,'_blank','noopener,noreferrer');
   };
-  container.appendChild(button);
+  actions.appendChild(button);
 }
 
 function portalInstallButton(){
@@ -54,30 +61,46 @@ function portalUpdateInstallButton(installed=false){
   button.hidden=standalone;button.classList.toggle('is-ready',Boolean(portalInstallPrompt));
 }
 
-function portalReadCountdown(){
-  try{const value=JSON.parse(localStorage.getItem(PORTAL_COUNTDOWN_KEY));return value && typeof value==='object' ? value : {};}
-  catch(_){return {};}
+function portalCountdownDate(value){
+  if(value instanceof Date)return value;
+  const text=String(value || '').trim();if(!text)return new Date(NaN);
+  const pakistanLocal=/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2})?$/.test(text) ? text.replace(' ','T')+'+05:00' : text;
+  return new Date(pakistanLocal);
 }
 
-function portalRenderCountdown(){
-  const saved=portalReadCountdown();const output=document.getElementById('examCountdownOutput');if(!output)return;
-  if(!saved.date){output.textContent='Choose an exam date to start your countdown.';return;}
-  const target=new Date(saved.date+'T23:59:59');
-  if(Number.isNaN(target.getTime())){output.textContent='Choose a valid exam date.';return;}
-  const days=Math.max(0,Math.ceil((target.getTime()-Date.now())/86400000));
-  const label=portalText(saved.name || 'Your exam',80);
-  output.textContent=target.getTime()<Date.now() ? label+' date has passed.' : days===0 ? label+' is today.' : days+' day'+(days===1?'':'s')+' until '+label+'.';
+function portalCountdownTargetLabel(target){
+  try{return new Intl.DateTimeFormat('en-PK',{dateStyle:'long',timeStyle:'short',timeZone:'Asia/Karachi'}).format(target)+' PKT';}
+  catch(_){return target.toLocaleString();}
 }
 
-function portalCreateHomeTools(){
+function portalDrawCountdown(item){
+  const section=document.getElementById('homeTools');if(!section)return;
+  if(portalCountdownTimer){clearInterval(portalCountdownTimer);portalCountdownTimer=null;}
+  const target=portalCountdownDate(item && item.TargetDateTime);
+  if(!item || Number.isNaN(target.getTime())){section.dataset.active='';section.hidden=true;section.replaceChildren();return;}
+  section.dataset.active='true';section.hidden=false;
+  section.innerHTML='<div class="container"><article class="public-countdown-card"><div class="public-countdown-copy"><span class="home-tool-eyebrow">IMPORTANT UPDATE</span><h2></h2><p class="public-countdown-description"></p><p class="public-countdown-target"></p></div><div class="public-countdown-status"><div class="public-countdown-clock" role="timer" aria-live="off"><div><strong data-unit="days">00</strong><span>Days</span></div><div><strong data-unit="hours">00</strong><span>Hours</span></div><div><strong data-unit="minutes">00</strong><span>Minutes</span></div><div><strong data-unit="seconds">00</strong><span>Seconds</span></div></div><div class="public-countdown-announced" hidden><span aria-hidden="true">✓</span><strong></strong></div></div></article></div>';
+  const card=section.querySelector('.public-countdown-card');card.querySelector('h2').textContent=portalText(item.Title,240);
+  const description=card.querySelector('.public-countdown-description');description.textContent=portalText(item.Description,1000);description.hidden=!description.textContent;
+  card.querySelector('.public-countdown-target').textContent='Scheduled for '+portalCountdownTargetLabel(target);
+  const url=typeof safePortalURL==='function' ? safePortalURL(item.OfficialURL) : '';
+  if(url){const link=document.createElement('a');link.className='resource-button';link.href=url;link.target='_blank';link.rel='noopener noreferrer';link.textContent=portalText(item.ButtonText || 'Official details',80);card.querySelector('.public-countdown-copy').appendChild(link);}
+  appendPortalShareButton(card.querySelector('.public-countdown-copy'),item,'update');
+  const update=()=>{
+    const remaining=target.getTime()-Date.now();const clock=card.querySelector('.public-countdown-clock');const announced=card.querySelector('.public-countdown-announced');
+    if(remaining<=0){clock.hidden=true;announced.hidden=false;announced.querySelector('strong').textContent=portalText(item.AfterMessage || 'Result announced',240);card.classList.add('is-announced');if(portalCountdownTimer){clearInterval(portalCountdownTimer);portalCountdownTimer=null;}return;}
+    const totalSeconds=Math.floor(remaining/1000);const values={days:Math.floor(totalSeconds/86400),hours:Math.floor((totalSeconds%86400)/3600),minutes:Math.floor((totalSeconds%3600)/60),seconds:totalSeconds%60};
+    Object.entries(values).forEach(([unit,value])=>{card.querySelector('[data-unit="'+unit+'"]').textContent=String(value).padStart(2,'0');});
+  };
+  update();if(target.getTime()>Date.now())portalCountdownTimer=setInterval(update,1000);
+}
+
+function portalCreatePublicCountdown(){
   if(document.getElementById('homeTools'))return;
-  const section=document.createElement('section');section.id='homeTools';section.className='home-tools';
-  section.innerHTML='<div class="container"><div class="home-tools-grid"><article class="home-tool-card"><div><span class="home-tool-eyebrow">PERSONAL STUDY TOOL</span><h3>Exam countdown</h3><p id="examCountdownOutput">Choose an exam date to start your countdown.</p></div><form id="examCountdownForm" class="countdown-form"><label>Exam name<input id="examCountdownName" maxlength="80" placeholder="For example: MDCAT"></label><label>Exam date<input id="examCountdownDate" type="date" required></label><div><button class="resource-button" type="submit">Save countdown</button><button id="examCountdownClear" class="secondary-button" type="button">Clear</button></div></form></article></div></div>';
-  document.getElementById('homeHero').insertAdjacentElement('afterend',section);
-  const saved=portalReadCountdown();document.getElementById('examCountdownName').value=saved.name || '';document.getElementById('examCountdownDate').value=saved.date || '';
-  document.getElementById('examCountdownForm').onsubmit=event=>{event.preventDefault();const value={name:portalText(document.getElementById('examCountdownName').value || 'My exam',80),date:document.getElementById('examCountdownDate').value};try{localStorage.setItem(PORTAL_COUNTDOWN_KEY,JSON.stringify(value));}catch(_){}portalRenderCountdown();};
-  document.getElementById('examCountdownClear').onclick=()=>{try{localStorage.removeItem(PORTAL_COUNTDOWN_KEY);}catch(_){}document.getElementById('examCountdownForm').reset();portalRenderCountdown();};
-  portalRenderCountdown();
+  const section=document.createElement('section');section.id='homeTools';section.className='home-tools';section.hidden=true;
+  const hero=document.getElementById('homeHero');if(!hero)return;hero.insertAdjacentElement('afterend',section);
+  if(typeof refreshPublicModule!=='function')return;
+  refreshPublicModule('countdowns').then(rows=>portalDrawCountdown((rows || [])[0])).catch(()=>{section.hidden=true;});
 }
 
 function portalCreateWelcomeTour(){
@@ -136,7 +159,7 @@ function portalRefreshInBackground(){
 }
 
 function initializePortalExtras(){
-  portalCreateHomeTools();portalUpdateInstallButton();
+  portalCreatePublicCountdown();portalUpdateInstallButton();
   setTimeout(portalCreateWelcomeTour,500);
   const startReminder=()=>portalRenderFridayReminder();if('requestIdleCallback'in window)requestIdleCallback(startReminder,{timeout:2500});else setTimeout(startReminder,1200);
   addEventListener('online',portalRefreshInBackground);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')portalRefreshInBackground();});

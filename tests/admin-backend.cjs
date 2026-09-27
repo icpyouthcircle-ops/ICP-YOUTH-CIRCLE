@@ -2,6 +2,7 @@ const assert=require('node:assert/strict');
 const {createBackend}=require('./scoring-harness.cjs');
 const backend=createBackend();
 assert.match(backend.context.setupUniversalTestsAndNotifications_(),/ready/i);
+assert.match(backend.context.setupPortalEnhancements(),/Public Countdowns/i);
 backend.addSheet('Admins',[{ID:'ADMIN-001',Email:'owner@example.test',Role:'Super Admin',Status:'Active'}]);
 backend.addSheet('Resources',[{ID:'RES-001',Title:'Existing note',Slug:'existing-note',Category:'Notes',Level:'',Subject:'',Institution:'',Year:'',ResourceType:'PDF',Description:'Keep this',FileURL:'https://example.test/existing.pdf',ThumbnailURL:'',Featured:'No',DisplayOrder:'',Status:'Active',CreatedAt:'old',UpdatedAt:'old'}]);
 const adminSheetNames=['Categories','Subjects','Levels','Institutions','Entry_Tests','Admissions','Scholarships','Opportunities','Announcements','MCQs','Videos','AI_Tools','Islamic_Content','Blog','Navigation','Homepage','Social_Links','Submissions','Help_Desk','Activity_Log','Settings','MDCAT_Subjects','MDCAT_Units','MDCAT_Chapters','MDCAT_Topics','MDCAT_Question_Bank','MDCAT_Tests','MDCAT_Test_Questions','MDCAT_Daily_Practice','MDCAT_Updates'];
@@ -17,6 +18,7 @@ assert.equal(session.email,'owner@example.test');assert.equal(session.role,'Supe
 assert.ok(session.tables.some(table=>table.key==='RESOURCES'));
 assert.ok(session.tables.some(table=>table.key==='TEST_CATALOG'));
 assert.ok(session.tables.some(table=>table.key==='NOTIFICATIONS'));
+assert.ok(session.tables.some(table=>table.key==='COUNTDOWNS'));
 assert.ok(!session.tables.some(table=>table.key==='MDCAT_ATTEMPT_ANSWERS'));
 const testCatalog=JSON.parse(backend.context.doGet({parameter:{action:'testCatalog'}}).getContent());
 assert.equal(testCatalog.success,true);assert.equal(testCatalog.data[0].Slug,'mdcat');

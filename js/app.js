@@ -640,6 +640,7 @@ function setPortalAccountButton(signedIn) {
 function openPortalAccount(pending) {
   document.getElementById('homeHero').style.display = 'none';
   document.getElementById('homeExplore').style.display = 'none';
+  const homeTools=document.getElementById('homeTools');if(homeTools)homeTools.hidden=true;
   document.getElementById('dynamicPage').style.display = 'none';
   document.getElementById('mdcatHub').hidden = false;
   window.location.hash = 'account';
@@ -1248,7 +1249,7 @@ function showHome(options={}) {
     'homeExplore'
   ).style.display = 'block';
 
-  const homeTools=document.getElementById('homeTools');if(homeTools)homeTools.hidden=false;
+  const homeTools=document.getElementById('homeTools');if(homeTools)homeTools.hidden=homeTools.dataset.active!=='true';
 
   if(!options.fromHistory && (window.location.hash || window.location.search)) history.pushState({portal:true},'',window.location.pathname);
 

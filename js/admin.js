@@ -129,10 +129,23 @@ function adminOpenEditor(record={}) {
     const label=document.createElement('label');label.className='admin-field';
     if (/description|content|summary|question|eligibility|benefits|notes|text|details|answer|address/i.test(header)) label.classList.add('admin-field-wide');
     const caption=document.createElement('span');caption.textContent=header;
-    const long=label.classList.contains('admin-field-wide');const input=document.createElement(long?'textarea':'input');
-    if (long) input.rows=4;input.dataset.field=header;input.value=record[header] == null ? '' : String(record[header]);
+    const countdownStatus=header==='Status' && adminCurrentTable.key==='COUNTDOWNS';
+    const long=label.classList.contains('admin-field-wide');const input=document.createElement(countdownStatus?'select':long?'textarea':'input');
+    if(countdownStatus){
+      ['Inactive','Active'].forEach(value=>{const option=document.createElement('option');option.value=value;option.textContent=value;input.appendChild(option);});
+      input.value=String(record[header] || 'Inactive');
+    }else{
+      if (long) input.rows=4;
+      if(header==='TargetDateTime'){
+        input.type='datetime-local';input.step='1';
+        const parsed=new Date(record[header] || '');
+        input.value=Number.isNaN(parsed.getTime()) ? String(record[header] || '').slice(0,19) : new Date(parsed.getTime()-parsed.getTimezoneOffset()*60000).toISOString().slice(0,19);
+      }else input.value=record[header] == null ? '' : String(record[header]);
+    }
+    input.dataset.field=header;
     if (header==='ID' && input.value) input.readOnly=true;
     label.append(caption,input);fields.appendChild(label);
+    if(header==='TargetDateTime'){const hint=document.createElement('small');hint.textContent='Enter the public date and time in Pakistan Standard Time.';label.appendChild(hint);}
   });
   const save=document.createElement('button');save.type='submit';save.className='resource-button';save.textContent='Save record';
   form.append(fields,save);form.onsubmit=event=>{event.preventDefault();adminSaveEditor(save);};panel.hidden=false;panel.scrollIntoView({behavior:'smooth',block:'start'});

@@ -1,18 +1,18 @@
-const CACHE_NAME = 'icp-portal-shell-20260926-v5';
+const CACHE_NAME = 'icp-portal-shell-20260927-v6';
 const SHELL_ASSETS = [
   './',
   './index.html',
   './offline.html',
-  './manifest.webmanifest?v=20260926-portal-suite',
+  './manifest.webmanifest?v=20260927-countdown-suite',
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png',
   './assets/icons/icon-maskable-512.png',
-  './css/style.css?v=20260926-portal-suite',
-  './js/app.js?v=20260926-portal-suite',
-  './js/mdcat.js?v=20260926-portal-suite',
-  './js/mdcat-study.js?v=20260926-portal-suite',
-  './js/mdcat-account.js?v=20260926-portal-suite',
-  './js/portal-extras.js?v=20260926-portal-suite'
+  './css/style.css?v=20260927-countdown-suite',
+  './js/app.js?v=20260927-countdown-suite',
+  './js/mdcat.js?v=20260927-countdown-suite',
+  './js/mdcat-study.js?v=20260927-countdown-suite',
+  './js/mdcat-account.js?v=20260927-countdown-suite',
+  './js/portal-extras.js?v=20260927-countdown-suite'
 ];
 
 self.addEventListener('install', event => {

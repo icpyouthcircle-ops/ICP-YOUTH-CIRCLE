@@ -32,6 +32,7 @@ const CONFIG = {
     NOTIFICATION_PREFERENCES: 'Notification_Preferences',
     FAQS: 'FAQs',
     FEEDBACK: 'Feedback',
+    COUNTDOWNS: 'Countdowns',
     MDCAT_SUBJECTS: 'MDCAT_Subjects',
     MDCAT_UNITS: 'MDCAT_Units',
     MDCAT_CHAPTERS: 'MDCAT_Chapters',
@@ -844,6 +845,10 @@ function doGet(e) {
       return cachedPublicJsonResponse_('announcements',getPublicAnnouncements_,300);
     }
 
+    if (action === 'countdowns') {
+      return cachedPublicJsonResponse_('countdowns',getPublicCountdowns_,60);
+    }
+
     if (action === 'faqs') {
       return cachedPublicJsonResponse_('faqs',getPublicFAQs_,300);
     }
@@ -1137,6 +1142,22 @@ function getPublicAnnouncements_() {
     Priority: item.Priority,
     Featured: item.Featured
   }));
+}
+function getPublicCountdowns_() {
+  return getOptionalSheetData_(CONFIG.SHEETS.COUNTDOWNS)
+    .filter(item=>String(item.Status || '').trim().toLowerCase()==='active')
+    .map(item=>({
+      ID:String(item.ID || '').slice(0,120),
+      Title:String(item.Title || '').slice(0,240),
+      Description:String(item.Description || '').slice(0,1000),
+      TargetDateTime:item.TargetDateTime || '',
+      AfterMessage:String(item.AfterMessage || 'Result announced').slice(0,240),
+      OfficialURL:String(item.OfficialURL || '').slice(0,2000),
+      ButtonText:String(item.ButtonText || '').slice(0,80),
+      DisplayOrder:Number(item.DisplayOrder || 0)
+    }))
+    .filter(item=>item.ID && item.Title && item.TargetDateTime)
+    .sort((a,b)=>a.DisplayOrder-b.DisplayOrder || a.Title.localeCompare(b.Title));
 }
 function getPublicFAQs_() {
   const rows=getOptionalSheetData_(CONFIG.SHEETS.FAQS).filter(item=>String(item.Status == null ? 'Active' : item.Status).trim().toLowerCase()==='active');
@@ -1639,6 +1660,7 @@ const ADMIN_TABLES_ = [
   ['AI_TOOLS','AI tools','AIT'],['ISLAMIC_CONTENT','Islamic content','ISL'],['BLOG','Blog','BLOG'],
   ['NAVIGATION','Navigation','NAV'],['HOMEPAGE','Homepage','HOME'],['SOCIAL_LINKS','Social links','SOC'],
   ['SETTINGS','Settings','SET'],['SUBMISSIONS','Resource submissions','SUBM'],['HELP_DESK','Help desk','HELP'],
+  ['COUNTDOWNS','Public countdowns','COUNT'],
   ['FAQS','Frequently asked questions','FAQ'],['FEEDBACK','Anonymous feedback','FDBK'],
   ['TEST_CATALOG','Test catalog','TST'],['NOTIFICATIONS','Notifications','NTF'],
   ['MDCAT_SUBJECTS','MDCAT subjects','MDS'],['MDCAT_UNITS','MDCAT units','MDU'],
@@ -1677,7 +1699,7 @@ function adminAuthenticate_(token) {
 
 function adminManifest_(admin) {
   const spreadsheet=getSpreadsheet_();
-  const optional={TEST_CATALOG:true,NOTIFICATIONS:true,FAQS:true,FEEDBACK:true};
+  const optional={TEST_CATALOG:true,NOTIFICATIONS:true,FAQS:true,FEEDBACK:true,COUNTDOWNS:true};
   return {
     email:admin.email,
     role:admin.role,
@@ -1835,7 +1857,7 @@ function adminUploadPdf_(body,admin) {
 function adminClearPublicCache_() {
   try {
     const cache=CacheService.getScriptCache();
-    cache.removeAll(['icp-public-v1-portalData','icp-public-v1-portalBundle','icp-public-v1-searchIndex','icp-public-v1-mcqs','icp-public-v1-videos','icp-public-v1-admissions','icp-public-v1-scholarships','icp-public-v1-opportunities','icp-public-v1-announcements','icp-public-v1-faqs','icp-public-v1-aiTools','icp-public-v1-islamicContent','icp-public-v1-blog','icp-public-v1-entryTests','icp-public-v1-testCatalog','icp-public-v1-mdcatSubjects','icp-public-v1-mdcatTests','icp-public-v1-mdcatDailyPractice','icp-public-v1-mdcatUpdates']);
+    cache.removeAll(['icp-public-v1-portalData','icp-public-v1-portalBundle','icp-public-v1-searchIndex','icp-public-v1-mcqs','icp-public-v1-videos','icp-public-v1-admissions','icp-public-v1-scholarships','icp-public-v1-opportunities','icp-public-v1-announcements','icp-public-v1-countdowns','icp-public-v1-faqs','icp-public-v1-aiTools','icp-public-v1-islamicContent','icp-public-v1-blog','icp-public-v1-entryTests','icp-public-v1-testCatalog','icp-public-v1-mdcatSubjects','icp-public-v1-mdcatTests','icp-public-v1-mdcatDailyPractice','icp-public-v1-mdcatUpdates']);
   } catch (_) {}
 }
 
@@ -1937,7 +1959,8 @@ function setupPortalEnhancements() {
   const spreadsheet=getSpreadsheet_();
   const definitions=[
     [CONFIG.SHEETS.FAQS,['ID','Question','Answer','Category','DisplayOrder','Status','CreatedAt','UpdatedAt']],
-    [CONFIG.SHEETS.FEEDBACK,['ID','Category','Message','PageURL','Status','SubmittedAt','CreatedAt','UpdatedAt']]
+    [CONFIG.SHEETS.FEEDBACK,['ID','Category','Message','PageURL','Status','SubmittedAt','CreatedAt','UpdatedAt']],
+    [CONFIG.SHEETS.COUNTDOWNS,['ID','Title','Description','TargetDateTime','AfterMessage','OfficialURL','ButtonText','DisplayOrder','Status','CreatedAt','UpdatedAt']]
   ];
   definitions.forEach(([name,headers])=>{
     let sheet=spreadsheet.getSheetByName(name);
@@ -1948,7 +1971,7 @@ function setupPortalEnhancements() {
     if (new Set(actual).size!==actual.length || missing.length) mdcatError_('SETUP_REQUIRED',name+' is missing required headers: '+missing.join(', ')+'.');
     sheet.setFrozenRows(1);
   });
-  return 'FAQs and Feedback are ready for the public portal and admin dashboard.';
+  return 'FAQs, Feedback and Public Countdowns are ready for the public portal and admin dashboard.';
 }
 
 // Run once from the Apps Script editor. Never called by the public website.

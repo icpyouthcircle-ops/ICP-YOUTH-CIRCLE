@@ -13,8 +13,13 @@ The setup function preserves existing sheets and creates:
 
 - `FAQs`: `ID Question Answer Category DisplayOrder Status CreatedAt UpdatedAt`
 - `Feedback`: `ID Category Message PageURL Status SubmittedAt CreatedAt UpdatedAt`
+- `Countdowns`: `ID Title Description TargetDateTime AfterMessage OfficialURL ButtonText DisplayOrder Status CreatedAt UpdatedAt`
 
-Both sections appear automatically in the private admin dashboard after setup.
+All three sections appear automatically in the private admin dashboard after setup.
+
+## Publish or hide the homepage countdown
+
+Open **Admin → Public countdowns** and create a record. Enter `TargetDateTime` in Pakistan Standard Time. Set `Status` to `Active` to publish it. The homepage displays exact days, hours, minutes and seconds. At the target time, it automatically shows `AfterMessage`, such as **Result announced**. Use **Archive** to hide it immediately. If several records are active, the record with the lowest `DisplayOrder` is shown.
 
 ## Publish an FAQ
 

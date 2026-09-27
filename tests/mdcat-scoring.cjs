@@ -69,6 +69,6 @@ assert.equal(searchIndex.success,true);assert.ok(searchIndex.data.some(row=>row.
 assert.equal(JSON.stringify(searchIndex).includes('CorrectOption'),false);assert.equal(JSON.stringify(searchIndex).includes('Private demo explanation'),false);
 const source=fs.readFileSync(path.join(__dirname,'../backend/Code.gs'),'utf8');new vm.Script(source);
 const exposed=[...source.matchAll(/^function (\w+)\(/gm)].map(match=>match[1]).filter(name=>!name.endsWith('_'));
-assert.deepEqual(exposed,['doGet','doPost']);
+assert.deepEqual(exposed,['doGet','doPost','setupPortalEnhancements']);
 assert.equal((source.match(/function getPublicMDCATSubjects_\(/g)||[]).length,1);
 console.log('PASS server: provider-validated identity/claims; ownership; no pre-submit keys; server scoring and immutable snapshots; weighted/negative marks; late/invalid/duplicate submissions; idempotency and interrupted-save recovery; progress isolation; test/daily/topic selection; private helper boundary; syntax.');

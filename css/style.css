@@ -34,15 +34,24 @@
 .loading span { color: #64748b; }
 .home-tools { padding-top: 28px; padding-bottom: 0; }
 .home-tools[hidden] { display: none; }
-.home-tools-grid { display: grid; gap: 20px; }
-.home-tool-card { display: grid; grid-template-columns: minmax(0,1fr) minmax(300px,.85fr); gap: 28px; align-items: center; padding: 28px; border: 1px solid #e5e7eb; border-radius: 18px; background: #fff; box-shadow: 0 12px 32px rgba(15,23,42,.05); }
-.home-tool-card h3 { margin: 8px 0; font-size: 25px; }
-.home-tool-card p { margin: 0; color: #64748b; line-height: 1.55; }
 .home-tool-eyebrow { color: #991b2f; font-size: 11px; font-weight: 800; letter-spacing: .15em; }
-.countdown-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.countdown-form label { display: grid; gap: 7px; color: #475569; font-size: 13px; font-weight: 700; }
-.countdown-form input,.faq-search { width: 100%; padding: 12px 13px; border: 1px solid #dbe0e6; border-radius: 10px; background: #fff; color: #172033; font: inherit; }
-.countdown-form > div { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 10px; }
+.public-countdown-card { position: relative; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 34px; align-items: center; overflow: hidden; padding: 30px; border: 1px solid #e4e8ef; border-radius: 20px; background: linear-gradient(135deg,#fff 0%,#fff 65%,#fff7f8 100%); box-shadow: 0 16px 42px rgba(15,23,42,.07); }
+.public-countdown-card::before { content: ''; position: absolute; top: 0; left: 0; width: 5px; height: 100%; background: #b51635; }
+.public-countdown-copy { min-width: 0; }
+.public-countdown-copy h2 { margin: 8px 0 9px; color: #172033; font-size: clamp(24px,3vw,34px); line-height: 1.15; }
+.public-countdown-description,.public-countdown-target { margin: 0; color: #64748b; line-height: 1.6; }
+.public-countdown-target { margin-top: 8px; font-size: 13px; font-weight: 700; }
+.public-countdown-clock { display: grid; grid-template-columns: repeat(4,minmax(78px,1fr)); gap: 10px; }
+.public-countdown-clock[hidden] { display: none; }
+.public-countdown-clock > div { min-width: 78px; padding: 14px 10px 12px; border: 1px solid #eadde0; border-radius: 13px; background: rgba(255,255,255,.92); text-align: center; box-shadow: 0 8px 20px rgba(153,27,47,.07); }
+.public-countdown-clock strong { display: block; color: #991b2f; font-size: 28px; font-variant-numeric: tabular-nums; line-height: 1; }
+.public-countdown-clock span { display: block; margin-top: 7px; color: #64748b; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.public-countdown-announced { display: flex; align-items: center; gap: 12px; min-width: 310px; padding: 19px 22px; border: 1px solid #b8dec6; border-radius: 15px; background: #f0fdf4; color: #166534; }
+.public-countdown-announced[hidden] { display: none; }
+.public-countdown-announced span { display: grid; flex: 0 0 36px; width: 36px; height: 36px; place-items: center; border-radius: 50%; background: #15803d; color: #fff; font-size: 20px; }
+.public-countdown-announced strong { font-size: 20px; line-height: 1.3; }
+.public-countdown-card.is-announced::before { background: #15803d; }
+.faq-search { width: 100%; padding: 12px 13px; border: 1px solid #dbe0e6; border-radius: 10px; background: #fff; color: #172033; font: inherit; }
 .secondary-button,.footer-install-button { border: 1px solid #dbe0e6; border-radius: 9px; padding: 11px 15px; background: #fff; color: #334155; font: inherit; font-weight: 700; cursor: pointer; }
 .footer-install-button { margin-top: 12px; }
 .footer-install-button.is-ready { border-color: #fff; background: transparent; color: #fff; }
@@ -64,12 +73,19 @@
 .faq-item summary { cursor: pointer; color: #172033; font-weight: 750; line-height: 1.45; }
 .faq-item .resource-badge { display: inline-block; margin-top: 14px; }
 .faq-item p { margin: 12px 0 0; color: #475569; line-height: 1.7; white-space: pre-wrap; }
-.portal-share-button { border: 1px solid #991b2f; background: transparent; color: #991b2f; }
-.portal-share-button:hover,.portal-share-button:focus-visible { background: #fceef0; }
+.portal-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 18px; }
+.portal-card-actions .resource-button { margin: 0; }
+.portal-share-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 42px; margin: 0; padding: 9px 13px; border: 1px solid #d7dce4; border-radius: 9px; background: #fff; color: #475569; box-shadow: none; font: inherit; font-size: 13px; font-weight: 750; cursor: pointer; transition: border-color .2s ease,background .2s ease,color .2s ease,transform .2s ease; }
+.portal-share-button svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
+.portal-share-button:hover,.portal-share-button:focus-visible { border-color: #991b2f; background: #fff7f8; color: #991b2f; transform: translateY(-1px); }
 
 @media (max-width: 760px) {
-  .home-tool-card { grid-template-columns: 1fr; padding: 22px; }
-  .countdown-form { grid-template-columns: 1fr; }
+  .public-countdown-card { grid-template-columns: 1fr; gap: 22px; padding: 24px 20px; }
+  .public-countdown-clock { grid-template-columns: repeat(4,minmax(0,1fr)); gap: 7px; }
+  .public-countdown-clock > div { min-width: 0; padding: 12px 5px 10px; }
+  .public-countdown-clock strong { font-size: 23px; }
+  .public-countdown-clock span { font-size: 8px; }
+  .public-countdown-announced { min-width: 0; width: 100%; }
   .friday-reminder { align-items: flex-start; flex-direction: column; padding: 16px 20px; }
   .welcome-tour-card { padding: 24px; }
 }
