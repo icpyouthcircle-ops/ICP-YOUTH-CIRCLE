@@ -88,7 +88,6 @@ function renderMDCATBreadcrumb(items=[]) {
 function openMDCATHub(options={}) {
   document.getElementById('homeHero').style.display = 'none';
   document.getElementById('homeExplore').style.display = 'none';
-  if(typeof setHomePriorityVisible==='function')setHomePriorityVisible(false);
   const homeTools=document.getElementById('homeTools');if(homeTools)homeTools.hidden=true;
   document.getElementById('dynamicPage').style.display = 'none';
   document.getElementById('mdcatHub').hidden = false;

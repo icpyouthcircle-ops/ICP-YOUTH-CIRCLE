@@ -1,4 +1,4 @@
-const CACHE_NAME = 'icp-portal-shell-20261013-v9';
+const CACHE_NAME = 'icp-portal-shell-20261013-v8';
 const SHELL_ASSETS = [
   './',
   './index.html',
@@ -7,8 +7,8 @@ const SHELL_ASSETS = [
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png',
   './assets/icons/icon-maskable-512.png',
-  './css/style.css?v=20261013-verified-info',
-  './js/app.js?v=20261013-verified-info',
+  './css/style.css?v=20260927-publishing-suite',
+  './js/app.js?v=20261013-startup-fix',
   './js/mdcat.js?v=20260927-publishing-suite',
   './js/mdcat-study.js?v=20260927-publishing-suite',
   './js/mdcat-account.js?v=20260927-publishing-suite',
