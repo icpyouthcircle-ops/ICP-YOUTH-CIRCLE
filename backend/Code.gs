@@ -1967,6 +1967,8 @@ const ICP_AI_ = {
   maxDailyMessages: 30,
   maxSources: 8,
   defaultModel: 'gpt-5.4-mini',
+  defaultGeminiModel: 'gemini-3.5-flash',
+  providers: ['Auto','OpenAI','Gemini'],
   modes: ['Explain','Summarize','Solve','Quiz Me','Check My Answer','Translate','Find Resources','Study Plan'],
   languages: ['English','Urdu','Pashto']
 };
@@ -1983,12 +1985,16 @@ function aiSettings_() {
   const apiKey=String(properties.getProperty('OPENAI_API_KEY') || '').trim();
   const model=String(properties.getProperty('ICP_AI_MODEL') || ICP_AI_.defaultModel).trim();
   const enabled=properties.getProperty('ICP_AI_ENABLED')==='true' && /^sk-[A-Za-z0-9_-]{20,}$/.test(apiKey);
-  return {apiKey:apiKey,model:model,enabled:enabled};
+  const geminiApiKey=String(properties.getProperty('GEMINI_API_KEY') || '').trim();
+  const geminiModel=String(properties.getProperty('ICP_GEMINI_MODEL') || ICP_AI_.defaultGeminiModel).trim().replace(/^models\//,'');
+  const geminiEnabled=properties.getProperty('ICP_GEMINI_ENABLED')==='true' && geminiApiKey.length>=20 && geminiModel.length>0;
+  return {apiKey:apiKey,model:model,enabled:enabled,geminiApiKey:geminiApiKey,geminiModel:geminiModel,geminiEnabled:geminiEnabled};
 }
 
 function aiPublicConfig_() {
   const settings=aiSettings_();
-  return {enabled:settings.enabled,version:1,modes:ICP_AI_.modes,languages:ICP_AI_.languages,requiresSignIn:true,dailyLimit:ICP_AI_.maxDailyMessages};
+  const availableProviders=[];if(settings.enabled)availableProviders.push('OpenAI');if(settings.geminiEnabled)availableProviders.push('Gemini');
+  return {enabled:availableProviders.length>0,version:2,providers:ICP_AI_.providers,availableProviders:availableProviders,modes:ICP_AI_.modes,languages:ICP_AI_.languages,requiresSignIn:true,dailyLimit:ICP_AI_.maxDailyMessages};
 }
 
 function aiTokenize_(value) {
@@ -2061,10 +2067,7 @@ function aiOutputText_(response) {
   return '';
 }
 
-function aiGenerate_(user,body,conversation,sources,history) {
-  const settings=aiSettings_();
-  if(!settings.enabled)mdcatError_('NOT_CONFIGURED','ICP AI Assistant is not enabled yet.');
-  aiModerate_(body.message,settings);
+function aiPrompt_(body,conversation,sources,history) {
   const sourcePack=sources.length ? sources.map(source=>'['+source.id+'] '+source.kind+': '+source.title+'\n'+source.description+'\nRoute: #/'+source.route).join('\n\n') : 'No matching verified portal sources were found.';
   const verifiedOnly=body.verifiedOnly!==false;
   const instructions=[
@@ -2079,32 +2082,81 @@ function aiGenerate_(user,body,conversation,sources,history) {
   ].join('\n');
   const conversationText=history.slice(-ICP_AI_.maxHistoryMessages).map(row=>(String(row.Role)==='assistant'?'Assistant: ':'Student: ')+String(row.Content || '').slice(0,3000)).join('\n\n');
   const input='Conversation title: '+conversation.Title+'\n\nRecent conversation:\n'+(conversationText || 'No previous messages.')+'\n\nStudent request:\n'+body.message+'\n\nVerified ICP source pack:\n'+sourcePack;
+  return {instructions:instructions,input:input};
+}
+
+function aiNormalizeResult_(parsed,sources,provider) {
+  if(!parsed || typeof parsed!=='object' || Array.isArray(parsed))mdcatError_('AI_UNAVAILABLE','The AI returned an incomplete response. Please try again.');
+  const allowed=new Set(sources.map(source=>source.id));
+  parsed.cited_source_ids=Array.isArray(parsed.cited_source_ids)?[...new Set(parsed.cited_source_ids.filter(id=>allowed.has(String(id))).map(String))]:[];
+  parsed.follow_up_questions=Array.isArray(parsed.follow_up_questions)?parsed.follow_up_questions.slice(0,3).map(value=>String(value).slice(0,180)):[];
+  parsed.quiz=Array.isArray(parsed.quiz)?parsed.quiz.slice(0,5):[];parsed.study_plan=Array.isArray(parsed.study_plan)?parsed.study_plan.slice(0,14):[];
+  parsed.answer=aiText_(parsed.answer,'AI response',1,12000);parsed.grounded=Boolean(parsed.grounded && parsed.cited_source_ids.length);
+  parsed.confidence=['high','medium','low'].includes(parsed.confidence)?parsed.confidence:'low';
+  parsed.sources=sources.filter(source=>parsed.cited_source_ids.includes(source.id));parsed.provider=provider;
+  return parsed;
+}
+
+function aiGenerateOpenAI_(body,sources,prompt,settings) {
+  if(!settings.enabled)mdcatError_('NOT_CONFIGURED','OpenAI is not enabled for ICP AI Assistant.');
+  aiModerate_(body.message,settings);
+  const instructions=prompt.instructions,input=prompt.input;
   const request={model:settings.model,store:false,instructions:instructions,input:input,max_output_tokens:2600,text:{format:{type:'json_schema',name:'icp_ai_answer',strict:true,schema:aiSchema_()}}};
   const response=UrlFetchApp.fetch('https://api.openai.com/v1/responses',{method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+settings.apiKey},payload:JSON.stringify(request),muteHttpExceptions:true});
   if(response.getResponseCode()===429)mdcatError_('RATE_LIMIT','The AI service is busy. Please wait and try again.');
   if(response.getResponseCode()>=500)mdcatError_('AI_UNAVAILABLE','The AI service is temporarily unavailable.');
   if(response.getResponseCode()!==200)mdcatError_('AI_CONFIGURATION','The AI service configuration needs administrator attention.');
   let raw,parsed;try{raw=JSON.parse(response.getContentText());parsed=JSON.parse(aiOutputText_(raw));}catch(_){mdcatError_('AI_UNAVAILABLE','The AI returned an incomplete response. Please try again.');}
-  const allowed=new Set(sources.map(source=>source.id));
-  parsed.cited_source_ids=Array.isArray(parsed.cited_source_ids)?[...new Set(parsed.cited_source_ids.filter(id=>allowed.has(String(id))))]:[];
-  parsed.follow_up_questions=Array.isArray(parsed.follow_up_questions)?parsed.follow_up_questions.slice(0,3).map(value=>String(value).slice(0,180)):[];
-  parsed.quiz=Array.isArray(parsed.quiz)?parsed.quiz.slice(0,5):[];parsed.study_plan=Array.isArray(parsed.study_plan)?parsed.study_plan.slice(0,14):[];
-  parsed.answer=aiText_(parsed.answer,'AI response',1,12000);parsed.grounded=Boolean(parsed.grounded && parsed.cited_source_ids.length);
-  parsed.confidence=['high','medium','low'].includes(parsed.confidence)?parsed.confidence:'low';
-  parsed.sources=sources.filter(source=>parsed.cited_source_ids.includes(source.id));
-  return parsed;
+  return aiNormalizeResult_(parsed,sources,'OpenAI');
+}
+
+function aiGeminiOutputText_(response) {
+  const candidates=response && Array.isArray(response.candidates)?response.candidates:[];
+  const candidate=candidates[0] || {};const parts=candidate.content && Array.isArray(candidate.content.parts)?candidate.content.parts:[];
+  return parts.filter(part=>typeof part.text==='string').map(part=>part.text).join('');
+}
+
+function aiGenerateGemini_(body,sources,prompt,settings) {
+  if(!settings.geminiEnabled)mdcatError_('NOT_CONFIGURED','Gemini is not enabled for ICP AI Assistant.');
+  const request={
+    systemInstruction:{parts:[{text:prompt.instructions}]},
+    contents:[{role:'user',parts:[{text:prompt.input}]}],
+    generationConfig:{temperature:0.3,maxOutputTokens:2600,responseMimeType:'application/json',responseJsonSchema:aiSchema_()}
+  };
+  const url='https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(settings.geminiModel)+':generateContent';
+  const response=UrlFetchApp.fetch(url,{method:'post',contentType:'application/json',headers:{'x-goog-api-key':settings.geminiApiKey},payload:JSON.stringify(request),muteHttpExceptions:true});
+  const status=response.getResponseCode();let raw={};try{raw=JSON.parse(response.getContentText());}catch(_){}
+  if(status===429)mdcatError_('RATE_LIMIT','Gemini is busy. Please wait and try again.');
+  if(status>=500)mdcatError_('AI_UNAVAILABLE','Gemini is temporarily unavailable.');
+  const blocked=raw && raw.promptFeedback && raw.promptFeedback.blockReason || raw && raw.candidates && raw.candidates[0] && raw.candidates[0].finishReason==='SAFETY';
+  if(blocked)mdcatError_('CONTENT_BLOCKED','Please rewrite the request using safe, respectful academic language.');
+  if(status!==200)mdcatError_('AI_CONFIGURATION','The Gemini configuration needs administrator attention.');
+  let parsed;try{parsed=JSON.parse(aiGeminiOutputText_(raw));}catch(_){mdcatError_('AI_UNAVAILABLE','Gemini returned an incomplete response. Please try again.');}
+  return aiNormalizeResult_(parsed,sources,'Gemini');
+}
+
+function aiGenerate_(user,body,conversation,sources,history) {
+  const settings=aiSettings_();const provider=String(body.provider || 'Auto');const prompt=aiPrompt_(body,conversation,sources,history);
+  if(provider==='OpenAI')return aiGenerateOpenAI_(body,sources,prompt,settings);
+  if(provider==='Gemini')return aiGenerateGemini_(body,sources,prompt,settings);
+  if(!settings.enabled && !settings.geminiEnabled)mdcatError_('NOT_CONFIGURED','ICP AI Assistant is not enabled yet.');
+  if(settings.enabled){
+    try{return aiGenerateOpenAI_(body,sources,prompt,settings);}
+    catch(error){if(!settings.geminiEnabled || !['AI_UNAVAILABLE','AI_CONFIGURATION','RATE_LIMIT'].includes(error.mdcatCode))throw error;}
+  }
+  return aiGenerateGemini_(body,sources,prompt,settings);
 }
 
 function aiChat_(user,body) {
   const message=aiText_(body.message,'Message',2,ICP_AI_.maxPrompt);
-  const mode=String(body.mode || 'Explain');const language=String(body.language || 'English');
-  if(!ICP_AI_.modes.includes(mode) || !ICP_AI_.languages.includes(language))mdcatError_('BAD_REQUEST','Choose a valid assistant mode and language.');
+  const mode=String(body.mode || 'Explain');const language=String(body.language || 'English');const provider=String(body.provider || 'Auto');
+  if(!ICP_AI_.modes.includes(mode) || !ICP_AI_.languages.includes(language) || !ICP_AI_.providers.includes(provider))mdcatError_('BAD_REQUEST','Choose a valid assistant provider, mode and language.');
   const requestId=String(body.requestId || '').trim();
   if(!/^[A-Za-z0-9-]{20,80}$/.test(requestId))mdcatError_('BAD_REQUEST','The request reference is invalid.');
   const existing=getSheetData_(CONFIG.SHEETS.AI_MESSAGES).find(row=>String(row.UserID)===user.uid && String(row.RequestID)===requestId && String(row.Role)==='assistant');
   if(existing)return {conversationId:String(existing.ConversationID),message:aiMessagePublic_(existing)};
   aiRateLimit_(user);
-  const normalized=Object.assign({},body,{message:message,mode:mode,language:language});
+  const normalized=Object.assign({},body,{message:message,mode:mode,language:language,provider:provider});
   const conversation=aiConversation_(user,body.conversationId,normalized);const history=aiMessageRows_(user,conversation.ID);const sources=aiSources_(message);
   const result=aiGenerate_(user,normalized,conversation,sources,history);const now=new Date().toISOString();
   const userMessage={ID:'AIM-'+Utilities.getUuid(),ConversationID:conversation.ID,UserID:user.uid,RequestID:requestId,Role:'user',Content:message,PayloadJSON:'{}',Saved:'No',Status:'Active',CreatedAt:now,UpdatedAt:now};

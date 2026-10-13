@@ -25,7 +25,7 @@ function createBackend(){
   const headers=[...new Set(rows.flatMap(Object.keys))];
   sheets.set(name,new Sheet(name,[headers,...rows.map(row=>headers.map(key=>row[key]??''))]));
  }
- const props={MDCAT_SCORING_ENABLED:'true',MDCAT_FIREBASE_CONFIG:JSON.stringify({apiKey:'fake-public-key',authDomain:'demo.firebaseapp.com',projectId:'demo-project',appId:'fake-app-id'}),OPENAI_API_KEY:'sk-test-0000000000000000000000000000',ICP_AI_MODEL:'gpt-5.4-mini',ICP_AI_ENABLED:'true'};
+ const props={MDCAT_SCORING_ENABLED:'true',MDCAT_FIREBASE_CONFIG:JSON.stringify({apiKey:'fake-public-key',authDomain:'demo.firebaseapp.com',projectId:'demo-project',appId:'fake-app-id'}),OPENAI_API_KEY:'sk-test-0000000000000000000000000000',ICP_AI_MODEL:'gpt-5.4-mini',ICP_AI_ENABLED:'true',GEMINI_API_KEY:'AIza-test-0000000000000000000000000000',ICP_GEMINI_MODEL:'gemini-3.5-flash',ICP_GEMINI_ENABLED:'true'};
  class FakeDate extends Date{constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}}
  const context=vm.createContext({console,Date:FakeDate,SpreadsheetApp:{getActiveSpreadsheet:()=>({getSheetByName:name=>sheets.get(name),insertSheet:name=>{const sheet=new Sheet(name);sheets.set(name,sheet);return sheet;}}),flush:()=>{}},
   PropertiesService:{getScriptProperties:()=>({getProperty:key=>props[key]||null,setProperty:(key,value)=>{props[key]=String(value);}})},
@@ -39,6 +39,11 @@ function createBackend(){
     const body=JSON.parse(options.payload);const sourceIds=[...body.input.matchAll(/\[(S\d+)\]/g)].map(match=>match[1]);
     const answer={answer:sourceIds.length?'Verified guidance from ICP ['+sourceIds[0]+'].':'No matching verified information is available.',grounded:Boolean(sourceIds.length),confidence:sourceIds.length?'high':'low',cited_source_ids:sourceIds.slice(0,1),follow_up_questions:['Would you like a short quiz?'],quiz:[],study_plan:[]};
     return {getResponseCode:()=>200,getContentText:()=>JSON.stringify({output:[{content:[{type:'output_text',text:JSON.stringify(answer)}]}]})};
+   }
+   if(url.startsWith('https://generativelanguage.googleapis.com/v1beta/models/')){
+    const body=JSON.parse(options.payload);const input=body.contents[0].parts[0].text;const sourceIds=[...input.matchAll(/\[(S\d+)\]/g)].map(match=>match[1]);
+    const answer={answer:sourceIds.length?'Gemini guidance from ICP ['+sourceIds[0]+'].':'No matching verified information is available.',grounded:Boolean(sourceIds.length),confidence:sourceIds.length?'high':'low',cited_source_ids:sourceIds.slice(0,1),follow_up_questions:['Would you like a short quiz?'],quiz:[],study_plan:[]};
+    return {getResponseCode:()=>200,getContentText:()=>JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify(answer)}]},finishReason:'STOP'}]})};
    }
    throw new Error('Unexpected outbound request: '+url);
   }},

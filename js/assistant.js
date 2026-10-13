@@ -1,5 +1,7 @@
 const ICP_AI_DEFAULTS={
   enabled:false,
+  providers:['Auto','OpenAI','Gemini'],
+  availableProviders:[],
   modes:['Explain','Summarize','Solve','Quiz Me','Check My Answer','Translate','Find Resources','Study Plan'],
   languages:['English','Urdu','Pashto'],
   dailyLimit:30
@@ -166,6 +168,7 @@ function aiMessageNode(message){
   else{
     const payload=message.payload||{};const meta=aiEl('div','icp-ai-response-meta');
     const grounded=Boolean(payload.grounded);meta.append(aiEl('span','icp-ai-badge '+(grounded?'is-grounded':'is-guidance'),grounded?'✓ Verified sources':'General guidance'));
+    if(payload.provider)meta.append(aiEl('span','icp-ai-provider-badge',payload.provider));
     if(payload.confidence)meta.append(aiEl('span','icp-ai-confidence','Confidence: '+payload.confidence));body.appendChild(meta);
     const answer=aiEl('div','icp-ai-answer');aiRenderRichText(answer,message.content);body.appendChild(answer);
     if(Array.isArray(payload.sources)&&payload.sources.length){
@@ -231,7 +234,7 @@ async function aiSend(){
   try{
     const identity=await aiEnsureIdentity(false);if(!identity.auth.currentUser){aiShowSignIn();return;}
     userMessage={id:'local-'+Date.now(),role:'user',content:message,payload:{},saved:false};icpAssistantState.messages.push(userMessage);aiRenderMessages();input.value='';aiResizeComposer(input);aiSetBusy(true);aiSetStatus('Reviewing verified ICP sources and preparing an answer…');
-    const data=await mdcatPrivateRequest('aiChat',{conversationId:icpAssistantState.conversationId||undefined,message,mode:document.getElementById('icpAiMode').value,language:document.getElementById('icpAiLanguage').value,verifiedOnly:document.getElementById('icpAiVerified').checked,requestId:aiRequestId()});
+    const data=await mdcatPrivateRequest('aiChat',{conversationId:icpAssistantState.conversationId||undefined,message,provider:document.getElementById('icpAiProvider').value,mode:document.getElementById('icpAiMode').value,language:document.getElementById('icpAiLanguage').value,verifiedOnly:document.getElementById('icpAiVerified').checked,requestId:aiRequestId()});
     icpAssistantState.conversationId=data.conversationId;icpAssistantState.messages.push(data.message);aiRenderMessages();await aiLoadHistory();aiSetStatus('');
   }catch(error){icpAssistantState.messages=icpAssistantState.messages.filter(item=>item.id!==userMessage?.id);aiRenderMessages();input.value=message;aiResizeComposer(input);aiSetStatus(error.message||'The assistant could not answer. Please try again.','error');}
   finally{aiSetBusy(false);}
@@ -265,10 +268,12 @@ function aiBuildShell(content){
   const header=aiEl('header','icp-ai-header');const historyButton=aiIconButton('Open conversation history','☰',()=>shell.classList.add('is-history-open'));historyButton.classList.add('icp-ai-history-toggle');
   const heading=aiEl('div','icp-ai-heading');heading.append(aiEl('strong',null,'ICP AI'),aiEl('span',null,'Study assistant'));
   const controls=aiEl('div','icp-ai-controls');
+  const provider=document.createElement('select');provider.id='icpAiProvider';provider.setAttribute('aria-label','AI provider');
+  const available=new Set(icpAssistantState.config.availableProviders||[]);icpAssistantState.config.providers.forEach(value=>{const option=aiEl('option',null,value);option.value=value;option.disabled=value!=='Auto'&&!available.has(value);provider.appendChild(option);});
   const mode=document.createElement('select');mode.id='icpAiMode';mode.setAttribute('aria-label','Assistant mode');icpAssistantState.config.modes.forEach(value=>{const option=aiEl('option',null,value);option.value=value;mode.appendChild(option);});
   const language=document.createElement('select');language.id='icpAiLanguage';language.setAttribute('aria-label','Answer language');icpAssistantState.config.languages.forEach(value=>{const option=aiEl('option',null,value);option.value=value;language.appendChild(option);});
   const verified=aiEl('label','icp-ai-verified');const check=document.createElement('input');check.type='checkbox';check.id='icpAiVerified';check.checked=true;verified.append(check,document.createTextNode(' Verified ICP sources only'));
-  controls.append(mode,language,verified);header.append(historyButton,heading,controls);
+  controls.append(provider,mode,language,verified);header.append(historyButton,heading,controls);
   const feed=aiEl('div','icp-ai-messages');feed.id='icpAiMessages';feed.setAttribute('role','log');feed.setAttribute('aria-live','polite');
   const composerArea=aiEl('div','icp-ai-composer-area');const status=aiEl('p','icp-ai-status');status.id='icpAiStatus';status.setAttribute('role','status');
   const composer=aiEl('div','icp-ai-composer');const input=document.createElement('textarea');input.id='icpAiInput';input.rows=1;input.maxLength=4000;input.placeholder='Message ICP AI Assistant';input.setAttribute('aria-label','Message ICP AI Assistant');input.oninput=()=>aiResizeComposer(input);input.onkeydown=event=>{if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();aiSend();}};

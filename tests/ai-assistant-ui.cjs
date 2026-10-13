@@ -10,7 +10,7 @@ const {pathToFileURL}=require('node:url');
     await page.route('https://script.google.com/**',async route=>{
       const action=new URL(route.request().url()).searchParams.get('action');
       if(action==='portalData')return route.fulfill({json:{success:true,data:{settings:{},navigation:[],categories:[]}}});
-      if(action==='aiAssistantConfig')return route.fulfill({json:{success:true,data:{enabled:true,modes:['Explain','Summarize','Solve','Quiz Me','Check My Answer','Translate','Find Resources','Study Plan'],languages:['English','Urdu','Pashto'],dailyLimit:30}}});
+      if(action==='aiAssistantConfig')return route.fulfill({json:{success:true,data:{enabled:true,providers:['Auto','OpenAI','Gemini'],availableProviders:['OpenAI','Gemini'],modes:['Explain','Summarize','Solve','Quiz Me','Check My Answer','Translate','Find Resources','Study Plan'],languages:['English','Urdu','Pashto'],dailyLimit:30}}});
       if(['publicNotifications','countdowns'].includes(action))return route.fulfill({json:{success:true,data:[]}});
       if(action==='portalBundle')return route.fulfill({json:{success:true,data:{resources:[],mcqs:[],videos:[],admissions:[],scholarships:[],opportunities:[],announcements:[],aiTools:[],islamicContent:[],blog:[],entryTests:[]}}});
       return route.fulfill({json:{success:true,data:[]}});
@@ -20,9 +20,9 @@ const {pathToFileURL}=require('node:url');
     await page.evaluate(()=>{
       window.openMDCATHub=()=>{};window.openUserAccount=()=>{};window.initializePortalAccountState=async()=>{};
       window.mdcatLoadIdentity=async()=>({auth:{currentUser:{uid:'student'}},sdk:{}});
-      window.mdcatPrivateRequest=async(action,body)=>{
+      window.aiTestRequest=null;window.mdcatPrivateRequest=async(action,body)=>{
         if(action==='aiListConversations')return [];
-        if(action==='aiChat')return {conversationId:'AIC-1',message:{id:'AIM-1',role:'assistant',content:'## Cell structure\nCells contain <script>unsafe()</script> text and organized parts.',saved:false,payload:{grounded:true,confidence:'high',cited_source_ids:['S1'],sources:[{id:'S1',title:'Biology Cell Notes',kind:'Resource',route:'notes'}],follow_up_questions:['Quiz me on this topic'],quiz:[{question:'Which part contains genetic material?',options:['Nucleus','Cell wall'],correct_index:0,explanation:'The nucleus contains most genetic material.'}],study_plan:[]}}};
+        if(action==='aiChat'){window.aiTestRequest=body;return {conversationId:'AIC-1',message:{id:'AIM-1',role:'assistant',content:'## Cell structure\nCells contain <script>unsafe()</script> text and organized parts.',saved:false,payload:{provider:'Gemini',grounded:true,confidence:'high',cited_source_ids:['S1'],sources:[{id:'S1',title:'Biology Cell Notes',kind:'Resource',route:'notes'}],follow_up_questions:['Quiz me on this topic'],quiz:[{question:'Which part contains genetic material?',options:['Nucleus','Cell wall'],correct_index:0,explanation:'The nucleus contains most genetic material.'}],study_plan:[]}}};}
         if(action==='aiFeedback'||action==='aiSaveMessage')return {saved:true};
         return {conversation:{id:'AIC-1',title:'Cell structure',mode:'Explain',language:'English'},messages:[]};
       };
@@ -30,11 +30,13 @@ const {pathToFileURL}=require('node:url');
     });
     await page.getByRole('heading',{name:'How can I help you study?'}).waitFor();
     assert.equal(await page.locator('script[src*="assistant.js"]').count(),1);
+    await page.getByLabel('AI provider').selectOption('Gemini');
     await page.getByLabel('Assistant mode').selectOption('Explain');
     await page.getByLabel('Answer language').selectOption('Urdu');
     await page.getByLabel('Message ICP AI Assistant').fill('Explain cell structure');
     await page.getByRole('button',{name:'Send',exact:true}).click();
     await page.getByText('Biology Cell Notes',{exact:true}).waitFor();
+    assert.equal(await page.evaluate(()=>window.aiTestRequest.provider),'Gemini');await page.locator('.icp-ai-provider-badge',{hasText:'Gemini'}).waitFor();
     assert.equal(await page.locator('.icp-ai-answer script').count(),0,'Assistant content must render as text, never executable HTML.');
     assert.equal(await page.getByText('<script>unsafe()</script>',{exact:false}).count(),1);
     await page.getByText('Verified sources',{exact:false}).waitFor();
