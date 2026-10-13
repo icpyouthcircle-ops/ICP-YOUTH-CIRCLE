@@ -2074,7 +2074,8 @@ function qnaReport_(user,body) {
   return {id:id,status:'Pending Review'};
 }
 
-function setupQASystem_() {
+// Run once from the Apps Script editor to create the Student Q&A sheets.
+function setupQASystem() {
   const spreadsheet=getSpreadsheet_();
   const definitions=[
     [CONFIG.SHEETS.QNA_QUESTIONS,['ID','UserID','DisplayName','Subject','Title','Body','Tags','AuthorVerified','AuthorRole','Status','CreatedAt','UpdatedAt']],
