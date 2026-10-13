@@ -2001,10 +2001,30 @@ function aiTokenize_(value) {
   return [...new Set(String(value || '').toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/g,' ').split(/\s+/).filter(word=>word.length>2))];
 }
 
+function aiSourceCatalog_() {
+  const cache=CacheService.getScriptCache();const cacheKey='icp-ai-source-catalog-v2';
+  try{const cached=cache.get(cacheKey);if(cached){const rows=JSON.parse(cached);if(Array.isArray(rows))return rows;}}catch(_){}
+  const catalog=[];
+  const add=(kind,title,description,route,keywords)=>{
+    const cleanTitle=searchText_(title,240);if(!cleanTitle || catalog.length>=1200)return;
+    catalog.push({Kind:kind,Title:cleanTitle,Description:searchText_(description,500),Route:searchText_(route,120),Keywords:searchText_(keywords,500)});
+  };
+  searchRows_(()=>getPublicResources_('')).forEach(row=>add('Resource',row.Title,row.Description,({notes:'notes','past papers':'past-papers','study resources':'study-resources'}[String(row.Category||'').trim().toLowerCase()] || 'study'),[row.Category,row.Subject,row.Level,row.Institution,row.Year,row.ResourceType].join(' ')));
+  searchRows_(getPublicVideos_).forEach(row=>add('Video',row.Title,row.Description,'videos',[row.Category,row.Subject,row.Level,row.Platform].join(' ')));
+  searchRows_(getPublicAdmissions_).forEach(row=>add('Admission',row.Program || row.Institution,row.Description,'admissions',[row.Institution,row.DegreeLevel,row.AdmissionType,row.Eligibility,row.EntryTest].join(' ')));
+  searchRows_(getPublicScholarships_).forEach(row=>add('Scholarship',row.Name,row.Description,'scholarships',[row.Provider,row.Type,row.Country,row.Eligibility,row.Benefits].join(' ')));
+  searchRows_(getPublicOpportunities_).forEach(row=>add('Opportunity',row.Title,row.Description,'career',[row.Organization,row.Type,row.Location,row.Eligibility].join(' ')));
+  searchRows_(getPublicAnnouncements_).forEach(row=>add('Announcement',row.Title,row.Summary || row.Content,'updates',[row.Category,row.Priority].join(' ')));
+  searchRows_(getPublicEntryTests_).forEach(row=>add('Entry Test',row.Name,row.Description,row.Slug || 'entry-tests',[row.Organization,row.Eligibility].join(' ')));
+  searchRows_(getPublicFAQs_).forEach(row=>add('FAQ',row.Question,row.Answer,'faq',row.Category));
+  try{const packed=JSON.stringify(catalog);if(packed.length<90000)cache.put(cacheKey,packed,300);}catch(_){}
+  return catalog;
+}
+
 function aiSources_(query) {
   const words=aiTokenize_(query);
   if(!words.length)return [];
-  return getPublicSearchIndex_().map((row,index)=>{
+  return aiSourceCatalog_().map((row,index)=>{
     const title=String(row.Title || '').toLowerCase();
     const haystack=[row.Title,row.Description,row.Keywords,row.SubjectName,row.UnitName,row.ChapterName,row.Kind].join(' ').toLowerCase();
     let score=0;
