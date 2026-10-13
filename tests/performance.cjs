@@ -11,9 +11,11 @@ const {createBackend}=require('./scoring-harness.cjs');
     const page=await browser.newPage({viewport:{width:1280,height:900}});
     await page.addInitScript(()=>{ window.__ICP_ENABLE_PREFETCH__=true; });
     const requestCounts=new Map();
+    const requestTimes=new Map();
     await page.route('https://script.google.com/**',async route=>{
       const action=new URL(route.request().url()).searchParams.get('action');
       requestCounts.set(action,(requestCounts.get(action)||0)+1);
+      if(!requestTimes.has(action))requestTimes.set(action,Date.now());
       if(action==='portalData'){
         await new Promise(resolve=>setTimeout(resolve,2500));
         return route.fulfill({json:{success:true,data:{settings:{site_name:'Live title'},navigation:[],categories:[]}}});
@@ -29,6 +31,10 @@ const {createBackend}=require('./scoring-harness.cjs');
           announcements:[{ID:'ANN-1',Title:'Cached announcement',Category:'Notice',Summary:'Ready immediately',PublishDate:new Date().toISOString()}],
           aiTools:[],islamicContent:[],blog:[],entryTests:[]
         }}});
+      }
+      if(action==='resources'){
+        await new Promise(resolve=>setTimeout(resolve,1000));
+        return route.fulfill({json:{success:true,data:[]}});
       }
       return route.fulfill({json:{success:true,data:[]}});
     });
@@ -47,6 +53,18 @@ const {createBackend}=require('./scoring-harness.cjs');
     await page.getByRole('heading',{name:'Cached announcement',exact:true}).waitFor({timeout:400});
     assert.ok(Date.now()-clickStarted<450,'Cached section did not render immediately');
     assert.equal(requestCounts.get('portalBundle'),1,'Background warming did not request the portal bundle');
+    assert.ok(requestTimes.get('portalBundle')-started<1000,'Public bundle warming did not start immediately');
+
+    await page.evaluate(()=>{
+      const key='action=resources&category=Notes';
+      const cached={savedAt:Date.now()-2*60*60*1000,data:[{ID:'NOTE-STALE',Title:'Instant cached notes',Category:'Notes',Subject:'Physics',Status:'Active'}]};
+      localStorage.setItem('icp-public-module-v2:'+key,JSON.stringify(cached));
+      publicModuleMemory.set(key,cached);
+    });
+    const notesStarted=Date.now();
+    await page.evaluate(()=>handleNavigation({Slug:'notes',Label:'Notes'}));
+    await page.getByRole('heading',{name:'Instant cached notes',exact:true}).waitFor({timeout:400});
+    assert.ok(Date.now()-notesStarted<450,'Stale resources blocked navigation while refreshing');
 
     const accountSource=fs.readFileSync(path.join(__dirname,'../js/mdcat-account.js'),'utf8');
     assert.equal(accountSource.includes('?action=mdcatAccountConfig'),false);
@@ -63,6 +81,6 @@ const {createBackend}=require('./scoring-harness.cjs');
     const before=readSubjects();
     backend.change('MDCAT_Subjects','MDS-001',{Name:'Changed after cache'});
     assert.deepEqual(readSubjects(),before);
-    console.log('PASS performance: immediate startup; background module warming; instant cached navigation; background refresh; non-blocking account configuration; server public-data cache.');
+    console.log('PASS performance: immediate startup; eager bundle warming; instant fresh and stale navigation; background refresh; non-blocking account configuration; server public-data cache.');
   } finally { await browser.close(); }
 })().catch(error=>{console.error(error);process.exit(1);});
