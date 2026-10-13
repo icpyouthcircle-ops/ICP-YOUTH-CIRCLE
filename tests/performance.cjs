@@ -55,10 +55,12 @@ const {createBackend}=require('./scoring-harness.cjs');
     assert.equal(requestCounts.get('portalBundle'),1,'Background warming did not request the portal bundle');
     assert.ok(requestTimes.get('portalBundle')-started<1000,'Public bundle warming did not start immediately');
 
-    await page.evaluate(()=>localStorage.setItem('icp-public-module-v2:action=resources&category=Notes',JSON.stringify({
-      savedAt:Date.now()-2*60*60*1000,
-      data:[{ID:'NOTE-STALE',Title:'Instant cached notes',Category:'Notes',Subject:'Physics',Status:'Active'}]
-    })));
+    await page.evaluate(()=>{
+      const key='action=resources&category=Notes';
+      const cached={savedAt:Date.now()-2*60*60*1000,data:[{ID:'NOTE-STALE',Title:'Instant cached notes',Category:'Notes',Subject:'Physics',Status:'Active'}]};
+      localStorage.setItem('icp-public-module-v2:'+key,JSON.stringify(cached));
+      publicModuleMemory.set(key,cached);
+    });
     const notesStarted=Date.now();
     await page.evaluate(()=>handleNavigation({Slug:'notes',Label:'Notes'}));
     await page.getByRole('heading',{name:'Instant cached notes',exact:true}).waitFor({timeout:400});
