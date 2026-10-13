@@ -22,7 +22,7 @@ const {pathToFileURL}=require('node:url');
       window.mdcatLoadIdentity=async()=>({auth:{currentUser:{uid:'student'}},sdk:{}});
       window.aiTestRequest=null;window.mdcatPrivateRequest=async(action,body)=>{
         if(action==='aiListConversations')return [];
-        if(action==='aiChat'){window.aiTestRequest=body;return {conversationId:'AIC-1',message:{id:'AIM-1',role:'assistant',content:'## Cell structure\nCells contain <script>unsafe()</script> text and organized parts.',saved:false,payload:{provider:'Gemini',grounded:true,confidence:'high',cited_source_ids:['S1'],sources:[{id:'S1',title:'Biology Cell Notes',kind:'Resource',route:'notes'}],follow_up_questions:['Quiz me on this topic'],quiz:[{question:'Which part contains genetic material?',options:['Nucleus','Cell wall'],correct_index:0,explanation:'The nucleus contains most genetic material.'}],study_plan:[]}}};}
+        if(action==='aiChat'){window.aiTestRequest=body;return {conversationId:'AIC-1',message:{id:'AIM-1',role:'assistant',content:'## Cell structure\nCells contain <script>unsafe()</script>, **organized parts**, and `DNA`.\n```text\ncell → nucleus\n```',saved:false,payload:{provider:'Gemini',grounded:true,confidence:'high',cited_source_ids:['S1'],sources:[{id:'S1',title:'Biology Cell Notes',kind:'Resource',route:'notes'}],follow_up_questions:['Quiz me on this topic'],quiz:[{question:'Which part contains genetic material?',options:['Nucleus','Cell wall'],correct_index:0,explanation:'The nucleus contains most genetic material.'}],study_plan:[]}}};}
         if(action==='aiFeedback'||action==='aiSaveMessage')return {saved:true};
         return {conversation:{id:'AIC-1',title:'Cell structure',mode:'Explain',language:'English'},messages:[]};
       };
@@ -39,6 +39,7 @@ const {pathToFileURL}=require('node:url');
     assert.equal(await page.evaluate(()=>window.aiTestRequest.provider),'Gemini');await page.locator('.icp-ai-provider-badge',{hasText:'Gemini'}).waitFor();
     assert.equal(await page.locator('.icp-ai-answer script').count(),0,'Assistant content must render as text, never executable HTML.');
     assert.equal(await page.getByText('<script>unsafe()</script>',{exact:false}).count(),1);
+    assert.equal(await page.locator('.icp-ai-answer strong',{hasText:'organized parts'}).count(),1);assert.equal(await page.locator('.icp-ai-code-block code').count(),1);
     await page.getByText('Verified sources',{exact:false}).waitFor();
     await page.getByText('Quick quiz',{exact:true}).waitFor();
     await page.getByLabel('Nucleus').check();await page.getByRole('button',{name:'Check answer'}).click();await page.getByText('Correct.',{exact:false}).waitFor();
