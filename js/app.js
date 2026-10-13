@@ -4,16 +4,18 @@ const PORTAL_CACHE_KEY = 'icp-public-portal-v1';
 const PUBLIC_MODULE_CACHE_PREFIX = 'icp-public-module-v2:';
 const PUBLIC_MODULE_CACHE_TTL = 30 * 60 * 1000;
 const SCHEDULED_MODULE_CACHE_TTL = 60 * 1000;
+const PUBLIC_MODULE_STALE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 const SCHEDULED_PUBLIC_MODULES = new Set(['resources','scholarships','announcements','countdowns','publicNotifications']);
 const PUBLIC_NOTIFICATION_SEEN_KEY = 'icp-public-notifications-seen-v1';
 const PUBLIC_NOTIFICATION_LIFETIME = 24 * 60 * 60 * 1000;
 const PORTAL_MDCAT_SCRIPTS = [
-  'js/mdcat.js?v=20261013-lazy-performance',
-  'js/mdcat-study.js?v=20261013-lazy-performance',
-  'js/mdcat-account.js?v=20261013-lazy-performance'
+  'js/mdcat.js?v=20261013-speed-v2',
+  'js/mdcat-study.js?v=20261013-speed-v2',
+  'js/mdcat-account.js?v=20261013-speed-v2'
 ];
 const publicModuleMemory = new Map();
 const publicModuleRequests = new Map();
+const portalFeaturePrefetches = new Set();
 let publicNotificationRequest = null;
 let portalMDCATLoadPromise = null;
 let portalRenderFingerprint = '';
@@ -119,6 +121,35 @@ function appendPortalFeatureScript(src) {
   });
 }
 
+function prefetchPortalMDCATAssets() {
+  PORTAL_MDCAT_SCRIPTS.forEach(src=>{
+    if (portalFeaturePrefetches.has(src) || document.querySelector('script[data-portal-feature="'+src+'"]')) return;
+    portalFeaturePrefetches.add(src);
+    const link=document.createElement('link');
+    link.rel='prefetch';link.as='script';link.href=src;
+    document.head.appendChild(link);
+  });
+}
+
+function prefetchPortalRoute(slug) {
+  const route=String(slug || '').trim().toLowerCase();
+  if (['entry-tests','mdcat','mdcat-2027'].includes(route)) prefetchPortalMDCATAssets();
+  if (route==='study') {
+    ['Notes','Past Papers','Study Resources'].forEach(category=>loadPublicModule('resources',{category}).catch(()=>{}));
+  } else if (route==='notes') loadPublicModule('resources',{category:'Notes'}).catch(()=>{});
+  else if (route==='past-papers') loadPublicModule('resources',{category:'Past Papers'}).catch(()=>{});
+  else if (route==='study-resources') loadPublicModule('resources',{category:'Study Resources'}).catch(()=>{});
+  else if (['entry-tests','nums','etea','ecat','nust-net','other-tests'].includes(route)) loadPublicModule('entryTests').catch(()=>{});
+}
+
+function addPortalIntentPrefetch(node,slug) {
+  if (!node) return;
+  const warm=()=>prefetchPortalRoute(slug);
+  node.addEventListener('pointerenter',warm,{once:true,passive:true});
+  node.addEventListener('focus',warm,{once:true,passive:true});
+  node.addEventListener('touchstart',warm,{once:true,passive:true});
+}
+
 function loadPortalMDCATFeatures() {
   if (typeof openMDCATHub==='function' && typeof openUserAccount==='function') return Promise.resolve();
   if (!portalMDCATLoadPromise) {
@@ -199,13 +230,15 @@ function readPublicModuleCache(key, allowStale = false) {
   const maxAge=SCHEDULED_PUBLIC_MODULES.has(action) ? SCHEDULED_MODULE_CACHE_TTL : PUBLIC_MODULE_CACHE_TTL;
   if (publicModuleMemory.has(key)) {
     const cached=publicModuleMemory.get(key);
-    if (allowStale || Date.now()-cached.savedAt<=maxAge) return cached.data;
+    const age=Date.now()-cached.savedAt;
+    if (age<=maxAge || (allowStale && age<=PUBLIC_MODULE_STALE_MAX_AGE)) return cached.data;
     publicModuleMemory.delete(key);
   }
   try {
     const cached = JSON.parse(localStorage.getItem(PUBLIC_MODULE_CACHE_PREFIX + key));
     if (!cached || !Array.isArray(cached.data)) return null;
-    if (!allowStale && Date.now() - Number(cached.savedAt || 0) > maxAge) return null;
+    const age=Date.now()-Number(cached.savedAt || 0);
+    if (age>maxAge && (!allowStale || age>PUBLIC_MODULE_STALE_MAX_AGE)) return null;
     publicModuleMemory.set(key, {savedAt:Number(cached.savedAt || 0),data:cached.data});
     return cached.data;
   } catch (_) { return null; }
@@ -252,7 +285,7 @@ function refreshPublicModule(action, params = {}) {
 
 function loadPublicModule(action, params = {}) {
   const key = publicModuleKey(action, params);
-  const cached = readPublicModuleCache(key, !SCHEDULED_PUBLIC_MODULES.has(action));
+  const cached = readPublicModuleCache(key, true);
   if (cached) {
     refreshPublicModule(action, params).catch(() => {});
     return Promise.resolve(cached);
@@ -305,8 +338,9 @@ function warmPublicModules() {
     refreshPublicModule(action, params || {}).catch(() => {}).finally(() => setTimeout(next, 120));
   };
   const start = () => warmPublicBundle().catch(() => { next(); next(); });
-  if ('requestIdleCallback' in window) window.requestIdleCallback(start, { timeout: 1500 });
-  else setTimeout(start, 600);
+  setTimeout(start,0);
+  if ('requestIdleCallback' in window) window.requestIdleCallback(prefetchPortalMDCATAssets,{timeout:1500});
+  else setTimeout(prefetchPortalMDCATAssets,1000);
 }
 
     document.addEventListener(
@@ -370,7 +404,7 @@ function loadPortal() {
 function registerPortalServiceWorker() {
   if (!('serviceWorker' in navigator) || location.protocol !== 'https:') return;
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js?v=20260926-portal-suite').catch(() => {});
+    navigator.serviceWorker.register('sw.js?v=20261013-speed-v2').catch(() => {});
   }, {once: true});
 }
 
@@ -594,6 +628,7 @@ function renderNavigation(items) {
       handleNavigation(parent);
       closeMobileNavigation();
     };
+    addPortalIntentPrefetch(link,parent.Slug);
 
     row.appendChild(link);
 
@@ -636,6 +671,7 @@ function renderNavigation(items) {
           handleNavigation(child);
           closeMobileNavigation();
         };
+        addPortalIntentPrefetch(childLink,child.Slug);
 
         dropdown.appendChild(childLink);
 
@@ -799,6 +835,7 @@ function closeMobileNavigation() { setMobileNavigationOpen(false); }
         card.onclick = function() {
           openCategory(category);
         };
+        addPortalIntentPrefetch(card,category.Slug);
         card.onkeydown = function(event) {
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
