@@ -46,7 +46,7 @@
 
   <link
     rel="stylesheet"
-    href="css/style.css?v=20260927-publishing-suite"
+    href="css/style.css?v=20261013-verified-info"
   >
 </head>
 
@@ -102,7 +102,8 @@
             <input
               id="searchInput"
               type="text"
-              placeholder="Search resources, notes, past papers..."
+              placeholder="Search admissions, scholarships, deadlines, notes..."
+              aria-label="Search the student portal"
             >
 
             <button onclick="portalSearch()">
@@ -110,6 +111,29 @@
             </button>
           </div>
 
+        </div>
+      </section>
+
+      <section id="homePriority" class="home-priority" aria-labelledby="priorityTitle">
+        <div class="container">
+          <div class="home-priority-panel">
+            <div class="home-priority-copy">
+              <span>VERIFIED STUDENT INFORMATION</span>
+              <h2 id="priorityTitle">Find important information faster</h2>
+              <p>Go directly to official-source admissions, scholarships, deadlines and student updates.</p>
+            </div>
+            <nav class="home-priority-actions" aria-label="Important student information">
+              <a href="#/announcements" onclick="event.preventDefault(); handleNavigation({Slug:'announcements',Label:'Announcements'});">Latest updates</a>
+              <a href="#/deadlines" onclick="event.preventDefault(); handleNavigation({Slug:'deadlines',Label:'Admission deadlines',ParentID:'NAV-004'});">Admission deadlines</a>
+              <a href="#/scholarships" onclick="event.preventDefault(); handleNavigation({Slug:'scholarships',Label:'Scholarships'});">Scholarships</a>
+              <a href="#/admissions" onclick="event.preventDefault(); handleNavigation({Slug:'admissions',Label:'Admissions'});">Admissions</a>
+            </nav>
+            <div class="home-trust-points" aria-label="Information standards">
+              <span>Official links highlighted</span>
+              <span>Deadlines shown clearly</span>
+              <span>Update dates displayed</span>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -215,7 +239,7 @@
 
   </div>
 
-  <script src="js/app.js?v=20261013-startup-fix"></script>
+  <script src="js/app.js?v=20261013-verified-info"></script>
   <script src="js/mdcat.js?v=20260927-publishing-suite"></script>
   <script src="js/mdcat-study.js?v=20260927-publishing-suite"></script>
   <script src="js/mdcat-account.js?v=20260927-publishing-suite"></script>
