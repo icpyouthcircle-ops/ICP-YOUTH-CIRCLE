@@ -1968,6 +1968,7 @@ const ICP_AI_ = {
   maxSources: 8,
   defaultModel: 'gpt-5.4-mini',
   defaultGeminiModel: 'gemini-3.8-flash',
+  defaultGeminiFallbackModel: 'gemini-3.5-flash-lite',
   providers: ['Auto','OpenAI','Gemini'],
   modes: ['Explain','Summarize','Solve','Quiz Me','Check My Answer','Translate','Find Resources','Study Plan'],
   languages: ['English','Urdu','Pashto']
@@ -1988,8 +1989,9 @@ function aiSettings_() {
   const geminiApiKey=String(properties.getProperty('GEMINI_API_KEY') || '').trim();
   const configuredGeminiModel=String(properties.getProperty('ICP_GEMINI_MODEL') || ICP_AI_.defaultGeminiModel).trim().replace(/^models\//,'');
   const geminiModel=configuredGeminiModel==='gemini-3.5-flash'?'gemini-3.8-flash':configuredGeminiModel;
+  const geminiFallbackModel=String(properties.getProperty('ICP_GEMINI_FALLBACK_MODEL') || ICP_AI_.defaultGeminiFallbackModel).trim().replace(/^models\//,'');
   const geminiEnabled=properties.getProperty('ICP_GEMINI_ENABLED')==='true' && geminiApiKey.length>=20 && geminiModel.length>0;
-  return {apiKey:apiKey,model:model,enabled:enabled,geminiApiKey:geminiApiKey,geminiModel:geminiModel,geminiEnabled:geminiEnabled};
+  return {apiKey:apiKey,model:model,enabled:enabled,geminiApiKey:geminiApiKey,geminiModel:geminiModel,geminiFallbackModel:geminiFallbackModel,geminiEnabled:geminiEnabled};
 }
 
 function aiPublicConfig_() {
@@ -2144,26 +2146,38 @@ function aiGenerateGemini_(body,sources,prompt,settings) {
     contents:[{role:'user',parts:[{text:prompt.input}]}],
     generationConfig:{temperature:0.3,maxOutputTokens:2600,responseMimeType:'application/json',responseJsonSchema:aiSchema_()}
   };
-  const url='https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(settings.geminiModel)+':generateContent';
-  const response=UrlFetchApp.fetch(url,{method:'post',contentType:'application/json',headers:{'x-goog-api-key':settings.geminiApiKey},payload:JSON.stringify(request),muteHttpExceptions:true});
-  const status=response.getResponseCode();let raw={};try{raw=JSON.parse(response.getContentText());}catch(_){}
-  if(status===429)mdcatError_('RATE_LIMIT','Gemini is busy. Please wait and try again.');
-  if(status>=500)mdcatError_('AI_UNAVAILABLE','Gemini is temporarily unavailable.');
-  const blocked=raw && raw.promptFeedback && raw.promptFeedback.blockReason || raw && raw.candidates && raw.candidates[0] && raw.candidates[0].finishReason==='SAFETY';
-  if(blocked)mdcatError_('CONTENT_BLOCKED','Please rewrite the request using safe, respectful academic language.');
-  if(status!==200)mdcatError_('AI_CONFIGURATION','The Gemini configuration needs administrator attention.');
-  let parsed;try{parsed=JSON.parse(aiGeminiOutputText_(raw));}catch(_){mdcatError_('AI_UNAVAILABLE','Gemini returned an incomplete response. Please try again.');}
-  return aiNormalizeResult_(parsed,sources,'Gemini');
+  const models=[settings.geminiModel,settings.geminiFallbackModel].filter((model,index,list)=>model && list.indexOf(model)===index);
+  let lastStatus=0;
+  for(const model of models) {
+    const url='https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent';
+    const response=UrlFetchApp.fetch(url,{method:'post',contentType:'application/json',headers:{'x-goog-api-key':settings.geminiApiKey},payload:JSON.stringify(request),muteHttpExceptions:true});
+    const status=response.getResponseCode();lastStatus=status;let raw={};try{raw=JSON.parse(response.getContentText());}catch(_){}
+    const blocked=raw && raw.promptFeedback && raw.promptFeedback.blockReason || raw && raw.candidates && raw.candidates[0] && raw.candidates[0].finishReason==='SAFETY';
+    if(blocked)mdcatError_('CONTENT_BLOCKED','Please rewrite the request using safe, respectful academic language.');
+    if(status!==200)continue;
+    let parsed;try{parsed=JSON.parse(aiGeminiOutputText_(raw));}catch(_){continue;}
+    return aiNormalizeResult_(parsed,sources,'Gemini');
+  }
+  if(lastStatus===429)mdcatError_('RATE_LIMIT','Gemini is busy. Please wait and try again.');
+  if(lastStatus>=500 || lastStatus===0)mdcatError_('AI_UNAVAILABLE','Gemini is temporarily unavailable.');
+  mdcatError_('AI_CONFIGURATION','The Gemini configuration needs administrator attention.');
 }
 
 function aiGenerate_(user,body,conversation,sources,history) {
   const settings=aiSettings_();const provider=String(body.provider || 'Auto');const prompt=aiPrompt_(body,conversation,sources,history);
-  if(provider==='OpenAI')return aiGenerateOpenAI_(body,sources,prompt,settings);
-  if(provider==='Gemini')return aiGenerateGemini_(body,sources,prompt,settings);
+  const recoverable=['AI_UNAVAILABLE','AI_CONFIGURATION','RATE_LIMIT'];
+  if(provider==='OpenAI'){
+    try{return aiGenerateOpenAI_(body,sources,prompt,settings);}
+    catch(error){if(!settings.geminiEnabled || !recoverable.includes(error.mdcatCode))throw error;const result=aiGenerateGemini_(body,sources,prompt,settings);result.fallbackFrom='OpenAI';return result;}
+  }
+  if(provider==='Gemini'){
+    try{return aiGenerateGemini_(body,sources,prompt,settings);}
+    catch(error){if(!settings.enabled || !recoverable.includes(error.mdcatCode))throw error;const result=aiGenerateOpenAI_(body,sources,prompt,settings);result.fallbackFrom='Gemini';return result;}
+  }
   if(!settings.enabled && !settings.geminiEnabled)mdcatError_('NOT_CONFIGURED','ICP AI Assistant is not enabled yet.');
   if(settings.enabled){
     try{return aiGenerateOpenAI_(body,sources,prompt,settings);}
-    catch(error){if(!settings.geminiEnabled || !['AI_UNAVAILABLE','AI_CONFIGURATION','RATE_LIMIT'].includes(error.mdcatCode))throw error;}
+    catch(error){if(!settings.geminiEnabled || !recoverable.includes(error.mdcatCode))throw error;}
   }
   return aiGenerateGemini_(body,sources,prompt,settings);
 }
