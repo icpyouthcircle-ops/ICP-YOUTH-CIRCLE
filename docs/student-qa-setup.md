@@ -7,7 +7,7 @@ The public Q&A interface and Apps Script backend must be released together. Do n
 1. Back up the current Apps Script `Code.gs`.
 2. Replace it with the complete repository `backend/Code.gs` file.
 3. Save the Apps Script project.
-4. Select `setupQASystem_` in the function menu and click **Run** once.
+4. Select `setupQASystem` in the function menu and click **Run** once.
 5. Approve the requested spreadsheet permission if Google asks.
 
 The setup function preserves existing sheets and creates these tabs when missing:
