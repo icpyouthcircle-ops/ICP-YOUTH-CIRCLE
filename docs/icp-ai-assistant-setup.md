@@ -14,7 +14,7 @@ The website keeps OpenAI and Gemini credentials inside Google Apps Script. Never
    - `ICP_AI_MODEL`: `gpt-5.4-mini`
    - `GEMINI_API_KEY`: the private Google AI Studio API key
    - `ICP_GEMINI_ENABLED`: `true`
-   - `ICP_GEMINI_MODEL`: `gemini-3.5-flash`
+   - `ICP_GEMINI_MODEL`: `gemini-3.8-flash`
 
 5. Open **Deploy → Manage deployments**, edit the existing web app, choose **New version**, and deploy it with the same public URL.
 6. Confirm the web app still executes as its owner and access remains available to the website audience.
