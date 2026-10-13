@@ -64,7 +64,7 @@ function aiSetStatus(message,type=''){
 function aiSetBusy(value){
   icpAssistantState.busy=value;
   const send=document.getElementById('icpAiSend');const input=document.getElementById('icpAiInput');
-  if(send){send.disabled=value;send.textContent=value?'Thinking…':'Send';}
+  if(send){send.disabled=value;send.textContent=value?'…':'↑';send.setAttribute('aria-label',value?'Assistant is thinking':'Send');}
   if(input)input.disabled=value;
 }
 
@@ -98,20 +98,45 @@ function aiWelcome(){
   welcome.appendChild(prompts);feed.appendChild(welcome);
 }
 
+function aiAppendInline(parent,text){
+  const pattern=/(\*\*[^*]+\*\*|`[^`]+`|\[S\d+\])/g;let last=0;let match;
+  while((match=pattern.exec(String(text||'')))){
+    if(match.index>last)parent.appendChild(document.createTextNode(text.slice(last,match.index)));
+    const token=match[0];
+    if(token.startsWith('**'))parent.appendChild(aiEl('strong',null,token.slice(2,-2)));
+    else if(token.startsWith('`'))parent.appendChild(aiEl('code','icp-ai-inline-code',token.slice(1,-1)));
+    else parent.appendChild(aiEl('span','icp-ai-inline-citation',token));
+    last=match.index+token.length;
+  }
+  if(last<text.length)parent.appendChild(document.createTextNode(text.slice(last)));
+}
+
 function aiRenderRichText(container,text){
-  const lines=String(text||'').split('\n');let list=null;
+  const lines=String(text||'').split('\n');let list=null;let codeLines=null;let codeLanguage='';
+  const addTextNode=(tag,className,value)=>{const node=aiEl(tag,className);aiAppendInline(node,value);container.appendChild(node);return node;};
+  const finishCode=()=>{
+    if(!codeLines)return;
+    const wrap=aiEl('div','icp-ai-code-block');const top=aiEl('div','icp-ai-code-top');top.appendChild(aiEl('span',null,codeLanguage||'Code'));
+    const copy=aiEl('button','icp-ai-code-copy','Copy');copy.type='button';copy.onclick=()=>aiCopy(codeLines.join('\n'));top.appendChild(copy);
+    const pre=aiEl('pre');pre.appendChild(aiEl('code',null,codeLines.join('\n')));wrap.append(top,pre);container.appendChild(wrap);codeLines=null;codeLanguage='';
+  };
   lines.forEach(raw=>{
-    const line=raw.trim();
-    if(!line){list=null;return;}
+    const fence=raw.trim().match(/^```([^`]*)$/);
+    if(fence){list=null;if(codeLines)finishCode();else{codeLines=[];codeLanguage=fence[1].trim();}return;}
+    if(codeLines){codeLines.push(raw);return;}
+    const line=raw.trim();if(!line){list=null;return;}
+    if(/^---+$/.test(line)){list=null;container.appendChild(aiEl('hr'));return;}
     const heading=line.match(/^#{1,3}\s+(.+)/);
-    if(heading){list=null;container.appendChild(aiEl('h4',null,heading[1]));return;}
+    if(heading){list=null;addTextNode('h4',null,heading[1]);return;}
+    const quote=line.match(/^>\s?(.+)/);if(quote){list=null;addTextNode('blockquote',null,quote[1]);return;}
     const bullet=line.match(/^[-*]\s+(.+)/);const numbered=line.match(/^\d+[.)]\s+(.+)/);
     if(bullet||numbered){
       const type=numbered?'ol':'ul';if(!list||list.tagName.toLowerCase()!==type){list=aiEl(type,'icp-ai-answer-list');container.appendChild(list);}
-      list.appendChild(aiEl('li',null,(bullet||numbered)[1]));return;
+      const item=aiEl('li');aiAppendInline(item,(bullet||numbered)[1]);list.appendChild(item);return;
     }
-    list=null;container.appendChild(aiEl('p',null,line));
+    list=null;addTextNode('p',null,line);
   });
+  finishCode();
 }
 
 function aiSpeak(text,button){
@@ -167,6 +192,7 @@ function aiMessageNode(message){
   if(message.role==='user')body.appendChild(aiEl('p',null,message.content));
   else{
     const payload=message.payload||{};const meta=aiEl('div','icp-ai-response-meta');
+    meta.appendChild(aiEl('strong','icp-ai-message-name','ICP AI'));
     const grounded=Boolean(payload.grounded);meta.append(aiEl('span','icp-ai-badge '+(grounded?'is-grounded':'is-guidance'),grounded?'✓ Verified sources':'General guidance'));
     if(payload.provider)meta.append(aiEl('span','icp-ai-provider-badge',payload.provider));
     if(payload.confidence)meta.append(aiEl('span','icp-ai-confidence','Confidence: '+payload.confidence));body.appendChild(meta);
@@ -192,6 +218,13 @@ function aiRenderMessages(){
   const feed=document.getElementById('icpAiMessages');if(!feed)return;
   feed.replaceChildren();if(!icpAssistantState.messages.length){aiWelcome();return;}
   icpAssistantState.messages.forEach(message=>feed.appendChild(aiMessageNode(message)));requestAnimationFrame(()=>{feed.scrollTop=feed.scrollHeight;});
+}
+
+function aiShowThinking(){
+  const feed=document.getElementById('icpAiMessages');if(!feed)return;
+  const article=aiEl('article','icp-ai-message is-assistant icp-ai-thinking');article.id='icpAiThinking';
+  const avatar=aiEl('div','icp-ai-avatar','ICP');const body=aiEl('div','icp-ai-message-body');body.append(aiEl('strong','icp-ai-message-name','ICP AI'));
+  const dots=aiEl('div','icp-ai-thinking-dots');dots.setAttribute('aria-label','ICP AI is preparing an answer');dots.append(aiEl('span'),aiEl('span'),aiEl('span'));body.appendChild(dots);article.append(avatar,body);feed.appendChild(article);feed.scrollTop=feed.scrollHeight;
 }
 
 function aiRenderHistory(){
@@ -233,7 +266,7 @@ async function aiSend(){
   let userMessage=null;
   try{
     const identity=await aiEnsureIdentity(false);if(!identity.auth.currentUser){aiShowSignIn();return;}
-    userMessage={id:'local-'+Date.now(),role:'user',content:message,payload:{},saved:false};icpAssistantState.messages.push(userMessage);aiRenderMessages();input.value='';aiResizeComposer(input);aiSetBusy(true);aiSetStatus('Reviewing verified ICP sources and preparing an answer…');
+    userMessage={id:'local-'+Date.now(),role:'user',content:message,payload:{},saved:false};icpAssistantState.messages.push(userMessage);aiRenderMessages();aiShowThinking();input.value='';aiResizeComposer(input);aiSetBusy(true);aiSetStatus('Reviewing sources and preparing a clear answer…');
     const data=await mdcatPrivateRequest('aiChat',{conversationId:icpAssistantState.conversationId||undefined,message,provider:document.getElementById('icpAiProvider').value,mode:document.getElementById('icpAiMode').value,language:document.getElementById('icpAiLanguage').value,verifiedOnly:document.getElementById('icpAiVerified').checked,requestId:aiRequestId()});
     icpAssistantState.conversationId=data.conversationId;icpAssistantState.messages.push(data.message);aiRenderMessages();await aiLoadHistory();aiSetStatus('');
   }catch(error){icpAssistantState.messages=icpAssistantState.messages.filter(item=>item.id!==userMessage?.id);aiRenderMessages();input.value=message;aiResizeComposer(input);aiSetStatus(error.message||'The assistant could not answer. Please try again.','error');}
@@ -277,7 +310,7 @@ function aiBuildShell(content){
   const feed=aiEl('div','icp-ai-messages');feed.id='icpAiMessages';feed.setAttribute('role','log');feed.setAttribute('aria-live','polite');
   const composerArea=aiEl('div','icp-ai-composer-area');const status=aiEl('p','icp-ai-status');status.id='icpAiStatus';status.setAttribute('role','status');
   const composer=aiEl('div','icp-ai-composer');const input=document.createElement('textarea');input.id='icpAiInput';input.rows=1;input.maxLength=4000;input.placeholder='Message ICP AI Assistant';input.setAttribute('aria-label','Message ICP AI Assistant');input.oninput=()=>aiResizeComposer(input);input.onkeydown=event=>{if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();aiSend();}};
-  const mic=aiIconButton('Use voice input','🎙',aiToggleVoice);mic.id='icpAiMic';const send=aiEl('button','icp-ai-send','Send');send.id='icpAiSend';send.type='button';send.onclick=aiSend;composer.append(mic,input,send);
+  const mic=aiIconButton('Use voice input','⌁',aiToggleVoice);mic.id='icpAiMic';const send=aiEl('button','icp-ai-send','↑');send.id='icpAiSend';send.type='button';send.setAttribute('aria-label','Send');send.onclick=aiSend;composer.append(mic,input,send);
   const note=aiEl('p','icp-ai-disclaimer','ICP AI may make mistakes. Verify deadlines, eligibility, health, legal, and financial information with official sources.');composerArea.append(status,composer,note);
   main.append(header,feed,composerArea);shell.append(sidebar,main);content.appendChild(shell);
 }
