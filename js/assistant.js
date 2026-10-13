@@ -72,7 +72,7 @@ function aiShowSignIn(){
   const feed=document.getElementById('icpAiMessages');if(!feed)return;
   feed.replaceChildren();
   const welcome=aiEl('section','icp-ai-welcome');
-  welcome.append(aiEl('span','icp-ai-mark','ICP AI'),aiEl('h3',null,'Your professional study assistant'),aiEl('p',null,'Sign in with Google to keep your conversations private, save helpful answers, and use grounded guidance from ICP YOUTH CIRCLE.'));
+  welcome.append(aiEl('span','icp-ai-mark','ICP AI'),aiEl('h3',null,'Your intelligent personal assistant'),aiEl('p',null,'Sign in with Google to ask questions on any subject, keep conversations private, save helpful answers, and use verified ICP sources when needed.'));
   const button=aiEl('button','resource-button','Continue with Google');button.type='button';
   button.onclick=async()=>{button.disabled=true;aiSetStatus('Opening secure sign-in…');try{await aiEnsureIdentity(true);await aiLoadHistory();aiStartConversation();aiSetStatus('Signed in.');}catch(error){aiSetStatus(error.message||'Sign-in was not completed.','error');button.disabled=false;}};
   welcome.appendChild(button);feed.appendChild(welcome);
@@ -82,13 +82,13 @@ function aiWelcome(){
   const feed=document.getElementById('icpAiMessages');if(!feed)return;
   feed.replaceChildren();
   const welcome=aiEl('section','icp-ai-welcome');
-  welcome.append(aiEl('span','icp-ai-mark','ICP AI'),aiEl('h3',null,'How can I help you study?'),aiEl('p',null,'Ask for a clear explanation, a step-by-step solution, a quiz, verified resources, or a practical study plan.'));
+  welcome.append(aiEl('span','icp-ai-mark','ICP AI'),aiEl('h3',null,'What can I help with?'),aiEl('p',null,'Ask any safe question, solve a problem, improve your writing, explore an idea, create a quiz, or build a practical plan.'));
   const prompts=aiEl('div','icp-ai-prompts');
   [
-    ['Explain a topic','Explain photosynthesis in simple steps.','Explain'],
-    ['Practice with a quiz','Quiz me on basic chemistry concepts.','Quiz Me'],
-    ['Build a study plan','Create a seven-day MDCAT revision plan.','Study Plan'],
-    ['Find verified resources','Find biology notes and practice resources.','Find Resources']
+    ['Ask any question','Why does the sky appear blue?','Explain'],
+    ['Solve step by step','Help me solve a difficult maths problem.','Solve'],
+    ['Improve my writing','Make my paragraph clear and professional.','Check My Answer'],
+    ['Learn with a plan','Create a practical seven-day study plan.','Study Plan']
   ].forEach(([label,prompt,mode])=>{
     const button=aiEl('button','icp-ai-prompt');button.type='button';
     button.append(aiEl('strong',null,label),aiEl('span',null,prompt));
@@ -269,7 +269,7 @@ async function aiSend(){
     const identity=await aiEnsureIdentity(false);if(!identity.auth.currentUser){aiShowSignIn();return;}
     userMessage={id:'local-'+Date.now(),role:'user',content:message,payload:{},saved:false};icpAssistantState.messages.push(userMessage);aiRenderMessages();aiShowThinking();input.value='';aiResizeComposer(input);aiSetBusy(true);aiSetStatus('Reviewing sources and preparing a clear answer…');
     progressTimer=setTimeout(()=>aiSetStatus('Still working. Complex answers can take a little longer…'),12000);
-    const data=await mdcatPrivateRequest('aiChat',{conversationId:icpAssistantState.conversationId||undefined,message,provider:document.getElementById('icpAiProvider').value,mode:document.getElementById('icpAiMode').value,language:document.getElementById('icpAiLanguage').value,verifiedOnly:document.getElementById('icpAiVerified').checked,requestId:aiRequestId()});
+    const data=await mdcatPrivateRequest('aiChat',{conversationId:icpAssistantState.conversationId||undefined,message,provider:document.getElementById('icpAiProvider').value,mode:document.getElementById('icpAiMode').value,language:document.getElementById('icpAiLanguage').value,verifiedOnly:false,requestId:aiRequestId()});
     icpAssistantState.conversationId=data.conversationId;icpAssistantState.messages.push(data.message);aiRenderMessages();await aiLoadHistory();aiSetStatus('');
   }catch(error){icpAssistantState.messages=icpAssistantState.messages.filter(item=>item.id!==userMessage?.id);aiRenderMessages();input.value=message;aiResizeComposer(input);aiSetStatus(error.message||'The assistant could not answer. Please try again.','error');}
   finally{if(progressTimer)clearTimeout(progressTimer);aiSetBusy(false);}
@@ -307,11 +307,10 @@ function aiBuildShell(content){
   const available=new Set(icpAssistantState.config.availableProviders||[]);icpAssistantState.config.providers.forEach(value=>{const option=aiEl('option',null,value);option.value=value;option.disabled=value!=='Auto'&&!available.has(value);provider.appendChild(option);});
   const mode=document.createElement('select');mode.id='icpAiMode';mode.setAttribute('aria-label','Assistant mode');icpAssistantState.config.modes.forEach(value=>{const option=aiEl('option',null,value);option.value=value;mode.appendChild(option);});
   const language=document.createElement('select');language.id='icpAiLanguage';language.setAttribute('aria-label','Answer language');icpAssistantState.config.languages.forEach(value=>{const option=aiEl('option',null,value);option.value=value;language.appendChild(option);});
-  const verified=aiEl('label','icp-ai-verified');const check=document.createElement('input');check.type='checkbox';check.id='icpAiVerified';check.checked=true;verified.append(check,document.createTextNode(' Verified ICP sources only'));
-  controls.append(provider,mode,language,verified);header.append(historyButton,heading,controls);
+  controls.append(provider,mode,language);header.append(historyButton,heading,controls);
   const feed=aiEl('div','icp-ai-messages');feed.id='icpAiMessages';feed.setAttribute('role','log');feed.setAttribute('aria-live','polite');
   const composerArea=aiEl('div','icp-ai-composer-area');const status=aiEl('p','icp-ai-status');status.id='icpAiStatus';status.setAttribute('role','status');
-  const composer=aiEl('div','icp-ai-composer');const input=document.createElement('textarea');input.id='icpAiInput';input.rows=1;input.maxLength=4000;input.placeholder='Message ICP AI Assistant';input.setAttribute('aria-label','Message ICP AI Assistant');input.oninput=()=>aiResizeComposer(input);input.onkeydown=event=>{if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();aiSend();}};
+  const composer=aiEl('div','icp-ai-composer');const input=document.createElement('textarea');input.id='icpAiInput';input.rows=1;input.maxLength=4000;input.placeholder='Ask anything';input.setAttribute('aria-label','Message ICP AI Assistant');input.oninput=()=>aiResizeComposer(input);input.onkeydown=event=>{if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();aiSend();}};
   const mic=aiIconButton('Use voice input','⌁',aiToggleVoice);mic.id='icpAiMic';const send=aiEl('button','icp-ai-send','↑');send.id='icpAiSend';send.type='button';send.setAttribute('aria-label','Send');send.onclick=aiSend;composer.append(mic,input,send);
   const note=aiEl('p','icp-ai-disclaimer','ICP AI may make mistakes. Verify deadlines, eligibility, health, legal, and financial information with official sources.');composerArea.append(status,composer,note);
   main.append(header,feed,composerArea);shell.append(sidebar,main);content.appendChild(shell);

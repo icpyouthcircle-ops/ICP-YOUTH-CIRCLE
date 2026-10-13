@@ -25,10 +25,13 @@ assert.ok(geminiCall);assert.equal(geminiCall.options.headers['x-goog-api-key'],
 assert.match(geminiCall.url,/gemini-3\.8-flash/,'Deprecated Gemini 3.5 configuration should migrate to the current model.');
 const duplicate=ok(backend.call('aiChat',alice,{message:'Explain cell structure using the portal notes',mode:'Explain',language:'English',verifiedOnly:true,requestId:'request-00000000000000000001'}));
 assert.equal(duplicate.message.id,chat.message.id);assert.equal(backend.rows('AI_Messages').length,4,'Idempotent retries must not duplicate messages.');
+const sourceLookup=backend.context.aiSources_;backend.context.aiSources_=()=>{throw new Error('General questions must skip ICP source lookup.');};
+const general=ok(backend.call('aiChat',alice,{conversationId:chat.conversationId,message:'Why is the sky blue?',provider:'OpenAI',mode:'Explain',language:'English',verifiedOnly:false,requestId:'request-00000000000000000003'}));backend.context.aiSources_=sourceLookup;
+assert.equal(general.message.payload.provider,'OpenAI');assert.equal(general.message.payload.grounded,false);assert.equal(general.message.payload.sources.length,0);assert.equal(backend.rows('AI_Messages').length,6);
 
 const history=ok(backend.call('aiListConversations',alice));assert.equal(history.length,1);assert.equal(history[0].id,chat.conversationId);
 bad(backend.call('aiLoadConversation',bob,{conversationId:chat.conversationId}),'NOT_FOUND');
-const loaded=ok(backend.call('aiLoadConversation',alice,{conversationId:chat.conversationId}));assert.equal(loaded.messages.length,4);
+const loaded=ok(backend.call('aiLoadConversation',alice,{conversationId:chat.conversationId}));assert.equal(loaded.messages.length,6);
 
 ok(backend.call('aiSaveMessage',alice,{messageId:chat.message.id,saved:true}));assert.equal(backend.rows('AI_Messages').find(row=>row.ID===chat.message.id).Saved,'Yes');
 ok(backend.call('aiFeedback',alice,{messageId:chat.message.id,rating:'Helpful'}));assert.equal(backend.rows('AI_Feedback').length,1);
@@ -40,4 +43,4 @@ assert.ok(openAI.length>=2);assert.ok(openAI.every(call=>call.options.headers.Au
 assert.equal(JSON.stringify(chat).includes('sk-test-'),false,'Secrets must never appear in client responses.');
 assert.equal(JSON.stringify(gemini).includes('AIza-test-'),false,'Gemini secrets must never appear in client responses.');
 
-console.log('PASS ICP AI backend: OpenAI and Gemini providers, auth, grounded structured responses, idempotency, privacy, saved answers, feedback, archive, and server-only credentials.');
+console.log('PASS ICP AI backend: OpenAI and Gemini providers, broad general answers without ICP lookup, optional grounding, auth, structured responses, idempotency, privacy, saved answers, feedback, archive, and server-only credentials.');

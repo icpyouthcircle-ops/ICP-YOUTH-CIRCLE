@@ -14,7 +14,7 @@ const PORTAL_MDCAT_SCRIPTS = [
   'js/mdcat-account.js?v=20261013-speed-v2'
 ];
 const PORTAL_QA_SCRIPT = 'js/qa.js?v=20261013-community-v1';
-const PORTAL_AI_SCRIPT = 'js/assistant.js?v=20261013-ai-v5';
+const PORTAL_AI_SCRIPT = 'js/assistant.js?v=20261013-ai-v6';
 const publicModuleMemory = new Map();
 const publicModuleRequests = new Map();
 const portalFeaturePrefetches = new Set();
