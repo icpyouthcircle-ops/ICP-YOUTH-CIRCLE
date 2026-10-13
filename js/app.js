@@ -324,13 +324,8 @@ function loadPortal() {
 function registerPortalServiceWorker() {
   if (!('serviceWorker' in navigator) || location.protocol !== 'https:') return;
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js?v=20261013-verified-info').catch(() => {});
+    navigator.serviceWorker.register('sw.js?v=20260926-portal-suite').catch(() => {});
   }, {once: true});
-}
-
-function setHomePriorityVisible(visible) {
-  const section=document.getElementById('homePriority');
-  if (section) section.hidden=!visible;
 }
 
 
@@ -655,7 +650,6 @@ function setPortalAccountButton(signedIn) {
 function openPortalAccount(pending) {
   document.getElementById('homeHero').style.display = 'none';
   document.getElementById('homeExplore').style.display = 'none';
-  setHomePriorityVisible(false);
   const homeTools=document.getElementById('homeTools');if(homeTools)homeTools.hidden=true;
   document.getElementById('dynamicPage').style.display = 'none';
   document.getElementById('mdcatHub').hidden = false;
@@ -1246,8 +1240,6 @@ if (resourceCategories[item.Slug]) {
     'homeExplore'
   ).style.display = 'none';
 
-  setHomePriorityVisible(false);
-
   const homeTools=document.getElementById('homeTools');if(homeTools)homeTools.hidden=true;
 
   document.getElementById(
@@ -1281,8 +1273,6 @@ function showHome(options={}) {
   document.getElementById(
     'homeExplore'
   ).style.display = 'block';
-
-  setHomePriorityVisible(true);
 
   const homeTools=document.getElementById('homeTools');if(homeTools)homeTools.hidden=homeTools.dataset.active!=='true';
 
@@ -4681,7 +4671,7 @@ function buildScholarshipFilters(scholarships) {
       'All Countries',
       countries
     )}
-    <select id="scholarshipClosing" aria-label="Filter scholarships by deadline"><option value="">All deadlines</option><option value="open">Open opportunities</option><option value="7">Closing in 7 days</option><option value="30">Closing in 30 days</option></select>
+    <select id="scholarshipClosing"><option value="">All deadlines</option><option value="closing">Closing in 30 days</option></select>
   `;
 
   filters
@@ -4724,11 +4714,11 @@ function displayFilteredScholarships() {
 
         (!country ||
           item.Country === country) &&
-        portalDeadlineMatchesFilter(item.Deadline,closing)
+        (!closing || portalDeadlineIsClosingSoon(item.Deadline,30))
       );
     });
 
-  drawScholarshipCards(sortPortalDeadlineItems(filtered));
+  drawScholarshipCards(filtered);
 }
 function drawScholarshipCards(scholarships) {
   const content =
@@ -4789,8 +4779,6 @@ function drawScholarshipCards(scholarships) {
 
       badges.appendChild(featuredBadge);
     }
-
-    appendPortalDeadlineBadge(badges,item.Deadline);
 
     if (badges.children.length > 0) {
       body.appendChild(badges);
@@ -4884,7 +4872,6 @@ function drawScholarshipCards(scholarships) {
     }
 
     const scholarshipURL=safePortalURL(item.OfficialURL);
-    appendPortalTrustDetails(body,item,scholarshipURL);
     if (scholarshipURL) {
       const link =
         document.createElement('a');
@@ -4898,7 +4885,7 @@ function drawScholarshipCards(scholarships) {
         'noopener noreferrer';
 
       link.textContent =
-        'View official source';
+        'Official Details';
 
       link.className =
         'resource-button';
@@ -4981,7 +4968,7 @@ function buildAdmissionsFilters(admissions) {
       'All Entry Tests',
       entryTests
     )}
-    <select id="admissionClosing" aria-label="Filter admissions by deadline"><option value="">All deadlines</option><option value="open">Open admissions</option><option value="7">Closing in 7 days</option><option value="30">Closing in 30 days</option></select>
+    <select id="admissionClosing"><option value="">All deadlines</option><option value="closing">Closing in 30 days</option></select>
   `;
 
   filters
@@ -5034,12 +5021,12 @@ function displayFilteredAdmissions() {
 
         (!entryTest ||
           item.EntryTest === entryTest) &&
-        portalDeadlineMatchesFilter(item.Deadline,closing)
+        (!closing || portalDeadlineIsClosingSoon(item.Deadline,30))
       );
 
     });
 
-  drawAdmissionCards(sortPortalDeadlineItems(filtered));
+  drawAdmissionCards(filtered);
 }
 function drawAdmissionCards(admissions) {
 
@@ -5112,8 +5099,6 @@ function drawAdmissionCards(admissions) {
 
       badges.appendChild(featuredBadge);
     }
-
-    appendPortalDeadlineBadge(badges,item.Deadline);
 
 
     if (badges.children.length > 0) {
@@ -5214,7 +5199,6 @@ function drawAdmissionCards(admissions) {
 
 
     const admissionURL=safePortalURL(item.OfficialURL);
-    appendPortalTrustDetails(body,item,admissionURL);
     if (admissionURL) {
 
       const link =
@@ -5229,7 +5213,7 @@ function drawAdmissionCards(admissions) {
         'noopener noreferrer';
 
       link.textContent =
-        'View official source';
+        'Official Details';
 
       link.className =
         'resource-button';
@@ -5273,60 +5257,6 @@ function portalDeadlineIsClosingSoon(value,days) {
   deadline.setHours(23,59,59,999);
   const remaining=deadline.getTime()-Date.now();
   return remaining>=0 && remaining<=Number(days || 30)*86400000;
-}
-function portalDeadlineStatus(value) {
-  if (!value) return {key:'unknown',label:'Deadline not listed',days:null};
-  const deadline=new Date(value);
-  if (Number.isNaN(deadline.getTime())) return {key:'unknown',label:'Check deadline',days:null};
-  deadline.setHours(23,59,59,999);
-  const days=Math.ceil((deadline.getTime()-Date.now())/86400000);
-  if (days<0) return {key:'closed',label:'Deadline passed',days:days};
-  if (days===0) return {key:'urgent',label:'Closes today',days:0};
-  if (days<=7) return {key:'urgent',label:'Closes in '+days+' day'+(days===1?'':'s'),days:days};
-  if (days<=30) return {key:'soon',label:'Closes in '+days+' days',days:days};
-  return {key:'open',label:'Open',days:days};
-}
-function portalDeadlineMatchesFilter(value,filter) {
-  if (!filter) return true;
-  const status=portalDeadlineStatus(value);
-  if (filter==='open') return status.key!=='closed';
-  const days=Number(filter);
-  return Number.isFinite(days) && status.days!==null && status.days>=0 && status.days<=days;
-}
-function sortPortalDeadlineItems(items) {
-  return (items || []).slice().sort((a,b)=>{
-    const aState=portalDeadlineStatus(a.Deadline);
-    const bState=portalDeadlineStatus(b.Deadline);
-    const rank={urgent:0,soon:1,open:2,unknown:3,closed:4};
-    return (rank[aState.key]-rank[bState.key]) || ((aState.days ?? 99999)-(bState.days ?? 99999));
-  });
-}
-function appendPortalDeadlineBadge(container,value) {
-  if (!container || !value) return;
-  const state=portalDeadlineStatus(value);
-  const badge=document.createElement('span');
-  badge.className='resource-badge deadline-badge deadline-'+state.key;
-  badge.textContent=state.label;
-  container.appendChild(badge);
-}
-function appendPortalTrustDetails(container,item,officialURL) {
-  if (!container) return;
-  const updated=item.UpdatedAt || item.PublishAt || item.PublishDate || item.CreatedAt;
-  if (!officialURL && !updated) return;
-  const trust=document.createElement('div');
-  trust.className='portal-trust-details';
-  if (officialURL) {
-    const source=document.createElement('span');
-    source.className='portal-official-source';
-    source.textContent='Official source linked';
-    trust.appendChild(source);
-  }
-  if (updated) {
-    const date=document.createElement('span');
-    date.textContent='Updated '+formatPortalDate(updated);
-    trust.appendChild(date);
-  }
-  container.appendChild(trust);
 }
 function showAdmissionsError(error) {
 
@@ -5458,7 +5388,6 @@ async function portalSearch() {
   input.setCustomValidity('');
   navigationVersion+=1;const requestVersion=navigationVersion;closeMDCATHub();
   document.getElementById('homeHero').style.display='none';document.getElementById('homeExplore').style.display='none';
-  setHomePriorityVisible(false);
   document.getElementById('dynamicPage').style.display='block';document.getElementById('dynamicPageTitle').textContent='Search results';
   document.getElementById('dynamicPageDescription').textContent='Searching ICP YOUTH CIRCLE for “'+query+'”.';
   document.getElementById('resourceFilters').style.display='none';
