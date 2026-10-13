@@ -1967,7 +1967,7 @@ const ICP_AI_ = {
   maxDailyMessages: 30,
   maxSources: 8,
   defaultModel: 'gpt-5.4-mini',
-  defaultGeminiModel: 'gemini-3.5-flash',
+  defaultGeminiModel: 'gemini-3.8-flash',
   providers: ['Auto','OpenAI','Gemini'],
   modes: ['Explain','Summarize','Solve','Quiz Me','Check My Answer','Translate','Find Resources','Study Plan'],
   languages: ['English','Urdu','Pashto']
@@ -1986,7 +1986,8 @@ function aiSettings_() {
   const model=String(properties.getProperty('ICP_AI_MODEL') || ICP_AI_.defaultModel).trim();
   const enabled=properties.getProperty('ICP_AI_ENABLED')==='true' && /^sk-[A-Za-z0-9_-]{20,}$/.test(apiKey);
   const geminiApiKey=String(properties.getProperty('GEMINI_API_KEY') || '').trim();
-  const geminiModel=String(properties.getProperty('ICP_GEMINI_MODEL') || ICP_AI_.defaultGeminiModel).trim().replace(/^models\//,'');
+  const configuredGeminiModel=String(properties.getProperty('ICP_GEMINI_MODEL') || ICP_AI_.defaultGeminiModel).trim().replace(/^models\//,'');
+  const geminiModel=configuredGeminiModel==='gemini-3.5-flash'?'gemini-3.8-flash':configuredGeminiModel;
   const geminiEnabled=properties.getProperty('ICP_GEMINI_ENABLED')==='true' && geminiApiKey.length>=20 && geminiModel.length>0;
   return {apiKey:apiKey,model:model,enabled:enabled,geminiApiKey:geminiApiKey,geminiModel:geminiModel,geminiEnabled:geminiEnabled};
 }
