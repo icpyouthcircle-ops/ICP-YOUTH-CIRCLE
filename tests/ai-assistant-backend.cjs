@@ -22,6 +22,7 @@ const gemini=ok(backend.call('aiChat',alice,{conversationId:chat.conversationId,
 assert.equal(gemini.message.payload.provider,'Gemini');assert.equal(gemini.message.payload.grounded,true);
 const geminiCall=backend.fetchCalls.find(call=>call.url.includes('generativelanguage.googleapis.com'));
 assert.ok(geminiCall);assert.equal(geminiCall.options.headers['x-goog-api-key'],backend.props.GEMINI_API_KEY);assert.equal(JSON.parse(geminiCall.options.payload).generationConfig.responseMimeType,'application/json');
+assert.match(geminiCall.url,/gemini-3\.8-flash/,'Deprecated Gemini 3.5 configuration should migrate to the current model.');
 const duplicate=ok(backend.call('aiChat',alice,{message:'Explain cell structure using the portal notes',mode:'Explain',language:'English',verifiedOnly:true,requestId:'request-00000000000000000001'}));
 assert.equal(duplicate.message.id,chat.message.id);assert.equal(backend.rows('AI_Messages').length,4,'Idempotent retries must not duplicate messages.');
 
