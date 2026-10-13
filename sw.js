@@ -1,4 +1,4 @@
-const CACHE_NAME = 'icp-portal-shell-20261013-v8';
+const CACHE_NAME = 'icp-portal-shell-20261013-v9';
 const SHELL_ASSETS = [
   './',
   './index.html',
@@ -8,12 +8,14 @@ const SHELL_ASSETS = [
   './assets/icons/icon-512.png',
   './assets/icons/icon-maskable-512.png',
   './css/style.css?v=20260927-publishing-suite',
-  './js/app.js?v=20261013-startup-fix',
-  './js/mdcat.js?v=20260927-publishing-suite',
-  './js/mdcat-study.js?v=20260927-publishing-suite',
-  './js/mdcat-account.js?v=20260927-publishing-suite',
+  './js/app.js?v=20261013-lazy-performance',
   './js/portal-extras.js?v=20260927-publishing-suite',
   './assets/social/portal-share-1200x630.png'
+];
+const LAZY_ASSETS = [
+  './js/mdcat.js?v=20261013-lazy-performance',
+  './js/mdcat-study.js?v=20261013-lazy-performance',
+  './js/mdcat-account.js?v=20261013-lazy-performance'
 ];
 
 self.addEventListener('install', event => {
@@ -39,19 +41,32 @@ self.addEventListener('fetch', event => {
     const assetURL = new URL(asset, self.registration.scope);
     return assetURL.pathname === url.pathname && (!assetURL.search || assetURL.search === url.search);
   });
-  if (!isPortalNavigation && !isShellAsset) return;
+  const isLazyAsset = LAZY_ASSETS.some(asset => new URL(asset,self.registration.scope).pathname === url.pathname);
+  if (!isPortalNavigation && !isShellAsset && !isLazyAsset) return;
+
+  if (isPortalNavigation) {
+    event.respondWith(
+      fetch(request).then(response=>{
+        if (response && response.ok) {
+          const copy=response.clone();
+          caches.open(CACHE_NAME).then(cache=>cache.put('./index.html',copy));
+        }
+        return response;
+      }).catch(()=>caches.match('./index.html').then(cached=>cached || caches.match('./offline.html')))
+    );
+    return;
+  }
 
   event.respondWith(
-    caches.match(isPortalNavigation ? './index.html' : request).then(cached => {
+    caches.match(request).then(cached => {
       const network = fetch(request).then(response => {
         if (response && response.ok) {
           const copy = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(isPortalNavigation ? './index.html' : request, copy));
+          caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
         }
         return response;
       }).catch(error => {
         if (cached) return cached;
-        if (isPortalNavigation) return caches.match('./offline.html');
         throw error;
       });
       return cached || network;
