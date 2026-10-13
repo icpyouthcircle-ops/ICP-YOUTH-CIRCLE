@@ -13,11 +13,13 @@ const PORTAL_MDCAT_SCRIPTS = [
   'js/mdcat-study.js?v=20261013-speed-v2',
   'js/mdcat-account.js?v=20261013-speed-v2'
 ];
+const PORTAL_QA_SCRIPT = 'js/qa.js?v=20261013-community-v1';
 const publicModuleMemory = new Map();
 const publicModuleRequests = new Map();
 const portalFeaturePrefetches = new Set();
 let publicNotificationRequest = null;
 let portalMDCATLoadPromise = null;
+let portalQALoadPromise = null;
 let portalRenderFingerprint = '';
 const PORTAL_BOOKMARKS_KEY = 'icp-student-bookmarks-v1';
 const PORTAL_BOOTSTRAP_DATA = {
@@ -56,7 +58,7 @@ const PORTAL_BOOTSTRAP_DATA = {
     ['NAV-055','Duas / Motivation','duas-motivation','NAV-010'],
     ['NAV-056','Study Abroad','study-abroad','NAV-011'],['NAV-057','Blog','blog','NAV-011'],
     ['NAV-058','About','about','NAV-011'],['NAV-059','Contact','contact','NAV-011'],
-    ['NAV-060','Frequently Asked Questions','faq','NAV-008']
+    ['NAV-060','Frequently Asked Questions','faq','NAV-008'],['NAV-061','Student Q&A','questions','NAV-008']
   ].map((row,index)=>({ID:row[0],Label:row[1],Slug:row[2],ParentID:row[3],DisplayOrder:index+1})),
   categories: [
     ['Study','study','Study materials and learning resources'],['Entry Tests','entry-tests','Entry test preparation and related content'],
@@ -134,12 +136,23 @@ function prefetchPortalMDCATAssets() {
 function prefetchPortalRoute(slug) {
   const route=String(slug || '').trim().toLowerCase();
   if (['entry-tests','mdcat','mdcat-2027'].includes(route)) prefetchPortalMDCATAssets();
+  if (['community','questions'].includes(route)) {
+    const link=document.createElement('link');link.rel='prefetch';link.as='script';link.href=PORTAL_QA_SCRIPT;document.head.appendChild(link);
+  }
   if (route==='study') {
     ['Notes','Past Papers','Study Resources'].forEach(category=>loadPublicModule('resources',{category}).catch(()=>{}));
   } else if (route==='notes') loadPublicModule('resources',{category:'Notes'}).catch(()=>{});
   else if (route==='past-papers') loadPublicModule('resources',{category:'Past Papers'}).catch(()=>{});
   else if (route==='study-resources') loadPublicModule('resources',{category:'Study Resources'}).catch(()=>{});
   else if (['entry-tests','nums','etea','ecat','nust-net','other-tests'].includes(route)) loadPublicModule('entryTests').catch(()=>{});
+}
+
+function loadPortalQAFeatures() {
+  if(typeof openPortalQA==='function')return Promise.resolve();
+  if(!portalQALoadPromise)portalQALoadPromise=appendPortalFeatureScript(PORTAL_QA_SCRIPT).then(()=>{
+    if(typeof openPortalQA!=='function')throw new Error('Student Q&A did not initialize.');
+  }).catch(error=>{portalQALoadPromise=null;throw error;});
+  return portalQALoadPromise;
 }
 
 function addPortalIntentPrefetch(node,slug) {
@@ -404,7 +417,7 @@ function loadPortal() {
 function registerPortalServiceWorker() {
   if (!('serviceWorker' in navigator) || location.protocol !== 'https:') return;
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js?v=20261013-speed-v2').catch(() => {});
+    navigator.serviceWorker.register('sw.js?v=20261013-community-v1').catch(() => {});
   }, {once: true});
 }
 
@@ -415,6 +428,10 @@ function registerPortalServiceWorker() {
       if(!navigation.some(item=>['faq','faqs','frequently-asked-questions'].includes(String(item.Slug)))){
         const community=navigation.find(item=>String(item.Slug)==='community');
         navigation.push({ID:'PORTAL-FAQ',Label:'Frequently Asked Questions',Slug:'faq',ParentID:community ? community.ID : '',DisplayOrder:999});
+      }
+      if(!navigation.some(item=>String(item.Slug)==='questions')){
+        const community=navigation.find(item=>String(item.Slug)==='community');
+        navigation.push({ID:'PORTAL-QA',Label:'Student Q&A',Slug:'questions',ParentID:community ? community.ID : '',DisplayOrder:998});
       }
       portalData = Object.assign({},data,{navigation:navigation});
 
@@ -1066,6 +1083,7 @@ function getRouteDescription(slug, label) {
     'student-help-desk':'Send a question or request support from the portal administrators.',
     'suggestions':'Share anonymous feedback to help improve the student portal.',
     'faq':'Search answers to frequently asked questions about the portal.'
+    ,'questions':'Ask subject questions, share moderated answers and recognise verified contributors.'
   };
   return descriptions[slug] || 'Find published '+label.toLowerCase()+' information and resources from ICP YOUTH CIRCLE.';
 }
@@ -1324,6 +1342,9 @@ if (resourceCategories[item.Slug]) {
   renderPublicPortalForm('feedback');
 } else if (item.Slug === 'faq' || item.Slug === 'faqs' || item.Slug === 'frequently-asked-questions') {
   loadPortalFAQs();
+} else if (item.Slug === 'questions') {
+  content.innerHTML='<p>Loading student questions…</p>';
+  loadPortalQAFeatures().then(()=>{if(requestVersion===navigationVersion)openPortalQA();}).catch(error=>{if(requestVersion===navigationVersion)renderSectionNotice(error.message || 'Unable to load Student Q&A.');});
 } else if (item.Slug === 'forum') {
   renderSectionNotice(itemLabel+' is not publicly available yet. An official link will appear here when it is published.');
 } else {
@@ -5369,7 +5390,7 @@ function showAdmissionsError(error) {
   console.error(error);
 }
 const PORTAL_SEARCH_CACHE_KEY='icp-search-index-v1';
-const PORTAL_SEARCH_ROUTES=new Set(['study','notes','past-papers','study-resources','videos','mcqs','admissions','scholarships','career','updates','ai-tools','islamic','hadith','blog','entry-tests','mdcat','nums','etea','ecat','nust-net','other-tests']);
+const PORTAL_SEARCH_ROUTES=new Set(['study','notes','past-papers','study-resources','videos','mcqs','admissions','scholarships','career','updates','ai-tools','islamic','hadith','blog','entry-tests','mdcat','nums','etea','ecat','nust-net','other-tests','questions']);
 
 function readPortalSearchCache() {
   try {
