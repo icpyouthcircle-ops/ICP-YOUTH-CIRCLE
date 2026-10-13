@@ -264,13 +264,15 @@ async function aiSend(){
   if(icpAssistantState.busy)return;const input=document.getElementById('icpAiInput');const message=input.value.trim();if(message.length<2){aiSetStatus('Enter a question with at least two characters.','error');input.focus();return;}
   if(message.length>4000){aiSetStatus('Keep your request under 4,000 characters.','error');return;}
   let userMessage=null;
+  let progressTimer=null;
   try{
     const identity=await aiEnsureIdentity(false);if(!identity.auth.currentUser){aiShowSignIn();return;}
     userMessage={id:'local-'+Date.now(),role:'user',content:message,payload:{},saved:false};icpAssistantState.messages.push(userMessage);aiRenderMessages();aiShowThinking();input.value='';aiResizeComposer(input);aiSetBusy(true);aiSetStatus('Reviewing sources and preparing a clear answer…');
+    progressTimer=setTimeout(()=>aiSetStatus('Still working. Complex answers can take a little longer…'),12000);
     const data=await mdcatPrivateRequest('aiChat',{conversationId:icpAssistantState.conversationId||undefined,message,provider:document.getElementById('icpAiProvider').value,mode:document.getElementById('icpAiMode').value,language:document.getElementById('icpAiLanguage').value,verifiedOnly:document.getElementById('icpAiVerified').checked,requestId:aiRequestId()});
     icpAssistantState.conversationId=data.conversationId;icpAssistantState.messages.push(data.message);aiRenderMessages();await aiLoadHistory();aiSetStatus('');
   }catch(error){icpAssistantState.messages=icpAssistantState.messages.filter(item=>item.id!==userMessage?.id);aiRenderMessages();input.value=message;aiResizeComposer(input);aiSetStatus(error.message||'The assistant could not answer. Please try again.','error');}
-  finally{aiSetBusy(false);}
+  finally{if(progressTimer)clearTimeout(progressTimer);aiSetBusy(false);}
 }
 
 function aiToggleVoice(){
