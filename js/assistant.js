@@ -194,7 +194,7 @@ function aiMessageNode(message){
     const payload=message.payload||{};const meta=aiEl('div','icp-ai-response-meta');
     meta.appendChild(aiEl('strong','icp-ai-message-name','ICP AI'));
     const grounded=Boolean(payload.grounded);meta.append(aiEl('span','icp-ai-badge '+(grounded?'is-grounded':'is-guidance'),grounded?'✓ Verified sources':'General guidance'));
-    if(payload.provider)meta.append(aiEl('span','icp-ai-provider-badge',payload.provider));
+    if(payload.provider)meta.append(aiEl('span','icp-ai-provider-badge',payload.provider+(payload.fallbackFrom?' fallback':'')));
     if(payload.confidence)meta.append(aiEl('span','icp-ai-confidence','Confidence: '+payload.confidence));body.appendChild(meta);
     const answer=aiEl('div','icp-ai-answer');aiRenderRichText(answer,message.content);body.appendChild(answer);
     if(Array.isArray(payload.sources)&&payload.sources.length){
