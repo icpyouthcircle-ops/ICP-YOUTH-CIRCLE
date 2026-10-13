@@ -124,9 +124,9 @@ function loadPortalMDCATFeatures() {
   if (!portalMDCATLoadPromise) {
     portalMDCATLoadPromise=PORTAL_MDCAT_SCRIPTS.reduce(
       (chain,src)=>chain.then(()=>appendPortalFeatureScript(src)),Promise.resolve()
-    ).then(()=>{
+    ).then(async()=>{
       if (typeof openMDCATHub!=='function' || typeof openUserAccount!=='function') throw new Error('Portal features did not initialize.');
-      if (typeof initializePortalAccountState==='function') initializePortalAccountState();
+      if (typeof initializePortalAccountState==='function') await initializePortalAccountState();
     }).catch(error=>{portalMDCATLoadPromise=null;throw error;});
   }
   return portalMDCATLoadPromise;
