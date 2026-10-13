@@ -21,7 +21,7 @@ assert.doesNotMatch(shell,/mdcat(?:-study|-account)?\.js/,'MDCAT files must not 
 assert.doesNotMatch(shell,/qa\.js/,'Student Q&A must remain lazy on the homepage.');
 assert.doesNotMatch(shell,/assistant\.js/,'ICP AI Assistant must remain lazy on the homepage.');
 assert.match(worker,/qa\.js\?v=20261013-community-v1/,'Student Q&A should be available to the service worker as a lazy asset.');
-assert.match(worker,/assistant\.js\?v=20261013-ai-v6/,'ICP AI Assistant should be available to the service worker as a lazy asset.');
+assert.match(worker,/assistant\.js\?v=20261013-ai-v7/,'ICP AI Assistant should be available to the service worker as a lazy asset.');
 assert.match(app,/const PORTAL_AI_SCRIPT/,'ICP AI Assistant needs a dedicated lazy loader.');
 assert.match(worker,/if \(isPortalNavigation\)[\s\S]*?fetch\(request\)/,'Navigation should check the network for fresh HTML.');
 assert.match(backend,/cachedPublicJsonResponse_\('portalBundle',getPublicPortalBundle_,300\)/);
