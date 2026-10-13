@@ -495,26 +495,6 @@ nav {
   color: white;
 }
 
-.home-priority { padding: 24px 20px 8px; background: #f7f8fa; }
-.home-priority-panel { display: grid; grid-template-columns: minmax(240px,.9fr) minmax(360px,1.1fr); gap: 24px 36px; padding: 28px; border: 1px solid #e5e7eb; border-radius: 22px; background: #fff; box-shadow: 0 14px 38px rgba(16,24,40,.07); }
-.home-priority-copy span { color: var(--portal-brand); font-size: 11px; font-weight: 850; letter-spacing: .13em; }
-.home-priority-copy h2 { margin: 7px 0 6px; color: var(--portal-ink); font-size: clamp(22px,3vw,30px); letter-spacing: -.025em; }
-.home-priority-copy p { margin: 0; color: var(--portal-muted); line-height: 1.6; }
-.home-priority-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; align-content: center; }
-.home-priority-actions a { display: flex; min-height: 48px; align-items: center; justify-content: space-between; padding: 11px 14px; border: 1px solid #e1e5ea; border-radius: 12px; background: #fbfcfd; color: #273449; font-size: 14px; font-weight: 750; text-decoration: none; }
-.home-priority-actions a::after { color: var(--portal-brand); content: '\2192'; }
-.home-priority-actions a:hover,.home-priority-actions a:focus-visible { border-color: #c87485; background: #fff5f7; color: var(--portal-brand); }
-.home-trust-points { display: flex; grid-column: 1/-1; flex-wrap: wrap; gap: 10px 20px; padding-top: 18px; border-top: 1px solid #edf0f3; color: #475467; font-size: 12px; font-weight: 700; }
-.home-trust-points span::before { margin-right: 7px; color: #157347; content: '\2713'; font-weight: 900; }
-.deadline-badge { font-weight: 750; }
-.deadline-urgent { background: #fff0f0; color: #b42318; }
-.deadline-soon { background: #fff6df; color: #805600; }
-.deadline-open { background: #eaf8ef; color: #157347; }
-.deadline-closed { background: #f2f4f7; color: #667085; }
-.portal-trust-details { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 16px; padding-top: 13px; border-top: 1px solid #edf0f3; color: #667085; font-size: 12px; font-weight: 650; }
-.portal-official-source { color: #157347; }
-.portal-official-source::before { margin-right: 5px; content: '\2713'; font-weight: 900; }
-
 .resource-meta {
   margin-top: 12px;
   font-size: 13px;
@@ -797,15 +777,10 @@ footer p { color: #b8c2d4; margin: 6px 0; }
 .notification-preference-form .resource-button,.notification-preference-form p { grid-column: 1/-1; justify-self: start; margin: 0; }
 
 @media (max-width: 800px) {
-  .home-priority-panel { grid-template-columns: 1fr; }
-  .home-trust-points { grid-column: auto; }
   .student-metric-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .student-dashboard-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 480px) {
-  .home-priority { padding-right: 14px; padding-left: 14px; }
-  .home-priority-panel { padding: 21px; border-radius: 17px; }
-  .home-priority-actions { grid-template-columns: 1fr; }
   .student-welcome-card { border-radius: 18px; }
   .student-metric-grid { grid-template-columns: 1fr; }
   .student-metric-card { min-height: 112px; }
