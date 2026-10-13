@@ -1,2328 +1,5420 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbwfIALyzy8rVPAyIyTj-RkFdjX5f92uaVpESOGHrBIsnsFQLH14uoYeAdggXKNEhQUo/exec";
-const CONFIG = {
-  APP_NAME: 'ICP YOUTH CIRCLE',
-  TIMEZONE: 'Asia/Karachi',
-
-    SHEETS: {
-    RESOURCES: 'Resources',
-    CATEGORIES: 'Categories',
-    SUBJECTS: 'Subjects',
-    LEVELS: 'Levels',
-    INSTITUTIONS: 'Institutions',
-    ENTRY_TESTS: 'Entry_Tests',
-    ADMISSIONS: 'Admissions',
-    SCHOLARSHIPS: 'Scholarships',
-    OPPORTUNITIES: 'Opportunities',
-    ANNOUNCEMENTS: 'Announcements',
-    MCQS: 'MCQs',
-    VIDEOS: 'Videos',
-    AI_TOOLS: 'AI_Tools',
-    ISLAMIC_CONTENT: 'Islamic_Content',
-    BLOG: 'Blog',
-    NAVIGATION: 'Navigation',
-    HOMEPAGE: 'Homepage',
-    SOCIAL_LINKS: 'Social_Links',
-    SUBMISSIONS: 'Submissions',
-    HELP_DESK: 'Help_Desk',
-    ADMINS: 'Admins',
-    ACTIVITY_LOG: 'Activity_Log',
-    SETTINGS: 'Settings',
-    TEST_CATALOG: 'Test_Catalog',
-    NOTIFICATIONS: 'Notifications',
-    NOTIFICATION_READS: 'Notification_Reads',
-    NOTIFICATION_PREFERENCES: 'Notification_Preferences',
-    FAQS: 'FAQs',
-    FEEDBACK: 'Feedback',
-    COUNTDOWNS: 'Countdowns',
-    MDCAT_SUBJECTS: 'MDCAT_Subjects',
-    MDCAT_UNITS: 'MDCAT_Units',
-    MDCAT_CHAPTERS: 'MDCAT_Chapters',
-    MDCAT_TOPICS: 'MDCAT_Topics',
-    MDCAT_QUESTION_BANK: 'MDCAT_Question_Bank',
-    MDCAT_TESTS: 'MDCAT_Tests',
-    MDCAT_TEST_QUESTIONS: 'MDCAT_Test_Questions',
-    MDCAT_TEST_ATTEMPTS: 'MDCAT_Test_Attempts',
-    MDCAT_ATTEMPT_ANSWERS: 'MDCAT_Attempt_Answers',
-    MDCAT_PROGRESS: 'MDCAT_Progress',
-    MDCAT_DAILY_PRACTICE: 'MDCAT_Daily_Practice',
-    MDCAT_REVISION: 'MDCAT_Revision',
-    MDCAT_STUDY_PLAN: 'MDCAT_Study_Plan',
-    MDCAT_UPDATES: 'MDCAT_Updates',
-  }
+const API_BASE_URL =
+  'https://script.google.com/macros/s/AKfycbwfIALyzy8rVPAyIyTj-RkFdjX5f92uaVpESOGHrBIsnsFQLH14uoYeAdggXKNEhQUo/exec';
+const PORTAL_CACHE_KEY = 'icp-public-portal-v1';
+const PUBLIC_MODULE_CACHE_PREFIX = 'icp-public-module-v2:';
+const PUBLIC_MODULE_CACHE_TTL = 30 * 60 * 1000;
+const SCHEDULED_MODULE_CACHE_TTL = 60 * 1000;
+const SCHEDULED_PUBLIC_MODULES = new Set(['resources','scholarships','announcements','countdowns','publicNotifications']);
+const PUBLIC_NOTIFICATION_SEEN_KEY = 'icp-public-notifications-seen-v1';
+const PUBLIC_NOTIFICATION_LIFETIME = 24 * 60 * 60 * 1000;
+const publicModuleMemory = new Map();
+const publicModuleRequests = new Map();
+let publicNotificationRequest = null;
+let portalRenderFingerprint = '';
+const PORTAL_BOOKMARKS_KEY = 'icp-student-bookmarks-v1';
+const PORTAL_BOOTSTRAP_DATA = {
+  settings: {
+    site_name: 'ICP YOUTH CIRCLE',
+    site_tagline: 'Learn • Connect • Grow',
+    site_description: 'A student resource, opportunity, guidance and community platform by ICP YOUTH CIRCLE.',
+    footer_text: 'ICP YOUTH CIRCLE'
+  },
+  navigation: [
+    ['NAV-001','Home','home',''],['NAV-002','Study','study',''],['NAV-003','Entry Tests','entry-tests',''],
+    ['NAV-004','Admissions','admissions',''],['NAV-005','Scholarships','scholarships',''],['NAV-006','Career','career',''],
+    ['NAV-007','AI & Smart Tools','ai-smart-tools',''],['NAV-008','Community','community',''],['NAV-009','Updates','updates',''],
+    ['NAV-010','Islamic','islamic',''],['NAV-011','Explore','explore',''],
+    ['NAV-012','Notes','notes','NAV-002'],['NAV-013','Past Papers','past-papers','NAV-002'],['NAV-014','MCQs','mcqs','NAV-002'],
+    ['NAV-015','Videos','videos','NAV-002'],['NAV-016','Study Resources','study-resources','NAV-002'],
+    ['NAV-017','Prep Tracker','prep-tracker','NAV-002'],
+    ['NAV-018','MDCAT','mdcat','NAV-003'],['NAV-019','NUMS','nums','NAV-003'],['NAV-020','ETEA','etea','NAV-003'],
+    ['NAV-021','ECAT','ecat','NAV-003'],['NAV-022','NUST NET','nust-net','NAV-003'],['NAV-023','Other Tests','other-tests','NAV-003'],
+    ['NAV-024','College Admissions','college-admissions','NAV-004'],['NAV-025','University Admissions','university-admissions','NAV-004'],
+    ['NAV-026','Eligibility','eligibility','NAV-004'],['NAV-027','Deadlines','deadlines','NAV-004'],
+    ['NAV-028','Merit Lists','merit-lists','NAV-004'],['NAV-029','Admission Guides','admission-guides','NAV-004'],
+    ['NAV-030','Pakistan Scholarships','pakistan-scholarships','NAV-005'],['NAV-031','International Scholarships','international-scholarships','NAV-005'],
+    ['NAV-032','Financial Aid','financial-aid','NAV-005'],['NAV-033','Scholarship Guides','scholarship-guides','NAV-005'],
+    ['NAV-034','Career Guidance','career-guidance','NAV-006'],['NAV-035','Internships','internships','NAV-006'],
+    ['NAV-036','Competitions','competitions','NAV-006'],['NAV-037','Student Programs','student-programs','NAV-006'],
+    ['NAV-038','Portfolio Guidance','portfolio-guidance','NAV-006'],['NAV-039','Mentors','mentors','NAV-006'],
+    ['NAV-040','AI Assistant','ai-assistant','NAV-007'],['NAV-041','AI Tools','ai-tools','NAV-007'],
+    ['NAV-042','Smart Tools','smart-tools','NAV-007'],['NAV-043','Study Tools','study-tools','NAV-007'],
+    ['NAV-044','Forum','forum','NAV-008'],['NAV-045','Student Help Desk','student-help-desk','NAV-008'],
+    ['NAV-046','Submit Resource','submit-resource','NAV-008'],['NAV-047','Suggestions','suggestions','NAV-008'],
+    ['NAV-048','Announcements','announcements','NAV-009'],['NAV-049','Exam Updates','exam-updates','NAV-009'],
+    ['NAV-050','Results','results','NAV-009'],['NAV-051','Merit Lists','merit-lists','NAV-009'],
+    ['NAV-052','Important Notices','important-notices','NAV-009'],
+    ['NAV-053','Hadith','hadith','NAV-010'],['NAV-054','Islamic Reminders','islamic-reminders','NAV-010'],
+    ['NAV-055','Duas / Motivation','duas-motivation','NAV-010'],
+    ['NAV-056','Study Abroad','study-abroad','NAV-011'],['NAV-057','Blog','blog','NAV-011'],
+    ['NAV-058','About','about','NAV-011'],['NAV-059','Contact','contact','NAV-011'],
+    ['NAV-060','Frequently Asked Questions','faq','NAV-008']
+  ].map((row,index)=>({ID:row[0],Label:row[1],Slug:row[2],ParentID:row[3],DisplayOrder:index+1})),
+  categories: [
+    ['Study','study','Study materials and learning resources'],['Entry Tests','entry-tests','Entry test preparation and related content'],
+    ['Admissions','admissions','College and university admission information'],['Scholarships','scholarships','Scholarships and financial aid'],
+    ['Career','career','Career guidance and student opportunities'],['AI & Smart Tools','ai-smart-tools','AI tools and smart study utilities'],
+    ['Community','community','Student support and community features'],['Updates','updates','Announcements, results and important notices'],
+    ['Islamic','islamic','Islamic reminders, hadith and duas'],['Explore','explore','Blog, study abroad, about and contact content']
+  ].map((row,index)=>({ID:'BOOT-'+(index+1),Name:row[0],Slug:row[1],Description:row[2],DisplayOrder:index+1}))
 };
+    let portalData = null;
+    let currentResources = [];
+    let currentVideos = [];
+    let currentAdmissions = [];
+    let currentScholarships = [];
+    let currentOpportunities = [];
+    let currentAnnouncements = [];
+    let currentAITools = [];
+    let currentIslamicContent = [];
+    let currentBlogPosts = [];
+    let currentEntryTests = [];
+    let portalSearchIndex = null;
+    let portalSearchPromise = null;
+    let navigationVersion = 0;
+    let portalInitialRouteApplied = false;
 
+    let mcqScore = 0;
+    let mcqAnswered = 0;
+    let currentMCQs = [];
 
-function getSpreadsheet_() {
-  return SpreadsheetApp.getActiveSpreadsheet();
+    let activeQuizMCQs = [];
+    let currentMCQIndex = 0;
+    let mockTestActive = false;
+
+    let mockTestSubmitted = false;
+    let mockTestAnswers = {};
+
+function safePortalURL(value) {
+  const raw=String(value == null ? '' : value).trim();
+  if (!raw) return '';
+  try {
+    const url=new URL(raw,window.location.href);
+    return ['http:','https:'].includes(url.protocol) ? url.href : '';
+  } catch (_) { return ''; }
 }
 
-
-function getSheet_(sheetName) {
-  const spreadsheet = getSpreadsheet_();
-  const sheet = spreadsheet.getSheetByName(sheetName);
-
-  if (!sheet) {
-    throw new Error('Sheet not found: ' + sheetName);
-  }
-
-  return sheet;
+function googleDriveDownloadURL(value) {
+  const safe=safePortalURL(value);
+  if (!safe) return '';
+  try {
+    const url=new URL(safe);
+    if (url.hostname!=='drive.google.com') return '';
+    const pathMatch=url.pathname.match(/\/file\/d\/([A-Za-z0-9_-]+)/);
+    const id=pathMatch ? pathMatch[1] : url.searchParams.get('id');
+    if (!id || !/^[A-Za-z0-9_-]+$/.test(id)) return '';
+    const download=new URL('https://drive.google.com/uc');
+    download.searchParams.set('export','download');download.searchParams.set('id',id);
+    const resourceKey=url.searchParams.get('resourcekey');if(resourceKey)download.searchParams.set('resourcekey',resourceKey);
+    return download.href;
+  } catch (_) { return ''; }
 }
 
+function getPortalBookmarks() {
+  try {
+    const rows=JSON.parse(localStorage.getItem(PORTAL_BOOKMARKS_KEY) || '[]');
+    return Array.isArray(rows) ? rows.filter(row=>row && row.key && row.title).slice(0,100) : [];
+  } catch (_) { return []; }
+}
 
-function verifyPortalSetup_() {
-  const spreadsheet = getSpreadsheet_();
-  const results = [];
-  const missingSheets = [];
+function portalBookmarkKey(resource) {
+  return String(resource.ID || resource.FileURL || resource.Title || '').trim().slice(0,300);
+}
 
-  Object.entries(CONFIG.SHEETS).forEach(([key, sheetName]) => {
-    const sheet = spreadsheet.getSheetByName(sheetName);
+function isPortalResourceBookmarked(resource) {
+  const key=portalBookmarkKey(resource);
+  return Boolean(key && getPortalBookmarks().some(row=>row.key===key));
+}
 
-    if (sheet) {
-      results.push('✅ ' + sheetName);
-    } else {
-      results.push('❌ ' + sheetName);
-      missingSheets.push(sheetName);
-    }
+function togglePortalResourceBookmark(resource,button) {
+  const key=portalBookmarkKey(resource);
+  if (!key) return;
+  const rows=getPortalBookmarks();
+  const index=rows.findIndex(row=>row.key===key);
+  if (index>=0) rows.splice(index,1);
+  else rows.unshift({
+    key:key,title:String(resource.Title || 'Resource').slice(0,240),
+    category:String(resource.Category || '').slice(0,80),subject:String(resource.Subject || '').slice(0,160),
+    level:String(resource.Level || '').slice(0,120),fileURL:safePortalURL(resource.FileURL),
+    resourceType:String(resource.ResourceType || '').slice(0,80),savedAt:new Date().toISOString()
   });
+  try {localStorage.setItem(PORTAL_BOOKMARKS_KEY,JSON.stringify(rows.slice(0,100)));} catch (_) {}
+  const saved=index<0;
+  button.textContent=saved?'Saved ✓':'Save resource';button.setAttribute('aria-pressed',String(saved));
+}
 
-  Logger.log(results.join('\n'));
+function publicModuleKey(action, params = {}) {
+  const query = new URLSearchParams({ action, ...params });
+  return query.toString();
+}
 
-  if (missingSheets.length > 0) {
-    throw new Error(
-      'Missing sheet(s): ' + missingSheets.join(', ')
-    );
+function readPublicModuleCache(key, allowStale = false) {
+  const action=new URLSearchParams(key).get('action') || '';
+  const maxAge=SCHEDULED_PUBLIC_MODULES.has(action) ? SCHEDULED_MODULE_CACHE_TTL : PUBLIC_MODULE_CACHE_TTL;
+  if (publicModuleMemory.has(key)) {
+    const cached=publicModuleMemory.get(key);
+    if (allowStale || Date.now()-cached.savedAt<=maxAge) return cached.data;
+    publicModuleMemory.delete(key);
   }
+  try {
+    const cached = JSON.parse(localStorage.getItem(PUBLIC_MODULE_CACHE_PREFIX + key));
+    if (!cached || !Array.isArray(cached.data)) return null;
+    if (!allowStale && Date.now() - Number(cached.savedAt || 0) > maxAge) return null;
+    publicModuleMemory.set(key, {savedAt:Number(cached.savedAt || 0),data:cached.data});
+    return cached.data;
+  } catch (_) { return null; }
+}
 
-  Logger.log('✅ ICP YOUTH CIRCLE database connection verified successfully.');
+function storePublicModuleCache(key, data) {
+  if (!Array.isArray(data)) return;
+  const savedAt=Date.now();
+  publicModuleMemory.set(key, {savedAt,data});
+  try {
+    const value = JSON.stringify({ savedAt, data });
+    if (value.length <= 500000) localStorage.setItem(PUBLIC_MODULE_CACHE_PREFIX + key, value);
+  } catch (_) {}
+}
 
+function fetchWithPortalTimeout(url, options = {}, timeoutMs = 15000) {
+  if (typeof AbortController === 'undefined') return fetch(url, options);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, {...options, signal: controller.signal})
+    .finally(() => clearTimeout(timeout));
+}
+
+function refreshPublicModule(action, params = {}) {
+  const key = publicModuleKey(action, params);
+  if (publicModuleRequests.has(key)) return publicModuleRequests.get(key);
+  const url = API_BASE_URL + '?' + key;
+  const request = fetchWithPortalTimeout(url)
+    .then(response => {
+      if (!response.ok) throw new Error('HTTP error: ' + response.status);
+      return response.json();
+    })
+    .then(result => {
+      if (!result.success || !Array.isArray(result.data)) {
+        throw new Error(result.error || 'Unable to load portal content.');
+      }
+      storePublicModuleCache(key, result.data);
+      return result.data;
+    })
+    .finally(() => publicModuleRequests.delete(key));
+  publicModuleRequests.set(key, request);
+  return request;
+}
+
+function loadPublicModule(action, params = {}) {
+  const key = publicModuleKey(action, params);
+  const cached = readPublicModuleCache(key, !SCHEDULED_PUBLIC_MODULES.has(action));
+  if (cached) {
+    refreshPublicModule(action, params).catch(() => {});
+    return Promise.resolve(cached);
+  }
+  return refreshPublicModule(action, params);
+}
+
+function storePublicBundle(bundle) {
+  if (!bundle || typeof bundle !== 'object' || Array.isArray(bundle)) return false;
+  const actions = ['mcqs','videos','admissions','scholarships','opportunities','announcements','aiTools','islamicContent','blog','entryTests'];
+  if (!actions.every(action => Array.isArray(bundle[action])) || !Array.isArray(bundle.resources)) return false;
+  actions.forEach(action => storePublicModuleCache(publicModuleKey(action), bundle[action]));
+  ['Notes','Past Papers','Study Resources'].forEach(category => {
+    const rows = bundle.resources.filter(item => String(item.Category || '').trim().toLowerCase() === category.toLowerCase());
+    storePublicModuleCache(publicModuleKey('resources',{category}), rows);
+  });
   return true;
 }
-function getSheetData_(sheetName) {
-  const sheet = getSheet_(sheetName);
-  const values = sheet.getDataRange().getValues();
 
-  if (values.length < 2) {
-    return [];
-  }
-
-  const headers = values[0].map(header =>
-    String(header).replace(/\uFEFF/g, '').trim()
-  );
-
-  return values
-    .slice(1)
-    .filter(row => row.some(cell => cell !== ''))
-    .map(row => {
-      const item = {};
-
-      headers.forEach((header, index) => {
-        if (header) {
-          item[header] = row[index];
-        }
-      });
-
-      return item;
-    });
-}
-function testGetCategories_() {
-  const data = getSheetData_(CONFIG.SHEETS.CATEGORIES);
-  Logger.log(JSON.stringify(data, null, 2));
-}
-function getActiveSheetData_(sheetName) {
-  const data = getSheetData_(sheetName);
-
-  return data.filter(item => {
-    if (!Object.prototype.hasOwnProperty.call(item, 'Status')) {
+function warmPublicBundle() {
+  return fetchWithPortalTimeout(API_BASE_URL + '?action=portalBundle')
+    .then(response => {
+      if (!response.ok) throw new Error('HTTP error: ' + response.status);
+      return response.json();
+    })
+    .then(result => {
+      if (!result.success || !storePublicBundle(result.data)) throw new Error('Invalid portal bundle.');
       return true;
-    }
-
-    return String(item.Status).trim().toLowerCase() === 'active';
-  });
-}
-function testGetActiveCategories_() {
-  const data = getActiveSheetData_(CONFIG.SHEETS.CATEGORIES);
-  Logger.log(JSON.stringify(data, null, 2));
-}
-function portalScheduleTimestamp_(value) {
-  if (!value) return 0;
-  if (value instanceof Date) return value.getTime();
-  let text=String(value).trim();
-  // Dashboard date-time values have no suffix. Treat them as Pakistan time.
-  if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2})?$/.test(text)) text=text.replace(' ','T')+'+05:00';
-  const timestamp=new Date(text).getTime();
-  return Number.isFinite(timestamp) ? timestamp : 0;
-}
-
-function isPortalRowPublished_(item,now) {
-  const status=String(item.Status == null ? 'Active' : item.Status).trim().toLowerCase();
-  const publishAt=portalScheduleTimestamp_(item.PublishAt || item.PublishDate);
-  const expiresAt=portalScheduleTimestamp_(item.ExpiresAt || item.ExpiryDate);
-  const current=Number(now) || Date.now();
-  if (status==='scheduled') {
-    if (!publishAt || publishAt>current) return false;
-  } else if (status!=='active') return false;
-  if (publishAt && publishAt>current) return false;
-  if (expiresAt && expiresAt<=current) return false;
-  return true;
-}
-
-function getPublishedSheetData_(sheetName) {
-  return getSheetData_(sheetName).filter(item=>isPortalRowPublished_(item));
-}
-function getFeaturedSheetData_(sheetName) {
-  const data = getActiveSheetData_(sheetName);
-
-  return data.filter(item => {
-    if (!Object.prototype.hasOwnProperty.call(item, 'Featured')) {
-      return false;
-    }
-
-    return String(item.Featured).trim().toLowerCase() === 'yes';
-  });
-}
-function testGetFeaturedResources_() {
-  const data = getFeaturedSheetData_(CONFIG.SHEETS.RESOURCES);
-  Logger.log(JSON.stringify(data, null, 2));
-}
-function getRecordById_(sheetName, id) {
-  const data = getSheetData_(sheetName);
-
-  if (!data.length) {
-    return null;
-  }
-
-  const idField = Object.keys(data[0]).find(
-    key => key.trim().toLowerCase() === 'id'
-  );
-
-  if (!idField) {
-    throw new Error('ID column not found in sheet: ' + sheetName);
-  }
-
-  return (
-    data.find(item => String(item[idField]).trim() === String(id).trim()) ||
-    null
-  );
-}
-function testGetCategoryById_() {
-  const item = getRecordById_(CONFIG.SHEETS.CATEGORIES, 'CAT-001');
-  Logger.log(JSON.stringify(item, null, 2));
-}
-function generateNextId_(sheetName, prefix) {
-  const data = getSheetData_(sheetName);
-
-  if (!data.length) {
-    return prefix + '-001';
-  }
-
-  const numbers = data
-    .map(item => item.ID)
-    .filter(Boolean)
-    .map(id => {
-      const match = String(id).match(/(\d+)$/);
-      return match ? Number(match[1]) : 0;
     });
-
-  const nextNumber = Math.max(...numbers, 0) + 1;
-
-  return prefix + '-' + String(nextNumber).padStart(3, '0');
 }
-function testGenerateCategoryId_() {
-  const nextId = generateNextId_(CONFIG.SHEETS.CATEGORIES, 'CAT');
-  Logger.log(nextId);
-}
-function addRecord_(sheetName, record) {
-  const sheet = getSheet_(sheetName);
-  const data = sheet.getDataRange().getValues();
 
-  if (!data.length) {
-    throw new Error('Sheet has no header row: ' + sheetName);
-  }
-
-  const headers = data[0];
-
-  const row = headers.map(header => {
-    return Object.prototype.hasOwnProperty.call(record, header)
-      ? record[header]
-      : '';
-  });
-
-  sheet.appendRow(row);
-
-  return record;
-}
-function testAddCategory_() {
-  const newId = generateNextId_(CONFIG.SHEETS.CATEGORIES, 'CAT');
-
-  const record = {
-    ID: newId,
-    Name: 'TEST CATEGORY',
-    Slug: 'test-category',
-    ParentCategory: '',
-    Description: 'Temporary backend test record',
-    Icon: '',
-    DisplayOrder: 999,
-    Status: 'Inactive',
-    CreatedAt: new Date(),
-    UpdatedAt: new Date()
+function warmPublicModules() {
+  if (location.hostname !== 'icpyouthcircle-ops.github.io' && !window.__ICP_ENABLE_PREFETCH__) return;
+  const modules = [
+    ['announcements'], ['entryTests'], ['admissions'], ['scholarships'],
+    ['opportunities'], ['aiTools'], ['islamicContent'], ['blog'], ['videos'], ['mcqs'],
+    ['resources', { category: 'Notes' }],
+    ['resources', { category: 'Past Papers' }],
+    ['resources', { category: 'Study Resources' }]
+  ];
+  let index = 0;
+  const next = () => {
+    if (index >= modules.length) return;
+    const [action, params] = modules[index++];
+    const key = publicModuleKey(action, params || {});
+    if (readPublicModuleCache(key)) {
+      setTimeout(next, 80);
+      return;
+    }
+    refreshPublicModule(action, params || {}).catch(() => {}).finally(() => setTimeout(next, 120));
   };
-
-  const result = addRecord_(CONFIG.SHEETS.CATEGORIES, record);
-
-  Logger.log(JSON.stringify(result, null, 2));
+  const start = () => warmPublicBundle().catch(() => { next(); next(); });
+  if ('requestIdleCallback' in window) window.requestIdleCallback(start, { timeout: 1500 });
+  else setTimeout(start, 600);
 }
-function updateRecordById_(sheetName, id, updates) {
-  const sheet = getSheet_(sheetName);
-  const values = sheet.getDataRange().getValues();
 
-  if (values.length < 2) {
-    throw new Error('No data found in sheet: ' + sheetName);
-  }
+    document.addEventListener(
+      'DOMContentLoaded',
+      loadPortal
+    );
 
-  const headers = values[0];
-  const idColumnIndex = headers.indexOf('ID');
 
-  if (idColumnIndex === -1) {
-    throw new Error('ID column not found in sheet: ' + sheetName);
-  }
-
-  const targetRowIndex = values.findIndex((row, index) => {
-    if (index === 0) return false;
-    return String(row[idColumnIndex]).trim() === String(id).trim();
-  });
-
-  if (targetRowIndex === -1) {
-    throw new Error('Record not found: ' + id);
-  }
-
-  const updatedRow = headers.map((header, columnIndex) => {
-    if (Object.prototype.hasOwnProperty.call(updates, header)) {
-      return updates[header];
-    }
-
-    return values[targetRowIndex][columnIndex];
-  });
-
-  sheet
-    .getRange(targetRowIndex + 1, 1, 1, headers.length)
-    .setValues([updatedRow]);
-
-  return getRecordById_(sheetName, id);
-}
-function testUpdateCategory_() {
-  const result = updateRecordById_(
-    CONFIG.SHEETS.CATEGORIES,
-    'CAT-059',
-    {
-      Name: 'UPDATED TEST CATEGORY',
-      Description: 'Temporary record successfully updated',
-      UpdatedAt: new Date()
-    }
-  );
-
-  Logger.log(JSON.stringify(result, null, 2));
-}
-function deleteRecordById_(sheetName, id) {
-  const sheet = getSheet_(sheetName);
-  const values = sheet.getDataRange().getValues();
-
-  if (values.length < 2) {
-    throw new Error('No data found in sheet: ' + sheetName);
-  }
-
-  const headers = values[0];
-  const idColumnIndex = headers.indexOf('ID');
-
-  if (idColumnIndex === -1) {
-    throw new Error('ID column not found in sheet: ' + sheetName);
-  }
-
-  const targetRowIndex = values.findIndex((row, index) => {
-    if (index === 0) return false;
-    return String(row[idColumnIndex]).trim() === String(id).trim();
-  });
-
-  if (targetRowIndex === -1) {
-    throw new Error('Record not found: ' + id);
-  }
-
-  const deletedRecord = {};
-
-  headers.forEach((header, columnIndex) => {
-    deletedRecord[header] = values[targetRowIndex][columnIndex];
-  });
-
-  sheet.deleteRow(targetRowIndex + 1);
-
-  return deletedRecord;
-}
-function testDeleteCategory_() {
-  const result = deleteRecordById_(
-    CONFIG.SHEETS.CATEGORIES,
-    'CAT-059'
-  );
-
-  Logger.log(JSON.stringify(result, null, 2));
-}
-function logActivity_(action, entityType, entityId, details) {
-  const sheet = getSheet_(CONFIG.SHEETS.ACTIVITY_LOG);
-
-  const id = generateNextId_(
-    CONFIG.SHEETS.ACTIVITY_LOG,
-    'LOG'
-  );
-
-  let adminEmail = '';
-
+function readPortalCache() {
   try {
-    adminEmail = Session.getActiveUser().getEmail() || '';
-  } catch (error) {
-    adminEmail = '';
-  }
-
-  const record = {
-    ID: id,
-    AdminEmail: adminEmail,
-    Action: action,
-    EntityType: entityType,
-    EntityID: entityId,
-    Details: details || '',
-    Timestamp: new Date()
-  };
-
-  addRecord_(CONFIG.SHEETS.ACTIVITY_LOG, record);
-
-  return record;
-}
-function testActivityLog_() {
-  const result = logActivity_(
-    'TEST',
-    'System',
-    'TEST-001',
-    'ICP YOUTH CIRCLE activity logging test'
-  );
-
-  Logger.log(JSON.stringify(result, null, 2));
-}
-function getSettingsObject_() {
-  const rows = getSheetData_(CONFIG.SHEETS.SETTINGS);
-  const settings = {};
-
-  rows.forEach(row => {
-    const key = String(row.Key || '').trim();
-
-    if (key) {
-      settings[key] = row.Value;
-    }
-  });
-
-  return settings;
-}
-function getPublicPortalData_() {
-  return {
-    settings: getSettingsObject_(),
-
-    navigation: getActiveSheetData_(
-      CONFIG.SHEETS.NAVIGATION
-    ),
-
-    homepage: getActiveSheetData_(
-      CONFIG.SHEETS.HOMEPAGE
-    ),
-
-    categories: getActiveSheetData_(
-      CONFIG.SHEETS.CATEGORIES
-    ),
-
-    socialLinks: getActiveSheetData_(
-      CONFIG.SHEETS.SOCIAL_LINKS
-    )
-  };
-}
-function testPublicPortalData_() {
-  const data = getPublicPortalData_();
-
-  Logger.log(
-    JSON.stringify(data, null, 2)
-  );
-}
-function jsonResponse_(data, status) {
-  const payload = {
-    success: status !== false,
-    data: data
-  };
-  if (status === false) payload.error = data && data.error ? data.error : "Request failed.";
-
-  return ContentService
-    .createTextOutput(JSON.stringify(payload))
-    .setMimeType(ContentService.MimeType.JSON);
+    const cached = JSON.parse(localStorage.getItem(PORTAL_CACHE_KEY));
+    if (!cached || Date.now() - Number(cached.savedAt) > 6 * 60 * 60 * 1000) return null;
+    if (!cached.data || !Array.isArray(cached.data.navigation) || !Array.isArray(cached.data.categories)) return null;
+    return cached.data;
+  } catch (_) { return null; }
 }
 
-function cachedPublicJsonResponse_(key, loader, seconds) {
-  const cacheKey = 'icp-public-v1-' + String(key).replace(/[^A-Za-z0-9_.-]/g, '_').slice(0, 200);
-  let cache = null;
-  try {
-    cache = CacheService.getScriptCache();
-    const cached = cache.get(cacheKey);
-    if (cached) return ContentService.createTextOutput(cached).setMimeType(ContentService.MimeType.JSON);
-  } catch (_) {}
-  const payload = JSON.stringify({success:true,data:loader()});
-  try {
-    if (cache && payload.length < 95000) cache.put(cacheKey,payload,seconds || 300);
-  } catch (_) {}
-  return ContentService.createTextOutput(payload).setMimeType(ContentService.MimeType.JSON);
-}
-// ==========================================
-// MDCAT 2027 - PUBLIC DATA FUNCTIONS
-// ==========================================
-
-function getPublicMDCATSubjects_() {
-  const rows =
-    getActiveSheetData_(
-      CONFIG.SHEETS.MDCAT_SUBJECTS
-    );
-
-  return rows
-    .map(item => ({
-      ID: item.ID,
-      Name: item.Name,
-      Slug: item.Slug,
-      Description: item.Description,
-      Icon: item.Icon,
-      DisplayOrder: item.DisplayOrder
-    }))
-    .sort((a, b) =>
-      Number(a.DisplayOrder || 0) -
-      Number(b.DisplayOrder || 0)
-    );
-}
-
-
-function getPublicMDCATUnits_(subjectId) {
-  let rows =
-    getActiveSheetData_(
-      CONFIG.SHEETS.MDCAT_UNITS
-    );
-
-  if (subjectId) {
-    rows = rows.filter(
-      item =>
-        String(item.SubjectID) ===
-        String(subjectId)
-    );
-  }
-
-  return rows
-    .map(item => ({
-      ID: item.ID,
-      SubjectID: item.SubjectID,
-      Name: item.Name,
-      Slug: item.Slug,
-      Description: item.Description,
-      DisplayOrder: item.DisplayOrder
-    }))
-    .sort((a, b) =>
-      Number(a.DisplayOrder || 0) -
-      Number(b.DisplayOrder || 0)
-    );
-}
-
-
-function getPublicMDCATChapters_(
-  subjectId,
-  unitId
-) {
-  let rows =
-    getActiveSheetData_(
-      CONFIG.SHEETS.MDCAT_CHAPTERS
-    );
-
-  if (subjectId) {
-    rows = rows.filter(
-      item =>
-        String(item.SubjectID) ===
-        String(subjectId)
-    );
-  }
-
-  if (unitId) {
-    rows = rows.filter(
-      item =>
-        String(item.UnitID) ===
-        String(unitId)
-    );
-  }
-
-  return rows
-    .map(item => ({
-      ID: item.ID,
-      UnitID: item.UnitID,
-      SubjectID: item.SubjectID,
-      Name: item.Name,
-      Slug: item.Slug,
-      Description: item.Description,
-      DisplayOrder: item.DisplayOrder
-    }))
-    .sort((a, b) =>
-      Number(a.DisplayOrder || 0) -
-      Number(b.DisplayOrder || 0)
-    );
-}
-
-
-function getPublicMDCATTopics_(
-  subjectId,
-  unitId,
-  chapterId
-) {
-  let rows =
-    getActiveSheetData_(
-      CONFIG.SHEETS.MDCAT_TOPICS
-    );
-
-  if (subjectId) {
-    rows = rows.filter(
-      item =>
-        String(item.SubjectID) ===
-        String(subjectId)
-    );
-  }
-
-  if (unitId) {
-    rows = rows.filter(
-      item =>
-        String(item.UnitID) ===
-        String(unitId)
-    );
-  }
-
-  if (chapterId) {
-    rows = rows.filter(
-      item =>
-        String(item.ChapterID) ===
-        String(chapterId)
-    );
-  }
-
-  return rows
-    .map(item => ({
-      ID: item.ID,
-      ChapterID: item.ChapterID,
-      UnitID: item.UnitID,
-      SubjectID: item.SubjectID,
-      Name: item.Name,
-      Slug: item.Slug,
-      Description: item.Description,
-      DisplayOrder: item.DisplayOrder
-    }))
-    .sort((a, b) =>
-      Number(a.DisplayOrder || 0) -
-      Number(b.DisplayOrder || 0)
-    );
-}
-
-
-// IMPORTANT:
-// CorrectOption and Explanation are intentionally
-// NOT exposed publicly here.
-function getPublicMDCATQuestions_(
-  subjectId,
-  unitId,
-  chapterId,
-  topicId
-) {
-  let rows =
-    getActiveSheetData_(
-      CONFIG.SHEETS.MDCAT_QUESTION_BANK
-    );
-
-  if (subjectId) {
-    rows = rows.filter(
-      item =>
-        String(item.SubjectID) ===
-        String(subjectId)
-    );
-  }
-
-  if (unitId) {
-    rows = rows.filter(
-      item =>
-        String(item.UnitID) ===
-        String(unitId)
-    );
-  }
-
-  if (chapterId) {
-    rows = rows.filter(
-      item =>
-        String(item.ChapterID) ===
-        String(chapterId)
-    );
-  }
-
-  if (topicId) {
-    rows = rows.filter(
-      item =>
-        String(item.TopicID) ===
-        String(topicId)
-    );
-  }
-
-  return rows.map(item => ({
-    ID: item.ID,
-    SubjectID: item.SubjectID,
-    UnitID: item.UnitID,
-    ChapterID: item.ChapterID,
-    TopicID: item.TopicID,
-    Question: item.Question,
-    OptionA: item.OptionA,
-    OptionB: item.OptionB,
-    OptionC: item.OptionC,
-    OptionD: item.OptionD,
-    Difficulty: item.Difficulty,
-    QuestionType: item.QuestionType,
-    Source: item.Source
-  }));
-}
-
-
-function getPublicMDCATTests_() {
-  const rows =
-    getActiveSheetData_(
-      CONFIG.SHEETS.MDCAT_TESTS
-    );
-
-  return rows.map(item => ({
-    ID: item.ID,
-    Title: item.Title,
-    Slug: item.Slug,
-    TestType: item.TestType,
-    SubjectID: item.SubjectID,
-    UnitID: item.UnitID,
-    ChapterID: item.ChapterID,
-    TopicID: item.TopicID,
-    Description: item.Description,
-    TotalQuestions: item.TotalQuestions,
-    DurationMinutes: item.DurationMinutes,
-    PassingPercentage: item.PassingPercentage,
-    RandomizeQuestions:
-      item.RandomizeQuestions,
-    RandomizeOptions:
-      item.RandomizeOptions,
-    Featured: item.Featured
-  }));
-}
-
-
-function getPublicMDCATTestQuestions_(
-  testId
-) {
-  let rows =
-    getActiveSheetData_(
-      CONFIG.SHEETS.MDCAT_TEST_QUESTIONS
-    );
-
-  if (testId) {
-    rows = rows.filter(
-      item =>
-        String(item.TestID) ===
-        String(testId)
-    );
-  }
-
-  return rows
-    .map(item => ({
-      ID: item.ID,
-      TestID: item.TestID,
-      QuestionID: item.QuestionID,
-      DisplayOrder: item.DisplayOrder,
-      Marks: item.Marks,
-      NegativeMarks: item.NegativeMarks
-    }))
-    .sort((a, b) =>
-      Number(a.DisplayOrder || 0) -
-      Number(b.DisplayOrder || 0)
-    );
-}
-
-
-function getPublicMDCATDailyPractice_() {
-  const rows =
-    getActiveSheetData_(
-      CONFIG.SHEETS.MDCAT_DAILY_PRACTICE
-    );
-
-  return rows.map(item => ({
-    ID: item.ID,
-    Date: item.Date,
-    Title: item.Title,
-    Description: item.Description,
-    SubjectID: item.SubjectID,
-    UnitID: item.UnitID,
-    ChapterID: item.ChapterID,
-    TopicID: item.TopicID,
-    QuestionCount: item.QuestionCount,
-    DurationMinutes: item.DurationMinutes,
-    Difficulty: item.Difficulty,
-    Featured: item.Featured
-  }));
-}
-
-
-function getPublicMDCATUpdates_() {
-  const rows =
-    getActiveSheetData_(
-      CONFIG.SHEETS.MDCAT_UPDATES
-    );
-
-  return rows.map(item => ({
-    ID: item.ID,
-    Title: item.Title,
-    Category: item.Category,
-    Summary: item.Summary,
-    Content: item.Content,
-    PublishDate: item.PublishDate,
-    ExpiryDate: item.ExpiryDate,
-    OfficialURL: item.OfficialURL,
-    Priority: item.Priority,
-    Featured: item.Featured
-  }));
-}
-
-
-// ==========================================
-// MDCAT - PRIVATE / INTERNAL DATA FUNCTIONS
-// DO NOT EXPOSE THESE THROUGH PUBLIC doGet()
-// ==========================================
-
-function getMDCATTestAttempts_() {
-  return getSheetData_(
-    CONFIG.SHEETS.MDCAT_TEST_ATTEMPTS
-  );
-}
-
-
-function getMDCATAttemptAnswers_() {
-  return getSheetData_(
-    CONFIG.SHEETS.MDCAT_ATTEMPT_ANSWERS
-  );
-}
-
-
-function getMDCATProgress_() {
-  return getSheetData_(
-    CONFIG.SHEETS.MDCAT_PROGRESS
-  );
-}
-
-
-function getMDCATRevision_() {
-  return getSheetData_(
-    CONFIG.SHEETS.MDCAT_REVISION
-  );
-}
-
-
-function getMDCATStudyPlan_() {
-  return getSheetData_(
-    CONFIG.SHEETS.MDCAT_STUDY_PLAN
-  );
-}
-function doGet(e) {
-  const action =
-    e && e.parameter
-      ? String(e.parameter.action || '')
-      : '';
-
-  try {
-
-    if (action === 'mdcatAccountConfig') return jsonResponse_(mdcatAuthConfig_());
-
-    if (action === 'searchIndex') return cachedPublicJsonResponse_('searchIndex',getPublicSearchIndex_,60);
-
-    if (action === 'portalData') {
-      return cachedPublicJsonResponse_('portalData',getPublicPortalData_,300);
-    }
-
-    if (action === 'portalBundle') {
-      return cachedPublicJsonResponse_('portalBundle',getPublicPortalBundle_,60);
-    }
-
-    if (action === 'mcqs') {
-      return cachedPublicJsonResponse_('mcqs',getPublicMCQs_,300);
-    }
-
-    if (action === 'videos') {
-      return cachedPublicJsonResponse_('videos',getPublicVideos_,300);
-    }
-
-    if (action === 'admissions') {
-      return cachedPublicJsonResponse_('admissions',getPublicAdmissions_,300);
-    }
-
-    if (action === 'scholarships') {
-      return cachedPublicJsonResponse_('scholarships',getPublicScholarships_,60);
-    }
-
-    if (action === 'opportunities') {
-      return cachedPublicJsonResponse_('opportunities',getPublicOpportunities_,300);
-    }
-
-    if (action === 'announcements') {
-      return cachedPublicJsonResponse_('announcements',getPublicAnnouncements_,60);
-    }
-
-    if (action === 'publicNotifications') {
-      return cachedPublicJsonResponse_('publicNotifications',getPublicBellNotifications_,60);
-    }
-
-    if (action === 'countdowns') {
-      return cachedPublicJsonResponse_('countdowns',getPublicCountdowns_,60);
-    }
-
-    if (action === 'faqs') {
-      return cachedPublicJsonResponse_('faqs',getPublicFAQs_,300);
-    }
-
-    if (action === 'aiTools') {
-      return cachedPublicJsonResponse_('aiTools',getPublicAITools_,300);
-    }
-
-    if (action === 'islamicContent') {
-      return cachedPublicJsonResponse_('islamicContent',getPublicIslamicContent_,300);
-    }
-    if (action === 'blog') {
-      return cachedPublicJsonResponse_('blog',getPublicBlog_,300);
-    }
-    if (action === 'entryTests') {
-      return cachedPublicJsonResponse_('entryTests',getPublicEntryTests_,300);
-    }
-    if (action === 'testCatalog') {
-      return cachedPublicJsonResponse_('testCatalog',getPublicTestCatalog_,300);
-    }
-    if (action === 'resources') {
-      const category =
-        e.parameter.category || '';
-
-      return cachedPublicJsonResponse_('resources-' + category,function(){return getPublicResources_(category);},60);
-    }
-    // ==========================================
-// MDCAT 2027 API ROUTES
-// ==========================================
-
-if (action === 'mdcatSubjects') {
-  return cachedPublicJsonResponse_('mdcatSubjects',getPublicMDCATSubjects_,300);
-}
-
-
-if (action === 'mdcatUnits') {
-  const subjectId =
-    e.parameter.subjectId || '';
-
-  return cachedPublicJsonResponse_('mdcatUnits-' + subjectId,function(){return getPublicMDCATUnits_(subjectId);},300);
-}
-
-
-if (action === 'mdcatChapters') {
-  const subjectId =
-    e.parameter.subjectId || '';
-
-  const unitId =
-    e.parameter.unitId || '';
-
-  return cachedPublicJsonResponse_('mdcatChapters-' + subjectId + '-' + unitId,function(){return getPublicMDCATChapters_(subjectId,unitId);},300);
-}
-
-
-if (action === 'mdcatTopics') {
-  const subjectId =
-    e.parameter.subjectId || '';
-
-  const unitId =
-    e.parameter.unitId || '';
-
-  const chapterId =
-    e.parameter.chapterId || '';
-
-  return cachedPublicJsonResponse_('mdcatTopics-' + subjectId + '-' + unitId + '-' + chapterId,function(){return getPublicMDCATTopics_(subjectId,unitId,chapterId);},300);
-}
-
-
-if (action === 'mdcatQuestions') {
-  const subjectId =
-    e.parameter.subjectId || '';
-
-  const unitId =
-    e.parameter.unitId || '';
-
-  const chapterId =
-    e.parameter.chapterId || '';
-
-  const topicId =
-    e.parameter.topicId || '';
-
-  return cachedPublicJsonResponse_('mdcatQuestions-' + subjectId + '-' + unitId + '-' + chapterId + '-' + topicId,function(){return getPublicMDCATQuestions_(subjectId,unitId,chapterId,topicId);},300);
-}
-
-
-if (action === 'mdcatTests') {
-  return cachedPublicJsonResponse_('mdcatTests',getPublicMDCATTests_,300);
-}
-
-
-if (action === 'mdcatTestQuestions') {
-  const testId =
-    e.parameter.testId || '';
-
-  return cachedPublicJsonResponse_('mdcatTestQuestions-' + testId,function(){return getPublicMDCATTestQuestions_(testId);},300);
-}
-
-
-if (action === 'mdcatDailyPractice') {
-  return cachedPublicJsonResponse_('mdcatDailyPractice',getPublicMDCATDailyPractice_,300);
-}
-
-
-if (action === 'mdcatUpdates') {
-  return cachedPublicJsonResponse_('mdcatUpdates',getPublicMDCATUpdates_,300);
-}
-    return HtmlService
-      .createTemplateFromFile('Index')
-      .evaluate()
-      .setTitle('ICP YOUTH CIRCLE');
-
-  } catch (error) {
-
-    return jsonResponse_({error: 'Unable to load portal data.'}, false);
-  }
-}
-
-function testDoGet_() {
-  const response = doGet({
-    parameter: {
-      action: 'portalData'
-    }
-  });
-
-  Logger.log(response.getContent());
-}
-function getPublicResources_(categoryName) {
-  const resources = getPublishedSheetData_(
-    CONFIG.SHEETS.RESOURCES
-  );
-
-  const category = String(
-    categoryName || ''
-  ).trim().toLowerCase();
-
-  return resources
-    .filter(resource => {
-
-      if (!category) {
-        return true;
+function loadPortal() {
+  // Render immediately from a safe same-origin snapshot; refresh from Sheets in the background.
+  renderPortal(readPortalCache() || PORTAL_BOOTSTRAP_DATA);
+  const searchInput=document.getElementById('searchInput');
+  searchInput.addEventListener('input',()=>searchInput.setCustomValidity(''));
+  searchInput.addEventListener('focus',()=>loadPortalSearchIndex().catch(()=>{}));
+  searchInput.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();portalSearch();}});
+  fetchWithPortalTimeout(API_BASE_URL + '?action=portalData')
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(
+          'HTTP error: ' + response.status
+        );
       }
 
-      return String(
-        resource.Category || ''
-      ).trim().toLowerCase() === category;
-
+      return response.json();
     })
-    .map(resource => ({
-      ID: resource.ID || '',
-      Title: resource.Title || '',
-      Slug: resource.Slug || '',
-      Category: resource.Category || '',
-      Level: resource.Level || '',
-      Subject: resource.Subject || '',
-      Institution: resource.Institution || '',
-      Year: resource.Year || '',
-      ResourceType: resource.ResourceType || '',
-      Description: resource.Description || '',
-      FileURL: resource.FileURL || '',
-      ThumbnailURL: resource.ThumbnailURL || '',
-      Featured: resource.Featured || '',
-      DisplayOrder: resource.DisplayOrder || '',
-      PublishAt: resource.PublishAt || resource.PublishDate || '',
-      ExpiresAt: resource.ExpiresAt || resource.ExpiryDate || ''
-    }))
+    .then(result => {
+      if (!result.success) {
+        throw new Error(
+          result.error ||
+          'Unable to load portal data.'
+        );
+      }
+
+      if (!result.data || !Array.isArray(result.data.navigation) || !Array.isArray(result.data.categories)) {
+        throw new Error('Invalid portal data.');
+      }
+      try { localStorage.setItem(PORTAL_CACHE_KEY, JSON.stringify({savedAt:Date.now(),data:result.data})); } catch (_) {}
+      renderPortal(result.data);
+    })
+    .catch(error => {
+      console.error(
+        'Portal data error:',
+        error
+      );
+
+      // The already-rendered snapshot keeps the portal usable while the API recovers.
+    });
+  warmPublicModules();
+  registerPortalServiceWorker();
+}
+
+function registerPortalServiceWorker() {
+  if (!('serviceWorker' in navigator) || location.protocol !== 'https:') return;
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js?v=20260926-portal-suite').catch(() => {});
+  }, {once: true});
+}
+
+
+    function renderPortal(data) {
+
+      const navigation=Array.isArray(data.navigation) ? data.navigation.slice() : [];
+      if(!navigation.some(item=>['faq','faqs','frequently-asked-questions'].includes(String(item.Slug)))){
+        const community=navigation.find(item=>String(item.Slug)==='community');
+        navigation.push({ID:'PORTAL-FAQ',Label:'Frequently Asked Questions',Slug:'faq',ParentID:community ? community.ID : '',DisplayOrder:999});
+      }
+      portalData = Object.assign({},data,{navigation:navigation});
+
+      let fingerprint = '';
+      try { fingerprint = JSON.stringify({settings:portalData.settings || {},navigation:portalData.navigation || [],categories:portalData.categories || []}); } catch (_) {}
+      if (fingerprint && fingerprint === portalRenderFingerprint) return;
+      portalRenderFingerprint = fingerprint;
+
+      const settings = data.settings || {};
+
+      document.getElementById(
+        'siteName'
+      ).textContent =
+        settings.site_name ||
+        'ICP YOUTH CIRCLE';
+
+
+      document.getElementById(
+        'tagline'
+      ).textContent =
+        settings.site_tagline ||
+        'Learn • Connect • Grow';
+
+
+      document.getElementById(
+        'heroTitle'
+      ).textContent =
+        settings.site_name ||
+        'ICP YOUTH CIRCLE';
+
+
+      document.getElementById(
+        'heroTagline'
+      ).textContent =
+        settings.site_tagline ||
+        'Learn • Connect • Grow';
+
+
+      document.getElementById(
+        'heroDescription'
+      ).textContent =
+        settings.site_description || '';
+
+
+      document.getElementById(
+        'footerText'
+      ).textContent =
+        settings.footer_text ||
+        'ICP YOUTH CIRCLE';
+
+
+      renderNavigation(
+        portalData.navigation || []
+      );
+
+
+      renderCategories(
+        data.categories || []
+      );
+
+      if (!publicNotificationRequest) {
+        publicNotificationRequest = loadPublicModule('publicNotifications')
+          .catch(error => { publicNotificationRequest = null; throw error; });
+      }
+      publicNotificationRequest.then(renderPublicNotifications).catch(() => {});
+
+
+      document.getElementById(
+        'loading'
+      ).style.display = 'none';
+
+
+      document.getElementById(
+        'app'
+      ).style.display = 'block';
+
+      if (!portalInitialRouteApplied) {
+        portalInitialRouteApplied = true;
+        navigatePortalLocation();
+      }
+
+    }
+
+function announcementTimestamp(value) {
+  const raw = String(value == null ? '' : value).trim();
+  if (!raw) return 0;
+  const timestamp = Date.parse(raw);
+  if (!Number.isNaN(timestamp)) return timestamp;
+  const match = raw.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
+  return match ? Date.UTC(Number(match[3]), Number(match[2]) - 1, Number(match[1])) : 0;
+}
+
+function sortedPublicNotifications(items) {
+  const priority = {high: 2, medium: 1, low: 0};
+  const now = Date.now();
+  return (Array.isArray(items) ? items : [])
+    .filter(item => {
+      if (!item || !(item.Title || item.Summary || item.Content)) return false;
+      const publishedAt = announcementTimestamp(item.PublishedAt || item.PublishAt || item.PublishDate || item.CreatedAt);
+      return publishedAt > 0 && publishedAt <= now && now - publishedAt < PUBLIC_NOTIFICATION_LIFETIME;
+    })
+    .sort((a, b) => {
+      const featured = String(b.Featured || '').toLowerCase() === 'yes' ? 1 : 0;
+      const otherFeatured = String(a.Featured || '').toLowerCase() === 'yes' ? 1 : 0;
+      return (featured - otherFeatured) ||
+        ((priority[String(b.Priority || '').toLowerCase()] || 0) - (priority[String(a.Priority || '').toLowerCase()] || 0)) ||
+        (announcementTimestamp(b.PublishedAt || b.PublishAt || b.PublishDate || b.CreatedAt) - announcementTimestamp(a.PublishedAt || a.PublishAt || a.PublishDate || a.CreatedAt));
+    });
+}
+
+function renderPublicNotifications(items) {
+  const wrapper = document.getElementById('publicNotifications');
+  if (!wrapper) return;
+  const notifications = sortedPublicNotifications(items);
+  const button = wrapper.querySelector('.public-notification-button');
+  const badge = wrapper.querySelector('.public-notification-badge');
+  const list = wrapper.querySelector('.public-notification-list');
+  if (!button || !badge || !list) return;
+  list.replaceChildren();
+  if (!notifications.length) {
+    button.disabled = true;
+    badge.hidden = true;
+    const empty = document.createElement('p'); empty.className = 'public-notification-empty'; empty.textContent = 'No new public updates.';
+    list.appendChild(empty);
+    return;
+  }
+  button.disabled = false;
+  notifications.slice(0, 5).forEach(item => {
+    const route=String(item.Route || 'announcements');const label=String(item.Label || item.Category || 'Announcements');
+    const link = document.createElement('a'); link.href = '#/'+route; link.className = 'public-notification-item';
+    const meta = document.createElement('span'); meta.className = 'public-notification-meta'; meta.textContent = String(item.Category || item.Type || 'Announcement');
+    const title = document.createElement('strong'); title.textContent = String(item.Title || item.Summary || 'Portal update');
+    link.append(meta, title);
+    link.onclick = event => { event.preventDefault(); closePublicNotifications(); handleNavigation({Slug:route,Label:label,ParentID:String(item.ParentID || '')}); closeMobileNavigation(); };
+    list.appendChild(link);
+  });
+  const latestId = String(notifications[0].ID || notifications[0].Title || 'latest');
+  let seen = null;
+  try { seen = JSON.parse(localStorage.getItem(PUBLIC_NOTIFICATION_SEEN_KEY) || 'null'); } catch (_) {}
+  const viewedRecently = seen && seen.latestId === latestId;
+  badge.textContent = String(Math.min(notifications.length, 9)) + (notifications.length > 9 ? '+' : '');
+  badge.hidden = Boolean(viewedRecently);
+  button.dataset.latestId = latestId;
+  button.dataset.notificationCount = String(notifications.length);
+}
+
+function closePublicNotifications() {
+  const wrapper = document.getElementById('publicNotifications');
+  if (!wrapper) return;
+  wrapper.classList.remove('is-open');
+  const button = wrapper.querySelector('.public-notification-button');
+  if (button) button.setAttribute('aria-expanded', 'false');
+}
+
+function togglePublicNotifications() {
+  const wrapper = document.getElementById('publicNotifications');
+  if (!wrapper) return;
+  const open = !wrapper.classList.contains('is-open');
+  closePublicNotifications();
+  if (!open) return;
+  closeMobileNavigation();
+  wrapper.classList.add('is-open');
+  const button = wrapper.querySelector('.public-notification-button');
+  const badge = wrapper.querySelector('.public-notification-badge');
+  button.setAttribute('aria-expanded', 'true');
+  const latestId = button.dataset.latestId;
+  if (latestId) {
+    try { localStorage.setItem(PUBLIC_NOTIFICATION_SEEN_KEY, JSON.stringify({latestId, seenAt: Date.now()})); } catch (_) {}
+    badge.hidden = true;
+  }
+}
+
+function renderNavigation(items) {
+
+  const nav = document.getElementById('mainNavigation');
+  const menuToggle = document.getElementById('menuToggle');
+  const previousPublicNotifications = document.getElementById('publicNotifications');
+  if (previousPublicNotifications) previousPublicNotifications.remove();
+
+  nav.innerHTML = '';
+  nav.classList.remove('is-open');
+  menuToggle.setAttribute('aria-expanded','false');
+  menuToggle.onclick=()=>{closePublicNotifications();setMobileNavigationOpen(!nav.classList.contains('is-open'));};
+  if (!nav.dataset.keyboardReady) {
+    document.addEventListener('keydown',event=>{if(event.key==='Escape') closeMobileNavigation();});
+    nav.dataset.keyboardReady='true';
+  }
+
+  const parents = items
+    .filter(item => !item.ParentID)
     .sort(
       (a, b) =>
-        Number(a.DisplayOrder || 9999) -
-        Number(b.DisplayOrder || 9999)
-    );
-}
-function getPublicMCQs_() {
-  const mcqs = getActiveSheetData_(
-    CONFIG.SHEETS.MCQS
-  );
-
-  return mcqs
-    .map(item => ({
-      ID: item.ID || '',
-      Question: item.Question || '',
-      OptionA: item.OptionA || '',
-      OptionB: item.OptionB || '',
-      OptionC: item.OptionC || '',
-      OptionD: item.OptionD || '',
-      CorrectOption: item.CorrectOption || '',
-      Explanation: item.Explanation || '',
-      Subject: item.Subject || '',
-      Topic: item.Topic || '',
-      Level: item.Level || '',
-      EntryTest: item.EntryTest || '',
-      Difficulty: item.Difficulty || ''
-    }));
-}
-function getPublicVideos_() {
-  const videos = getActiveSheetData_(
-    CONFIG.SHEETS.VIDEOS
-  );
-
-  return videos
-    .map(video => ({
-      ID: video.ID || '',
-      Title: video.Title || '',
-      Category: video.Category || '',
-      Subject: video.Subject || '',
-      Level: video.Level || '',
-      Platform: video.Platform || '',
-      VideoURL: video.VideoURL || '',
-      ThumbnailURL: video.ThumbnailURL || '',
-      Duration: video.Duration || '',
-      Description: video.Description || '',
-      Featured: video.Featured || ''
-    }));
-}
-
-function getPublicAdmissions_() {
-  const admissions = getActiveSheetData_(
-    CONFIG.SHEETS.ADMISSIONS
-  );
-
-  return admissions
-    .map(item => ({
-      ID: item.ID || '',
-      Institution: item.Institution || '',
-      Program: item.Program || '',
-      DegreeLevel: item.DegreeLevel || '',
-      AdmissionType: item.AdmissionType || '',
-      Eligibility: item.Eligibility || '',
-      OpeningDate: item.OpeningDate || '',
-      Deadline: item.Deadline || '',
-      EntryTest: item.EntryTest || '',
-      MeritListDate: item.MeritListDate || '',
-      OfficialURL: item.OfficialURL || '',
-      Description: item.Description || '',
-      Featured: item.Featured || '',
-      CreatedAt: item.CreatedAt || '',
-      UpdatedAt: item.UpdatedAt || ''
-    }));
-}
-
-function getPublicScholarships_() {
-  const rows = getPublishedSheetData_(CONFIG.SHEETS.SCHOLARSHIPS);
-
-  return rows.map(item => ({
-    ID: item.ID,
-    Name: item.Name,
-    Provider: item.Provider,
-    Type: item.Type,
-    Country: item.Country,
-    Eligibility: item.Eligibility,
-    Benefits: item.Benefits,
-    OpeningDate: item.OpeningDate,
-    Deadline: item.Deadline,
-    OfficialURL: item.OfficialURL,
-    Description: item.Description,
-    Featured: item.Featured,
-    PublishAt: item.PublishAt || item.PublishDate || '',
-    ExpiresAt: item.ExpiresAt || item.ExpiryDate || '',
-    CreatedAt: item.CreatedAt || '',
-    UpdatedAt: item.UpdatedAt || ''
-  }));
-}
-function getPublicOpportunities_() {
-  const rows =
-    getActiveSheetData_(
-      CONFIG.SHEETS.OPPORTUNITIES
+        Number(a.DisplayOrder || 0) -
+        Number(b.DisplayOrder || 0)
     );
 
-  return rows.map(item => ({
-    ID: item.ID,
-    Title: item.Title,
-    Organization: item.Organization,
-    Type: item.Type,
-    Location: item.Location,
-    Eligibility: item.Eligibility,
-    OpeningDate: item.OpeningDate,
-    Deadline: item.Deadline,
-    OfficialURL: item.OfficialURL,
-    Description: item.Description,
-    Featured: item.Featured
-  }));
-}
-function getPublicAnnouncements_() {
-  const rows =
-    getPublishedSheetData_(
-      CONFIG.SHEETS.ANNOUNCEMENTS
-    );
+  parents.forEach(parent => {
 
-  return rows.map(item => ({
-    ID: item.ID,
-    Title: item.Title,
-    Category: item.Category,
-    Summary: item.Summary,
-    Content: item.Content,
-    PublishDate: item.PublishDate,
-    ExpiryDate: item.ExpiryDate,
-    OfficialURL: item.OfficialURL,
-    ButtonText: item.ButtonText,
-    DisplayOrder: item.DisplayOrder,
-    Priority: item.Priority,
-    Featured: item.Featured,
-    PublishAt: item.PublishAt || item.PublishDate || '',
-    ExpiresAt: item.ExpiresAt || item.ExpiryDate || ''
-  }));
-}
-function getPublicBellNotifications_() {
-  const lifetime=24*60*60*1000;
-  const now=Date.now();
-  const clean=(value,max)=>String(value == null ? '' : value).replace(/\s+/g,' ').trim().slice(0,max);
-  const rows=[];
-  const add=(type,item,title,summary,publishedAt,route,label,parentId)=>{
-    const timestamp=portalScheduleTimestamp_(publishedAt);
-    if (!timestamp || timestamp>now || now-timestamp>=lifetime) return;
-    rows.push({
-      ID:type+'-'+clean(item.ID || title,120),Type:type,Title:clean(title,240),Summary:clean(summary,500),
-      Category:type,PublishedAt:publishedAt,Route:route,Label:label,ParentID:parentId || '',
-      Priority:clean(item.Priority || '',40),Featured:clean(item.Featured || '',20)
-    });
-  };
-  getPublicAnnouncements_().forEach(item=>add('Announcement',item,item.Title,item.Summary || item.Content,item.PublishAt || item.PublishDate,'announcements','Announcements','NAV-009'));
-  getPublicAdmissions_().forEach(item=>add('Admission',item,(item.Program || 'Admission')+' — '+(item.Institution || 'Admission update'),item.Description,item.CreatedAt || item.UpdatedAt || item.OpeningDate,'admissions','Admissions','NAV-004'));
-  getPublicScholarships_().forEach(item=>add('Scholarship',item,item.Name || 'Scholarship opportunity',item.Description,item.PublishAt || item.CreatedAt || item.UpdatedAt || item.OpeningDate,'scholarships','Scholarships','NAV-005'));
-  return rows.sort((a,b)=>portalScheduleTimestamp_(b.PublishedAt)-portalScheduleTimestamp_(a.PublishedAt)).slice(0,20);
-}
-function getPublicCountdowns_() {
-  return getOptionalSheetData_(CONFIG.SHEETS.COUNTDOWNS)
-    .filter(item=>isPortalRowPublished_(item))
-    .map(item=>({
-      ID:String(item.ID || '').slice(0,120),
-      Title:String(item.Title || '').slice(0,240),
-      Description:String(item.Description || '').slice(0,1000),
-      TargetDateTime:item.TargetDateTime || '',
-      AfterMessage:String(item.AfterMessage || 'Result announced').slice(0,240),
-      OfficialURL:String(item.OfficialURL || '').slice(0,2000),
-      ButtonText:String(item.ButtonText || '').slice(0,80),
-      DisplayOrder:Number(item.DisplayOrder || 0),
-      PublishAt:item.PublishAt || item.PublishDate || '',
-      ExpiresAt:item.ExpiresAt || item.ExpiryDate || ''
-    }))
-    .filter(item=>item.ID && item.Title && item.TargetDateTime)
-    .sort((a,b)=>a.DisplayOrder-b.DisplayOrder || a.Title.localeCompare(b.Title));
-}
-function getPublicFAQs_() {
-  const rows=getOptionalSheetData_(CONFIG.SHEETS.FAQS).filter(item=>String(item.Status == null ? 'Active' : item.Status).trim().toLowerCase()==='active');
-  return rows.map(item=>({
-    ID:String(item.ID || '').slice(0,120),
-    Question:String(item.Question || '').slice(0,500),
-    Answer:String(item.Answer || '').slice(0,5000),
-    Category:String(item.Category || 'General').slice(0,120),
-    DisplayOrder:Number(item.DisplayOrder || 0)
-  })).filter(item=>item.ID && item.Question && item.Answer)
-    .sort((a,b)=>a.DisplayOrder-b.DisplayOrder || a.Question.localeCompare(b.Question));
-}
-function getPublicAITools_() {
-  const rows =
-    getActiveSheetData_(
-      CONFIG.SHEETS.AI_TOOLS
-    );
+    const wrapper = document.createElement('div');
+    wrapper.className = 'nav-item';
 
-  return rows.map(item => ({
-    ID: item.ID,
-    Name: item.Name,
-    Category: item.Category,
-    Description: item.Description,
-    ToolURL: item.ToolURL,
-    LogoURL: item.LogoURL,
-    PricingType: item.PricingType,
-    BestFor: item.BestFor,
-    Featured: item.Featured
-  }));
-}
-function getPublicIslamicContent_() {
-  const rows =
-    getActiveSheetData_(
-      CONFIG.SHEETS.ISLAMIC_CONTENT
-    );
+    const row = document.createElement('div');
+    row.className = 'nav-item-row';
 
-  return rows.map(item => ({
-    ID: item.ID,
-    Title: item.Title,
-    Type: item.Type,
-    ArabicText: item.ArabicText,
-    UrduTranslation: item.UrduTranslation,
-    EnglishTranslation: item.EnglishTranslation,
-    Reference: item.Reference,
-    SourceURL: item.SourceURL,
-    Description: item.Description,
-    Featured: item.Featured
-  }));
-}
-function getPublicBlog_() {
-  const rows =
-    getActiveSheetData_(
-      CONFIG.SHEETS.BLOG
-    );
+    const link = document.createElement('a');
+    link.href = '#';
+    link.textContent = parent.Label;
 
-  return rows.map(item => ({
-    ID: item.ID,
-    Title: item.Title,
-    Slug: item.Slug,
-    Category: item.Category,
-    Author: item.Author,
-    Summary: item.Summary,
-    Content: item.Content,
-    ThumbnailURL: item.ThumbnailURL,
-    PublishDate: item.PublishDate,
-    Featured: item.Featured
-  }));
-}
-function getPublicEntryTests_() {
-  const rows =
-    getActiveSheetData_(
-      CONFIG.SHEETS.ENTRY_TESTS
-    );
+    link.onclick = function(event) {
+      event.preventDefault();
+      handleNavigation(parent);
+      closeMobileNavigation();
+    };
 
-  return rows.map(item => ({
-    ID: item.ID,
-    Name: item.Name,
-    Slug: item.Slug,
-    Organization: item.Organization,
-    Description: item.Description,
-    Eligibility: item.Eligibility,
-    RegistrationStart: item.RegistrationStart,
-    RegistrationDeadline: item.RegistrationDeadline,
-    TestDate: item.TestDate,
-    OfficialURL: item.OfficialURL
-  }));
-}
+    row.appendChild(link);
 
-function searchText_(value, limit) {
-  return String(value == null ? '' : value).replace(/\s+/g,' ').trim().slice(0,limit || 500);
-}
+    const children = items
+      .filter(item => item.ParentID === parent.ID)
+      .sort(
+        (a, b) =>
+          Number(a.DisplayOrder || 0) -
+          Number(b.DisplayOrder || 0)
+      );
 
-function searchRows_(loader) {
-  try { const rows=loader(); return Array.isArray(rows) ? rows : []; }
-  catch (_) { return []; }
-}
+    if (children.length > 0) {
 
-function getPublicPortalBundle_() {
-  return {
-    resources:getPublicResources_(''),
-    mcqs:getPublicMCQs_(),
-    videos:getPublicVideos_(),
-    admissions:getPublicAdmissions_(),
-    scholarships:getPublicScholarships_(),
-    opportunities:getPublicOpportunities_(),
-    announcements:getPublicAnnouncements_(),
-    aiTools:getPublicAITools_(),
-    islamicContent:getPublicIslamicContent_(),
-    blog:getPublicBlog_(),
-    entryTests:getPublicEntryTests_()
-  };
-}
+      const dropdown = document.createElement('div');
+      dropdown.className = 'dropdown-menu';
+      dropdown.id='submenu-'+String(parent.ID || parent.Slug || '').replace(/[^A-Za-z0-9_-]/g,'');
 
-function getPublicSearchIndex_() {
-  const index=[];
-  const add=(kind,title,description,route,row,keywords,level)=>{
-    const cleanTitle=searchText_(title,240);
-    if (!cleanTitle || index.length >= 10000) return;
-    index.push({
-      ID:searchText_(row && row.ID,120),Kind:kind,Title:cleanTitle,
-      Description:searchText_(description,500),Keywords:searchText_(keywords,600),Route:route,
-      MDCATLevel:level || '',SubjectID:searchText_(row && row.SubjectID,120),UnitID:searchText_(row && row.UnitID,120),
-      ChapterID:searchText_(row && row.ChapterID,120),TopicID:searchText_(row && row.TopicID,120),
-      SubjectName:searchText_(row && row.SubjectName,160),UnitName:searchText_(row && row.UnitName,160),ChapterName:searchText_(row && row.ChapterName,160)
-    });
-  };
-  const resourceRoute=category=>({notes:'notes','past papers':'past-papers','study resources':'study-resources'}[String(category||'').trim().toLowerCase()] || 'study');
-  searchRows_(()=>getPublicResources_('')).forEach(row=>add('Resource',row.Title,row.Description,resourceRoute(row.Category),row,[row.Category,row.Subject,row.Level,row.Institution,row.Year,row.ResourceType].join(' ')));
-  searchRows_(getPublicVideos_).forEach(row=>add('Video',row.Title,row.Description,'videos',row,[row.Category,row.Subject,row.Level,row.Platform].join(' ')));
-  // Search only public question text and labels; never index answers or explanations.
-  searchRows_(getPublicMCQs_).forEach(row=>add('MCQ',row.Question,[row.Subject,row.Topic,row.Difficulty].filter(Boolean).join(' • '),'mcqs',row,[row.Subject,row.Topic,row.Level,row.EntryTest,row.Difficulty].join(' ')));
-  searchRows_(getPublicAdmissions_).forEach(row=>add('Admission',row.Program || row.Institution,row.Description,'admissions',row,[row.Institution,row.DegreeLevel,row.AdmissionType,row.Eligibility,row.EntryTest].join(' ')));
-  searchRows_(getPublicScholarships_).forEach(row=>add('Scholarship',row.Name,row.Description,'scholarships',row,[row.Provider,row.Type,row.Country,row.Eligibility,row.Benefits].join(' ')));
-  searchRows_(getPublicOpportunities_).forEach(row=>add('Opportunity',row.Title,row.Description,'career',row,[row.Organization,row.Type,row.Location,row.Eligibility].join(' ')));
-  searchRows_(getPublicAnnouncements_).forEach(row=>add('Announcement',row.Title,row.Summary || row.Content,'updates',row,[row.Category,row.Priority].join(' ')));
-  searchRows_(getPublicAITools_).forEach(row=>add('AI Tool',row.Name,row.Description,'ai-tools',row,[row.Category,row.PricingType,row.BestFor].join(' ')));
-  searchRows_(getPublicIslamicContent_).forEach(row=>add('Islamic Content',row.Title,row.Description,String(row.Type||'').toLowerCase()==='hadith'?'hadith':'islamic',row,[row.Type,row.Reference,row.EnglishTranslation,row.UrduTranslation].join(' ')));
-  searchRows_(getPublicBlog_).forEach(row=>add('Blog',row.Title,row.Summary || row.Content,'blog',row,[row.Category,row.Author].join(' ')));
-  searchRows_(getPublicEntryTests_).forEach(row=>add('Entry Test',row.Name,row.Description,row.Slug || 'entry-tests',row,[row.Organization,row.Eligibility].join(' ')));
-  searchRows_(getPublicFAQs_).forEach(row=>add('FAQ',row.Question,row.Answer,'faq',row,row.Category));
+      const submenuToggle=document.createElement('button');
+      submenuToggle.type='button';submenuToggle.className='submenu-toggle';
+      submenuToggle.setAttribute('aria-controls',dropdown.id);submenuToggle.setAttribute('aria-expanded','false');
+      submenuToggle.setAttribute('aria-label','Show '+parent.Label+' submenu');submenuToggle.textContent='⌄';
+      submenuToggle.onclick=()=>{
+        const open=!wrapper.classList.contains('submenu-open');
+        nav.querySelectorAll('.nav-item.submenu-open').forEach(item=>{
+          if(item!==wrapper){item.classList.remove('submenu-open');const button=item.querySelector('.submenu-toggle');if(button)button.setAttribute('aria-expanded','false');}
+        });
+        wrapper.classList.toggle('submenu-open',open);submenuToggle.setAttribute('aria-expanded',String(open));
+      };
+      row.appendChild(submenuToggle);
 
-  const subjects=searchRows_(getPublicMDCATSubjects_);
-  const units=searchRows_(()=>getPublicMDCATUnits_(''));
-  const chapters=searchRows_(()=>getPublicMDCATChapters_('',''));
-  const topics=searchRows_(()=>getPublicMDCATTopics_('','',''));
-  const subjectNames=new Map(subjects.map(row=>[String(row.ID),row.Name]));
-  const unitNames=new Map(units.map(row=>[String(row.ID),row.Name]));
-  const chapterNames=new Map(chapters.map(row=>[String(row.ID),row.Name]));
-  const names=row=>Object.assign({},row,{SubjectName:subjectNames.get(String(row.SubjectID))||'',UnitName:unitNames.get(String(row.UnitID))||'',ChapterName:chapterNames.get(String(row.ChapterID))||''});
-  subjects.forEach(row=>add('MDCAT Subject',row.Name,row.Description,'mdcat',Object.assign({},row,{SubjectID:row.ID,SubjectName:row.Name}),'MDCAT 2027','subject'));
-  units.forEach(original=>{const row=names(original);add('MDCAT Unit',row.Name,row.Description,'mdcat',row,[row.SubjectName,'MDCAT 2027'].join(' '),'unit');});
-  chapters.forEach(original=>{const row=names(original);add('MDCAT Chapter',row.Name,row.Description,'mdcat',row,[row.SubjectName,row.UnitName,'MDCAT 2027'].join(' '),'chapter');});
-  topics.forEach(original=>{const row=names(original);add('MDCAT Topic',row.Name,row.Description,'mdcat',row,[row.SubjectName,row.UnitName,row.ChapterName,'MDCAT 2027'].join(' '),'topic');});
-  searchRows_(()=>getPublicMDCATQuestions_('','','','')).forEach(original=>{const row=names(original);add('MDCAT Question',row.Question,[row.SubjectName,row.UnitName,row.ChapterName,row.Difficulty].filter(Boolean).join(' • '),'mdcat',row,[row.Source,row.QuestionType,'MDCAT 2027'].join(' '),'question');});
-  searchRows_(getPublicMDCATTests_).forEach(row=>add('MDCAT Test',row.Title,row.Description,'mdcat',row,[row.TestType,'MDCAT 2027'].join(' '),'test'));
-  searchRows_(getPublicMDCATDailyPractice_).forEach(row=>add('MDCAT Daily Practice',row.Title,row.Description,'mdcat',row,[row.Difficulty,'MDCAT 2027'].join(' '),'daily'));
-  searchRows_(getPublicMDCATUpdates_).forEach(row=>add('MDCAT Update',row.Title,row.Summary || row.Content,'mdcat',row,[row.Category,'MDCAT 2027'].join(' '),'update'));
-  return index;
-}
+      children.forEach(child => {
 
-// Authenticated MDCAT scoring. All helpers end in _ to block google.script.run calls.
-const MDCAT_SCORING_ = {
-  version: 1,
-  sessions: 'MDCAT_Sessions',
-  snapshots: 'MDCAT_Session_Questions',
-  maxQuestions: 200,
-  maxStartsPerDay: 20,
-  sessionHeaders: 'ID UserID RequestID Mode ContextID Title StartedAt DeadlineAt SubmittedAt Status AnswersJSON TotalQuestions PassingPercentage RandomizeOptions'.split(' '),
-  snapshotHeaders: 'ID AttemptID QuestionID SubjectID UnitID ChapterID TopicID Question OptionA OptionB OptionC OptionD CorrectOption Explanation Marks NegativeMarks DisplayOrder'.split(' '),
-  attemptHeaders: 'ID UserID TestID StartedAt SubmittedAt TotalQuestions AttemptedQuestions CorrectAnswers WrongAnswers Unanswered Score Percentage TimeTakenSeconds Status CreatedAt UpdatedAt'.split(' '),
-  answerHeaders: 'ID AttemptID UserID TestID QuestionID SelectedOption CorrectOption IsCorrect MarksAwarded TimeSpentSeconds AnsweredAt CreatedAt UpdatedAt'.split(' '),
-  progressHeaders: 'ID UserID SubjectID UnitID ChapterID TopicID QuestionsAttempted CorrectAnswers WrongAnswers AccuracyPercentage AverageTimeSeconds LastPracticedAt WeaknessScore MasteryLevel Status CreatedAt UpdatedAt'.split(' ')
-};
+        const childLink = document.createElement('a');
 
-function mdcatError_(code, message) {
-  const error = new Error(message);
-  error.mdcatCode = code;
-  throw error;
-}
+        childLink.href = '#';
+        childLink.textContent = child.Label;
 
-function mdcatAuthConfig_() {
-  const settings=mdcatFirebaseSettings_();
-  const enabled = settings.valid && settings.scoringEnabled;
-  return {enabled:enabled, version:1, firebase: enabled ? {
-    apiKey:settings.firebase.apiKey, authDomain:settings.firebase.authDomain, projectId:settings.firebase.projectId, appId:settings.firebase.appId
-  } : null};
-}
+        childLink.onclick = function(event) {
+          event.preventDefault();
+          handleNavigation(child);
+          closeMobileNavigation();
+        };
 
-function mdcatFirebaseSettings_() {
-  const properties=PropertiesService.getScriptProperties();
-  let firebase;
-  try { firebase=JSON.parse(properties.getProperty('MDCAT_FIREBASE_CONFIG') || '{}'); }
-  catch (_) { firebase={}; }
-  const valid=['apiKey','authDomain','projectId','appId'].every(key=>typeof firebase[key]==='string' && firebase[key].trim());
-  return {firebase:firebase,valid:valid,scoringEnabled:properties.getProperty('MDCAT_SCORING_ENABLED')==='true'};
-}
+        dropdown.appendChild(childLink);
 
-function firebaseAuthenticate_(token) {
-  const settings=mdcatFirebaseSettings_();
-  if (!settings.valid) mdcatError_('NOT_CONFIGURED','Google sign-in is not configured yet.');
-  const config={firebase:settings.firebase};
-  if (typeof token !== 'string' || token.length < 100 || token.length > 12000) mdcatError_('AUTH_REQUIRED','Please sign in again.');
-  // Google validates the ID token on the account lookup endpoint. Never trust a submitted UserID.
-  const response = UrlFetchApp.fetch('https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' + encodeURIComponent(config.firebase.apiKey), {
-    method:'post', contentType:'application/json', payload:JSON.stringify({idToken:token}), muteHttpExceptions:true
-  });
-  if (response.getResponseCode() !== 200) mdcatError_('AUTH_REQUIRED','Your sign-in could not be verified. Please sign in again.');
-  let account, claims;
-  try {
-    const users = JSON.parse(response.getContentText()).users;
-    if (!Array.isArray(users) || users.length !== 1) throw new Error('Invalid account');
-    account = users[0];
-    claims = JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(token.split('.')[1])).getDataAsString());
-  } catch (_) { mdcatError_('AUTH_REQUIRED','Your sign-in could not be verified.'); }
-  const now = Math.floor(Date.now()/1000);
-  if (!account.localId || account.disabled || account.emailVerified !== true ||
-    claims.sub !== account.localId || claims.aud !== config.firebase.projectId ||
-    claims.iss !== 'https://securetoken.google.com/' + config.firebase.projectId ||
-    !Number.isFinite(claims.exp) || claims.exp <= now ||
-    !Number.isFinite(claims.iat) || claims.iat > now + 60 ||
-    !Number.isFinite(claims.auth_time) || claims.auth_time > now + 60 ||
-    claims.auth_time < Number(account.validSince || 0) ||
-    !claims.firebase || claims.firebase.sign_in_provider !== 'google.com') {
-    mdcatError_('AUTH_REQUIRED','A current, verified Google sign-in is required.');
-  }
-  return {uid:String(account.localId),email:String(account.email || '').trim().toLowerCase()};
-}
+      });
 
-function mdcatAuthenticate_(token) {
-  if (!mdcatAuthConfig_().enabled) mdcatError_('NOT_CONFIGURED','Scoring is not enabled yet.');
-  return firebaseAuthenticate_(token).uid;
-}
-
-const PUBLIC_FORM_LIMITS_ = {
-  resource: {sheet:'SUBMISSIONS',prefix:'SUBM',required:[['Name','SubmittedBy','SubmitterName','FullName'],['Email','ContactEmail'],['Title','ResourceTitle'],['ResourceType','Type','Category'],['URL','ResourceURL','Link']]},
-  help: {sheet:'HELP_DESK',prefix:'HELP',required:[['Name','SubmittedBy','RequesterName','FullName'],['Email','ContactEmail'],['RequestType','Category','Type'],['Subject','Title'],['Message','Description','Request','Details']]},
-  feedback: {sheet:'FEEDBACK',prefix:'FDBK',required:[['Category','Type'],['Message','Feedback','Suggestion']]}
-};
-
-function publicFormText_(value, label, maximum, required) {
-  const text=String(value == null ? '' : value).replace(/\r\n?/g,'\n').trim();
-  if (required && !text) mdcatError_('BAD_REQUEST',label+' is required.');
-  if (text.length>maximum) mdcatError_('BAD_REQUEST',label+' is too long.');
-  return text;
-}
-
-function publicFormEmail_(value) {
-  const email=publicFormText_(value,'Email',160,true).toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) mdcatError_('BAD_REQUEST','Enter a valid email address.');
-  return email;
-}
-
-function publicFormToken_(value, action) {
-  const token=String(value || '');
-  if (!/^[A-Za-z0-9_-]{20,80}$/.test(token)) mdcatError_('BAD_REQUEST','Refresh the page and try again.');
-  const cache=CacheService.getScriptCache();
-  const digest=Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,action+':'+token)
-    .map(byte=>(byte<0?byte+256:byte).toString(16).padStart(2,'0')).join('').slice(0,32);
-  const key='icp-public-form-'+digest;
-  const count=Number(cache.get(key) || 0);
-  if (count>=5) mdcatError_('RATE_LIMITED','Too many requests. Please wait ten minutes and try again.');
-  cache.put(key,String(count+1),600);
-}
-
-function publicFormAppend_(kind, fields) {
-  const definition=PUBLIC_FORM_LIMITS_[kind];
-  const sheetName=CONFIG.SHEETS[definition.sheet];
-  const sheet=getSheet_(sheetName);
-  const values=sheet.getDataRange().getValues();
-  const headers=(values[0] || []).map(value=>String(value).replace(/\uFEFF/g,'').trim());
-  if (!headers.length || !headers.some(Boolean) || new Set(headers.filter(Boolean)).size!==headers.filter(Boolean).length) {
-    mdcatError_('SETUP_REQUIRED',sheetName+' needs a valid header row.');
-  }
-  const lowerHeaders=new Set(headers.filter(Boolean).map(header=>header.toLowerCase()));
-  const missing=definition.required.filter(group=>!group.some(key=>lowerHeaders.has(key.toLowerCase()))).map(group=>group[0]);
-  if (missing.length) mdcatError_('SETUP_REQUIRED',sheetName+' is missing required field column(s): '+missing.join(', ')+'.');
-  const now=new Date();
-  const id=generateNextId_(sheetName,definition.prefix);
-  const record=Object.assign({},fields,{ID:id,Status:'Pending Review',SubmittedAt:now,CreatedAt:now,UpdatedAt:now});
-  const byLower={};Object.keys(record).forEach(key=>{byLower[key.toLowerCase()]=record[key];});
-  const row=headers.map(header=>header ? mdcatCell_(byLower[header.toLowerCase()] == null ? '' : byLower[header.toLowerCase()]) : '');
-  sheet.appendRow(row);
-  return {id:id,status:'Pending Review'};
-}
-
-function publicSubmitResource_(body) {
-  if (String(body.website || '').trim()) mdcatError_('BAD_REQUEST','Unable to accept this submission.');
-  publicFormToken_(body.submissionToken,'resource');
-  const title=publicFormText_(body.title,'Resource title',200,true);
-  const url=publicFormText_(body.url,'Resource link',1000,true);
-  if (!/^https?:\/\/[^\s]+$/i.test(url)) mdcatError_('BAD_REQUEST','Enter a complete http or https resource link.');
-  const name=publicFormText_(body.name,'Name',120,true);
-  const email=publicFormEmail_(body.email);
-  const resourceType=publicFormText_(body.resourceType,'Resource type',80,true);
-  return publicFormAppend_('resource',{
-    Name:name,SubmittedBy:name,SubmitterName:name,FullName:name,
-    Email:email,ContactEmail:email,
-    Title:title,ResourceTitle:title,
-    ResourceType:resourceType,Type:resourceType,Category:resourceType,
-    Subject:publicFormText_(body.subject,'Subject',120,false),
-    Level:publicFormText_(body.level,'Level',120,false),
-    Description:publicFormText_(body.description,'Description',1500,false),
-    URL:url,ResourceURL:url,Link:url,
-    Consent:'Yes'
-  });
-}
-
-function publicHelpRequest_(body) {
-  if (String(body.website || '').trim()) mdcatError_('BAD_REQUEST','Unable to accept this request.');
-  publicFormToken_(body.submissionToken,'help');
-  const subject=publicFormText_(body.subject,'Subject',200,true);
-  const message=publicFormText_(body.message,'Message',2000,true);
-  const name=publicFormText_(body.name,'Name',120,true);
-  const email=publicFormEmail_(body.email);
-  const requestType=publicFormText_(body.requestType,'Request type',80,true);
-  return publicFormAppend_('help',{
-    Name:name,SubmittedBy:name,RequesterName:name,FullName:name,
-    Email:email,ContactEmail:email,
-    RequestType:requestType,Category:requestType,Type:requestType,
-    Subject:subject,Title:subject,
-    Message:message,Description:message,Request:message,Details:message,
-    Consent:'Yes'
-  });
-}
-
-function publicFeedback_(body) {
-  if (String(body.website || '').trim()) mdcatError_('BAD_REQUEST','Unable to accept this feedback.');
-  publicFormToken_(body.submissionToken,'feedback');
-  const category=publicFormText_(body.category,'Category',80,true);
-  const message=publicFormText_(body.message,'Feedback',2000,true);
-  const pageURL=publicFormText_(body.pageURL,'Page',500,false);
-  return publicFormAppend_('feedback',{
-    Category:category,Type:category,
-    Message:message,Feedback:message,Suggestion:message,
-    PageURL:/^https?:\/\/[^\s]+$/i.test(pageURL) ? pageURL : ''
-  });
-}
-
-function getOptionalSheetData_(sheetName) {
-  const sheet = getSpreadsheet_().getSheetByName(sheetName);
-  if (!sheet) return [];
-  return getSheetData_(sheetName);
-}
-
-function getPublicTestCatalog_() {
-  const sheet = getSpreadsheet_().getSheetByName(CONFIG.SHEETS.TEST_CATALOG);
-  const rows = sheet ? getActiveSheetData_(CONFIG.SHEETS.TEST_CATALOG) : [{
-    ID:'TST-MDCAT',Name:'MDCAT',Slug:'mdcat',Description:'Medical and Dental College Admission Test preparation and scored practice.',
-    TestType:'Entry Test',Route:'mdcat',Engine:'MDCAT',DisplayOrder:1
-  }];
-  return rows.map(row=>({
-    ID:String(row.ID || '').slice(0,120),Name:String(row.Name || row.Title || '').slice(0,200),
-    Slug:String(row.Slug || '').slice(0,120),Description:String(row.Description || '').slice(0,1000),
-    TestType:String(row.TestType || row.Category || '').slice(0,120),Route:String(row.Route || row.Slug || '').slice(0,120),
-    Engine:String(row.Engine || '').slice(0,80),DisplayOrder:Number(row.DisplayOrder || 0)
-  })).filter(row=>row.ID && row.Name).sort((a,b)=>a.DisplayOrder-b.DisplayOrder || a.Name.localeCompare(b.Name));
-}
-
-function studentOwnedRows_(sheetName,email) {
-  return getSheetData_(sheetName).filter(row=>{
-    const owner=String(row.Email || row.ContactEmail || row.SubmitterEmail || row.RequesterEmail || '').trim().toLowerCase();
-    return owner===email;
-  }).sort((a,b)=>new Date(b.UpdatedAt || b.SubmittedAt || b.CreatedAt || 0).getTime()-new Date(a.UpdatedAt || a.SubmittedAt || a.CreatedAt || 0).getTime()).slice(0,100);
-}
-
-function studentNotificationPreferences_(uid) {
-  const defaults={GeneralUpdates:true,TestNotices:true,DeadlineReminders:true,StudyPlanReminders:true};
-  const sheet=getSpreadsheet_().getSheetByName(CONFIG.SHEETS.NOTIFICATION_PREFERENCES);
-  if (!sheet) return defaults;
-  const rows=getSheetData_(CONFIG.SHEETS.NOTIFICATION_PREFERENCES).filter(row=>String(row.UserID)===String(uid) && String(row.Status || 'Active').toLowerCase()==='active');
-  if (!rows.length) return defaults;
-  const value=(row,key)=>String(row[key]).trim().toLowerCase()!=='false';
-  return Object.fromEntries(Object.keys(defaults).map(key=>[key,value(rows[0],key)]));
-}
-
-function studentNotificationReadIds_(uid) {
-  const sheet=getSpreadsheet_().getSheetByName(CONFIG.SHEETS.NOTIFICATION_READS);
-  if (!sheet) return [];
-  return getSheetData_(CONFIG.SHEETS.NOTIFICATION_READS).filter(row=>String(row.UserID)===String(uid) && String(row.Status || 'Active').toLowerCase()==='active')
-    .map(row=>String(row.NotificationID || '')).filter(Boolean).slice(-1000);
-}
-
-function studentNotifications_(preferences) {
-  const timestamp=value=>{
-    if (!value) return 0;
-    const parsed=new Date(value).getTime();
-    return Number.isFinite(parsed) ? parsed : 0;
-  };
-  return getOptionalSheetData_(CONFIG.SHEETS.NOTIFICATIONS).filter(row=>{
-    if (!isPortalRowPublished_(row)) return false;
-    const audience=String(row.Audience || 'All').trim().toLowerCase();
-    if (!['all','everyone','registered users','students'].includes(audience)) return false;
-    const category=String(row.Category || (row.TestID ? 'Test' : 'General')).trim().toLowerCase();
-    const reminder=String(row.ReminderType || '').trim().toLowerCase();
-    const pinned=/^(yes|true|1)$/i.test(String(row.IsPinned || '')) || /^(important|urgent)$/i.test(String(row.Priority || ''));
-    if (pinned || !preferences) return true;
-    if ((row.TestID || category==='test') && preferences.TestNotices===false) return false;
-    if ((reminder==='deadline' || category==='deadline') && preferences.DeadlineReminders===false) return false;
-    if ((reminder==='study plan' || reminder==='study-plan' || category==='study plan') && preferences.StudyPlanReminders===false) return false;
-    return preferences.GeneralUpdates!==false;
-  }).sort((a,b)=>{
-    const pinnedA=/^(yes|true|1)$/i.test(String(a.IsPinned || '')) || /^(important|urgent)$/i.test(String(a.Priority || ''));
-    const pinnedB=/^(yes|true|1)$/i.test(String(b.IsPinned || '')) || /^(important|urgent)$/i.test(String(b.Priority || ''));
-    if (pinnedA!==pinnedB) return pinnedA ? -1 : 1;
-    const order=Number(a.DisplayOrder || 0)-Number(b.DisplayOrder || 0);
-    return order || timestamp(b.PublishAt || b.CreatedAt)-timestamp(a.PublishAt || a.CreatedAt);
-  }).slice(0,50).map(row=>({
-    ID:String(row.ID || '').slice(0,120),Title:String(row.Title || '').replace(/\s+/g,' ').trim().slice(0,240),
-    Message:String(row.Message || row.Description || '').trim().slice(0,2000),
-    TestID:String(row.TestID || '').slice(0,120),LinkURL:String(row.LinkURL || row.URL || '').trim().slice(0,1000),
-    Category:String(row.Category || (row.TestID ? 'Test' : 'General')).trim().slice(0,80) || 'General',
-    Priority:String(row.Priority || 'Normal').trim().slice(0,40) || 'Normal',
-    IsPinned:/^(yes|true|1)$/i.test(String(row.IsPinned || '')) || /^(important|urgent)$/i.test(String(row.Priority || '')),
-    ReminderType:String(row.ReminderType || '').trim().slice(0,80),ReminderAt:row.ReminderAt || '',
-    PublishAt:row.PublishAt || row.PublishDate || row.CreatedAt || '',ExpiresAt:row.ExpiresAt || row.ExpiryDate || ''
-  })).filter(row=>row.ID && row.Title);
-}
-
-function studentDashboardMetrics_(uid) {
-  const empty={recentResults:[],questionsAttempted:0,overallAccuracy:0,accuracyBySubject:[],weakTopics:[]};
-  try {
-    const attempts=mdcatTable_(CONFIG.SHEETS.MDCAT_TEST_ATTEMPTS).rows.filter(row=>row.UserID===uid && row.Status==='Submitted')
-      .sort((a,b)=>new Date(b.SubmittedAt)-new Date(a.SubmittedAt));
-    const sessions=new Map(mdcatTable_(MDCAT_SCORING_.sessions).rows.map(row=>[String(row.ID),row]));
-    const recentResults=attempts.slice(0,5).map(row=>({
-      attemptId:String(row.ID),title:String((sessions.get(String(row.ID)) || {}).Title || 'MDCAT practice').slice(0,240),
-      percentage:Number(row.Percentage || 0),score:Number(row.Score || 0),totalQuestions:Number(row.TotalQuestions || 0),
-      attemptedQuestions:Number(row.AttemptedQuestions || 0),submittedAt:row.SubmittedAt || row.UpdatedAt || ''
-    }));
-    const progress=mdcatProgress_(uid,false);
-    const questionsAttempted=progress.reduce((sum,row)=>sum+Number(row.QuestionsAttempted || 0),0);
-    const correct=progress.reduce((sum,row)=>sum+Number(row.CorrectAnswers || 0),0);
-    const bySubject={};
-    progress.forEach(row=>{
-      const key=String(row.SubjectID || row.SubjectName || 'Other');
-      if(!bySubject[key])bySubject[key]={subjectId:String(row.SubjectID || ''),subjectName:String(row.SubjectName || 'Other'),questionsAttempted:0,correctAnswers:0};
-      bySubject[key].questionsAttempted+=Number(row.QuestionsAttempted || 0);bySubject[key].correctAnswers+=Number(row.CorrectAnswers || 0);
-    });
-    const accuracyBySubject=Object.values(bySubject).map(row=>Object.assign(row,{accuracy:row.questionsAttempted?Math.round(row.correctAnswers/row.questionsAttempted*10000)/100:0}))
-      .sort((a,b)=>b.questionsAttempted-a.questionsAttempted);
-    const weakTopics=progress.filter(row=>Number(row.QuestionsAttempted || 0)>0).sort((a,b)=>Number(a.AccuracyPercentage)-Number(b.AccuracyPercentage) || Number(b.QuestionsAttempted)-Number(a.QuestionsAttempted)).slice(0,5)
-      .map(row=>({topicId:String(row.TopicID || ''),topicName:String(row.TopicName || 'Topic'),subjectName:String(row.SubjectName || ''),questionsAttempted:Number(row.QuestionsAttempted || 0),accuracy:Number(row.AccuracyPercentage || 0)}));
-    return {recentResults:recentResults,questionsAttempted:questionsAttempted,overallAccuracy:questionsAttempted?Math.round(correct/questionsAttempted*10000)/100:0,accuracyBySubject:accuracyBySubject,weakTopics:weakTopics};
-  } catch (_) { return empty; }
-}
-
-function studentDashboard_(user) {
-  const clean=(value,max)=>String(value == null ? '' : value).replace(/\s+/g,' ').trim().slice(0,max || 500);
-  const submissions=studentOwnedRows_(CONFIG.SHEETS.SUBMISSIONS,user.email).map(row=>({
-    ID:clean(row.ID,120),Title:clean(row.Title || row.ResourceTitle,240),ResourceType:clean(row.ResourceType || row.Type,100),
-    Subject:clean(row.Subject,160),Status:clean(row.Status || 'Pending Review',80),
-    SubmittedAt:row.SubmittedAt || row.CreatedAt || '',UpdatedAt:row.UpdatedAt || '',
-    Response:clean(row.AdminResponse || row.ReviewNotes || row.Response,1000)
-  }));
-  const helpRequests=studentOwnedRows_(CONFIG.SHEETS.HELP_DESK,user.email).map(row=>({
-    ID:clean(row.ID,120),RequestType:clean(row.RequestType || row.Category || row.Type,100),
-    Subject:clean(row.Subject || row.Title,240),Status:clean(row.Status || 'Pending Review',80),
-    SubmittedAt:row.SubmittedAt || row.CreatedAt || '',UpdatedAt:row.UpdatedAt || '',
-    Response:clean(row.AdminResponse || row.Response || row.Resolution,1000)
-  }));
-  const preferences=studentNotificationPreferences_(user.uid);
-  const readNotificationIds=studentNotificationReadIds_(user.uid);
-  const readSet=new Set(readNotificationIds);
-  const notifications=studentNotifications_(preferences).map(row=>Object.assign({},row,{IsRead:readSet.has(String(row.ID))}));
-  return Object.assign({email:user.email,submissions:submissions,helpRequests:helpRequests,notifications:notifications,
-    unreadNotificationCount:notifications.filter(row=>!row.IsRead).length,readNotificationIds:readNotificationIds,notificationPreferences:preferences},studentDashboardMetrics_(user.uid));
-}
-
-function notificationDigest_(value) {
-  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,String(value)).map(byte=>('0'+(byte&255).toString(16)).slice(-2)).join('');
-}
-
-function studentMarkNotificationsRead_(user,body) {
-  if (!Array.isArray(body.notificationIds) || !body.notificationIds.length || body.notificationIds.length>100) mdcatError_('BAD_REQUEST','Choose between 1 and 100 notifications.');
-  const ids=[...new Set(body.notificationIds.map(value=>String(value || '').trim()))];
-  if(ids.some(id=>!id || id.length>120 || !/^[A-Za-z0-9_-]+$/.test(id))) mdcatError_('BAD_REQUEST','A notification reference is invalid.');
-  const now=new Date().toISOString();
-  mdcatPutMany_(CONFIG.SHEETS.NOTIFICATION_READS,ids.map(id=>({ID:'NREAD-'+notificationDigest_(user.uid+':'+id),UserID:user.uid,NotificationID:id,ReadAt:now,Status:'Active',CreatedAt:now,UpdatedAt:now})));
-  return {readNotificationIds:ids};
-}
-
-function studentSaveNotificationPreferences_(user,body) {
-  const keys=['GeneralUpdates','TestNotices','DeadlineReminders','StudyPlanReminders'];
-  if(!body.preferences || typeof body.preferences!=='object' || Array.isArray(body.preferences) || keys.some(key=>typeof body.preferences[key]!=='boolean')) mdcatError_('BAD_REQUEST','Choose valid notification preferences.');
-  const now=new Date().toISOString();
-  const preferences=Object.fromEntries(keys.map(key=>[key,body.preferences[key]]));
-  mdcatPut_(CONFIG.SHEETS.NOTIFICATION_PREFERENCES,Object.assign({ID:'NPREF-'+notificationDigest_(user.uid),UserID:user.uid,Status:'Active',CreatedAt:now,UpdatedAt:now},preferences));
-  return preferences;
-}
-
-const ADMIN_TABLES_ = [
-  ['RESOURCES','Resources','RES'],['CATEGORIES','Categories','CAT'],['SUBJECTS','Subjects','SUB'],
-  ['LEVELS','Levels','LVL'],['INSTITUTIONS','Institutions','INS'],['ENTRY_TESTS','Entry tests','TEST'],
-  ['ADMISSIONS','Admissions','ADM'],['SCHOLARSHIPS','Scholarships','SCH'],['OPPORTUNITIES','Opportunities','OPP'],
-  ['ANNOUNCEMENTS','Announcements','ANN'],['MCQS','MCQs','MCQ'],['VIDEOS','Videos','VID'],
-  ['AI_TOOLS','AI tools','AIT'],['ISLAMIC_CONTENT','Islamic content','ISL'],['BLOG','Blog','BLOG'],
-  ['NAVIGATION','Navigation','NAV'],['HOMEPAGE','Homepage','HOME'],['SOCIAL_LINKS','Social links','SOC'],
-  ['SETTINGS','Settings','SET'],['SUBMISSIONS','Resource submissions','SUBM'],['HELP_DESK','Help desk','HELP'],
-  ['COUNTDOWNS','Public countdowns','COUNT'],
-  ['FAQS','Frequently asked questions','FAQ'],['FEEDBACK','Anonymous feedback','FDBK'],
-  ['TEST_CATALOG','Test catalog','TST'],['NOTIFICATIONS','Notifications','NTF'],
-  ['MDCAT_SUBJECTS','MDCAT subjects','MDS'],['MDCAT_UNITS','MDCAT units','MDU'],
-  ['MDCAT_CHAPTERS','MDCAT chapters','MDC'],['MDCAT_TOPICS','MDCAT topics','MDT'],
-  ['MDCAT_QUESTION_BANK','MDCAT question bank','MDQ'],['MDCAT_TESTS','MDCAT tests','MDTEST'],
-  ['MDCAT_TEST_QUESTIONS','MDCAT test questions','MDTQ'],['MDCAT_DAILY_PRACTICE','MDCAT daily practice','MDDP'],
-  ['MDCAT_UPDATES','MDCAT updates','MDUP']
-].map(row=>({key:row[0],label:row[1],prefix:row[2]}));
-
-function adminTable_(key) {
-  const table=ADMIN_TABLES_.find(item=>item.key===String(key || ''));
-  if (!table || !CONFIG.SHEETS[table.key]) mdcatError_('BAD_REQUEST','This dashboard section is not available.');
-  return Object.assign({},table,{sheetName:CONFIG.SHEETS[table.key]});
-}
-
-function adminHeaders_(sheetName) {
-  const values=getSheet_(sheetName).getDataRange().getValues();
-  if (!values.length) mdcatError_('SETUP_REQUIRED','The '+sheetName+' sheet needs a header row.');
-  const headers=values[0].map(value=>String(value).replace(/\uFEFF/g,'').trim()).filter(Boolean);
-  if (!headers.length) mdcatError_('SETUP_REQUIRED','The '+sheetName+' sheet needs a header row.');
-  return headers;
-}
-
-function adminAuthenticate_(token) {
-  const user=firebaseAuthenticate_(token);
-  if (!user.email) mdcatError_('ADMIN_REQUIRED','Your Google account has no verified email address.');
-  const rows=getSheetData_(CONFIG.SHEETS.ADMINS);
-  const admin=rows.find(row=>{
-    const email=String(row.Email || row.AdminEmail || row.GoogleEmail || '').trim().toLowerCase();
-    const status=String(row.Status == null ? 'Active' : row.Status).trim().toLowerCase();
-    return email===user.email && status==='active';
-  });
-  if (!admin) mdcatError_('ADMIN_REQUIRED','This Google account is not an active portal administrator.');
-  return {uid:user.uid,email:user.email,role:String(admin.Role || admin.AdminRole || 'Editor').trim() || 'Editor'};
-}
-
-function adminManifest_(admin) {
-  const spreadsheet=getSpreadsheet_();
-  const optional={TEST_CATALOG:true,NOTIFICATIONS:true,FAQS:true,FEEDBACK:true,COUNTDOWNS:true};
-  return {
-    email:admin.email,
-    role:admin.role,
-    tables:ADMIN_TABLES_.map(item=>{
-      const sheet=spreadsheet.getSheetByName(CONFIG.SHEETS[item.key]);
-      if (!sheet && optional[item.key]) return null;
-      if (!sheet) getSheet_(CONFIG.SHEETS[item.key]);
-      return {key:item.key,label:item.label,headers:adminHeaders_(CONFIG.SHEETS[item.key]),rowCount:Math.max(0,sheet.getLastRow()-1)};
-    }).filter(Boolean)
-  };
-}
-
-function adminList_(body) {
-  const table=adminTable_(body.table);
-  const rows=getSheetData_(table.sheetName);
-  const query=String(body.query || '').trim().toLowerCase().slice(0,100);
-  const filtered=query ? rows.filter(row=>Object.values(row).some(value=>String(value).toLowerCase().includes(query))) : rows;
-  const offset=Math.max(0,Math.floor(Number(body.offset) || 0));
-  const limit=Math.max(1,Math.min(100,Math.floor(Number(body.limit) || 50)));
-  return {table:table.key,headers:adminHeaders_(table.sheetName),rows:filtered.slice(offset,offset+limit),total:filtered.length,offset:offset,limit:limit};
-}
-
-function adminCell_(value) {
-  if (value == null) return '';
-  if (typeof value==='number' || typeof value==='boolean') return value;
-  const text=String(value).slice(0,20000);
-  return (/^[=+@]/.test(text) || (/^-/.test(text) && !/^-\d+(\.\d+)?$/.test(text))) ? "'"+text : text;
-}
-
-const ADMIN_PUBLISHING_TABLES_=['RESOURCES','SCHOLARSHIPS','ANNOUNCEMENTS','COUNTDOWNS','NOTIFICATIONS'];
-
-function adminValidatePublishingRecord_(table,record) {
-  if (!ADMIN_PUBLISHING_TABLES_.includes(table.key)) return;
-  const status=String(record.Status || 'Draft').trim();
-  const allowed=['Draft','Scheduled','Active','Archived','Inactive'];
-  if (!allowed.includes(status)) mdcatError_('BAD_REQUEST','Status must be Draft, Scheduled, Active or Archived.');
-  const publishText=String(record.PublishAt || record.PublishDate || '').trim();
-  const expiresText=String(record.ExpiresAt || record.ExpiryDate || '').trim();
-  const publishAt=portalScheduleTimestamp_(publishText);
-  const expiresAt=portalScheduleTimestamp_(expiresText);
-  if (publishText && !publishAt) mdcatError_('BAD_REQUEST','PublishAt must contain a valid date and time.');
-  if (expiresText && !expiresAt) mdcatError_('BAD_REQUEST','ExpiresAt must contain a valid date and time.');
-  if (status==='Scheduled' && !publishAt) mdcatError_('BAD_REQUEST','Scheduled content requires PublishAt.');
-  if (publishAt && expiresAt && expiresAt<=publishAt) mdcatError_('BAD_REQUEST','ExpiresAt must be later than PublishAt.');
-}
-
-function adminSaveRecord_(table, input, admin) {
-  if (!input || Array.isArray(input) || typeof input!=='object') mdcatError_('BAD_REQUEST','A record is required.');
-  const sheet=getSheet_(table.sheetName);
-  const values=sheet.getDataRange().getValues();
-  const rawHeaders=values[0] || [];
-  const headers=rawHeaders.map(value=>String(value).replace(/\uFEFF/g,'').trim());
-  if (!headers.filter(Boolean).length) mdcatError_('SETUP_REQUIRED','The '+table.sheetName+' sheet needs a header row.');
-  const record={};
-  headers.forEach(header=>{if(header && Object.prototype.hasOwnProperty.call(input,header)) record[header]=adminCell_(input[header]);});
-  const keyField=headers.includes('ID') ? 'ID' : (headers.includes('Key') ? 'Key' : headers.find(Boolean));
-  if (!keyField) mdcatError_('SETUP_REQUIRED','The sheet needs an ID or key column.');
-  if (keyField==='ID' && !String(record.ID || '').trim()) record.ID=generateNextId_(table.sheetName,table.prefix);
-  const key=String(record[keyField] || '').trim();
-  if (!key) mdcatError_('BAD_REQUEST',keyField+' is required.');
-  const keyIndex=headers.indexOf(keyField);
-  const existingIndex=values.findIndex((row,index)=>index>0 && String(row[keyIndex] || '').trim()===key);
-  const effective={};
-  headers.forEach((header,index)=>{effective[header]=Object.prototype.hasOwnProperty.call(record,header) ? record[header] : (existingIndex>=0 ? values[existingIndex][index] : '');});
-  if (headers.includes('Status') && !String(effective.Status || '').trim()) effective.Status=ADMIN_PUBLISHING_TABLES_.includes(table.key) ? 'Draft' : 'Inactive';
-  adminValidatePublishingRecord_(table,effective);
-  Object.keys(effective).forEach(header=>{if (!Object.prototype.hasOwnProperty.call(record,header) && existingIndex<0) record[header]=effective[header];});
-  const now=new Date();
-  if (headers.includes('UpdatedAt')) record.UpdatedAt=now;
-  if (existingIndex<0 && headers.includes('CreatedAt') && !record.CreatedAt) record.CreatedAt=now;
-  if (existingIndex<0 && headers.includes('Status') && !String(record.Status || '').trim()) record.Status=ADMIN_PUBLISHING_TABLES_.includes(table.key) ? 'Draft' : 'Inactive';
-  if (existingIndex>=0) {
-    const updated=headers.map((header,index)=>{
-      if (header==='CreatedAt' && values[existingIndex][index]) return values[existingIndex][index];
-      return Object.prototype.hasOwnProperty.call(record,header) ? record[header] : values[existingIndex][index];
-    });
-    sheet.getRange(existingIndex+1,1,1,headers.length).setValues([updated]);
-  } else {
-    sheet.appendRow(headers.map(header=>record[header] == null ? '' : record[header]));
-  }
-  try {
-    addRecord_(CONFIG.SHEETS.ACTIVITY_LOG,{ID:generateNextId_(CONFIG.SHEETS.ACTIVITY_LOG,'LOG'),AdminEmail:admin.email,Action:existingIndex>=0?'UPDATE':'CREATE',EntityType:table.key,EntityID:key,Details:'Admin dashboard',Timestamp:now});
-  } catch (_) {}
-  return {key:key,created:existingIndex<0};
-}
-
-function adminSave_(body,admin) {
-  return adminSaveRecord_(adminTable_(body.table),body.record,admin);
-}
-
-function adminBulk_(body,admin) {
-  const table=adminTable_(body.table);
-  if (!Array.isArray(body.records) || !body.records.length || body.records.length>100) mdcatError_('BAD_REQUEST','Paste between 1 and 100 rows at a time.');
-  const expected=adminHeaders_(table.sheetName);
-  const supplied=Array.isArray(body.headers) ? body.headers.map(value=>String(value).trim()) : [];
-  if (expected.length!==supplied.length || expected.some((header,index)=>header!==supplied[index])) mdcatError_('BAD_REQUEST','The pasted header row must exactly match the sheet headers shown in the dashboard.');
-  const results=body.records.map(record=>adminSaveRecord_(table,record,admin));
-  return {saved:results.length,created:results.filter(row=>row.created).length,updated:results.filter(row=>!row.created).length};
-}
-
-function adminArchive_(body,admin) {
-  const table=adminTable_(body.table);
-  const headers=adminHeaders_(table.sheetName);
-  if (!headers.includes('Status')) mdcatError_('BAD_REQUEST','This section cannot be archived because it has no Status column.');
-  const record={};
-  const keyField=headers.includes('ID') ? 'ID' : (headers.includes('Key') ? 'Key' : headers[0]);
-  record[keyField]=String(body.key || '').trim();record.Status=ADMIN_PUBLISHING_TABLES_.includes(table.key) ? 'Archived' : 'Inactive';
-  if (!record[keyField]) mdcatError_('BAD_REQUEST','A record key is required.');
-  return adminSaveRecord_(table,record,admin);
-}
-
-function adminUploadText_(value,label,max,required) {
-  const text=String(value == null ? '' : value).replace(/\s+/g,' ').trim();
-  if (required && !text) mdcatError_('BAD_REQUEST',label+' is required.');
-  if (text.length>max) mdcatError_('BAD_REQUEST',label+' is too long.');
-  return text;
-}
-
-function adminPdfFolder_() {
-  const properties=PropertiesService.getScriptProperties();
-  const key='PORTAL_PDF_FOLDER_ID';
-  const existing=properties.getProperty(key);
-  if (existing) {
-    try { return DriveApp.getFolderById(existing); } catch (_) {}
-  }
-  const folder=DriveApp.createFolder('ICP YOUTH CIRCLE Portal PDFs');
-  properties.setProperty(key,folder.getId());
-  return folder;
-}
-
-function adminSlug_(value) {
-  return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,120);
-}
-
-function adminUploadPdf_(body,admin) {
-  if (body.rightsConfirmed!==true) mdcatError_('BAD_REQUEST','Confirm that ICP YOUTH CIRCLE has permission to share this PDF.');
-  const table=adminTable_('RESOURCES');
-  const headers=adminHeaders_(table.sheetName);
-  ['Title','Category','FileURL','Status'].forEach(header=>{if(!headers.includes(header)) mdcatError_('SETUP_REQUIRED','Resources is missing required column: '+header+'.');});
-  const title=adminUploadText_(body.title,'Title',240,true);
-  const category=adminUploadText_(body.category,'Category',80,true);
-  if (!['Notes','Past Papers','Study Resources'].includes(category)) mdcatError_('BAD_REQUEST','Choose Notes, Past Papers or Study Resources.');
-  const originalName=adminUploadText_(body.fileName,'File name',180,true);
-  if (!/\.pdf$/i.test(originalName) || String(body.mimeType || 'application/pdf')!=='application/pdf') mdcatError_('BAD_REQUEST','Only PDF files are supported.');
-  const encoded=String(body.dataBase64 || '');
-  if (!encoded || encoded.length>11200000 || !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) mdcatError_('BAD_REQUEST','The PDF data is invalid or larger than 8 MB.');
-  let bytes;
-  try { bytes=Utilities.base64Decode(encoded); } catch (_) { mdcatError_('BAD_REQUEST','The PDF data could not be decoded.'); }
-  if (!bytes || bytes.length<5 || bytes.length>8*1024*1024 || bytes[0]!==37 || bytes[1]!==80 || bytes[2]!==68 || bytes[3]!==70 || bytes[4]!==45) mdcatError_('BAD_REQUEST','The selected file is not a valid PDF or is larger than 8 MB.');
-  const safeName=originalName.replace(/[^A-Za-z0-9._() -]/g,'_').replace(/\s+/g,' ').slice(0,170);
-  const now=new Date();
-  let file;
-  try {
-    file=adminPdfFolder_().createFile(Utilities.newBlob(bytes,MimeType.PDF,safeName));
-    file.setDescription('Published by '+admin.email+' through the ICP YOUTH CIRCLE admin dashboard.');
-    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK,DriveApp.Permission.VIEW);
-    const fileId=file.getId();
-    const resource=adminSaveRecord_(table,{
-      Title:title,Slug:adminSlug_(title),Category:category,
-      Subject:adminUploadText_(body.subject,'Subject',160,false),
-      Level:adminUploadText_(body.level,'Level',120,false),
-      Institution:adminUploadText_(body.institution,'Institution',180,false),
-      Year:adminUploadText_(body.year,'Year',20,false),ResourceType:'PDF',
-      Description:adminUploadText_(body.description,'Description',2000,false),
-      FileURL:file.getUrl(),Featured:'No',Status:'Active',CreatedAt:now,UpdatedAt:now
-    },admin);
-    let resourceKey='';
-    try { resourceKey=file.getResourceKey() || ''; } catch (_) {}
-    return {resourceId:resource.key,fileId:fileId,viewUrl:file.getUrl(),downloadUrl:'https://drive.google.com/uc?export=download&id='+encodeURIComponent(fileId)+(resourceKey?'&resourcekey='+encodeURIComponent(resourceKey):'')};
-  } catch (error) {
-    if (file) {try {file.setTrashed(true);} catch (_) {}}
-    if (error.mdcatCode) throw error;
-    mdcatError_('UPLOAD_FAILED','The PDF could not be stored or shared. Check the Apps Script Drive permission and sharing policy.');
-  }
-}
-
-function adminClearPublicCache_() {
-  try {
-    const cache=CacheService.getScriptCache();
-    cache.removeAll(['icp-public-v1-portalData','icp-public-v1-portalBundle','icp-public-v1-searchIndex','icp-public-v1-mcqs','icp-public-v1-videos','icp-public-v1-admissions','icp-public-v1-scholarships','icp-public-v1-opportunities','icp-public-v1-announcements','icp-public-v1-publicNotifications','icp-public-v1-countdowns','icp-public-v1-faqs','icp-public-v1-aiTools','icp-public-v1-islamicContent','icp-public-v1-blog','icp-public-v1-entryTests','icp-public-v1-testCatalog','icp-public-v1-mdcatSubjects','icp-public-v1-mdcatTests','icp-public-v1-mdcatDailyPractice','icp-public-v1-mdcatUpdates']);
-  } catch (_) {}
-}
-
-function doPost(e) {
-  try {
-    const raw = e && e.postData && e.postData.contents;
-    if (typeof raw !== 'string' || raw.length > 11500000) mdcatError_('BAD_REQUEST','Invalid request.');
-    let body;
-    try { body = JSON.parse(raw); } catch (_) { mdcatError_('BAD_REQUEST','Invalid request.'); }
-    if (!body || Array.isArray(body) || typeof body !== 'object') mdcatError_('BAD_REQUEST','Invalid request.');
-    if (body.action!=='adminUploadPdf' && raw.length>100000) mdcatError_('BAD_REQUEST','Invalid request.');
-    if (body.action==='publicSubmitResource' || body.action==='publicHelpRequest' || body.action==='publicFeedback') {
-      const publicLock=LockService.getScriptLock();
-      if (!publicLock.tryLock(10000)) mdcatError_('BUSY','The service is busy. Please retry.');
-      try {
-        return jsonResponse_(body.action==='publicSubmitResource' ? publicSubmitResource_(body) : body.action==='publicHelpRequest' ? publicHelpRequest_(body) : publicFeedback_(body));
-      } finally { publicLock.releaseLock(); }
+      wrapper.appendChild(dropdown);
     }
-    if (['studentDashboard','studentMarkNotificationsRead','studentSaveNotificationPreferences'].includes(body.action)) {
-      const student=firebaseAuthenticate_(body.idToken);
-      if(body.action==='studentDashboard') return jsonResponse_(studentDashboard_(student));
-      const studentLock=LockService.getScriptLock();
-      if(!studentLock.tryLock(10000)) mdcatError_('BUSY','The service is busy. Please retry.');
-      try {
-        if(body.action==='studentMarkNotificationsRead') return jsonResponse_(studentMarkNotificationsRead_(student,body));
-        return jsonResponse_(studentSaveNotificationPreferences_(student,body));
-      } finally { studentLock.releaseLock(); }
+
+    wrapper.prepend(row);
+    nav.appendChild(wrapper);
+  });
+
+  const publicNotifications = document.createElement('div');
+  publicNotifications.id = 'publicNotifications';
+  publicNotifications.className = 'public-notifications';
+  publicNotifications.innerHTML = `
+    <button type="button" class="public-notification-button" aria-label="Public notifications" aria-expanded="false" aria-controls="publicNotificationPanel">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
+      <span class="public-notification-badge" hidden>0</span>
+    </button>
+    <div id="publicNotificationPanel" class="public-notification-panel" role="region" aria-label="Latest public notifications">
+      <div class="public-notification-heading"><strong>Notifications</strong><span>Public updates</span></div>
+      <div class="public-notification-list"><p class="public-notification-empty">Loading updates…</p></div>
+      <a class="public-notification-all" href="#/updates">View all updates</a>
+    </div>`;
+  publicNotifications.querySelector('.public-notification-button').onclick = togglePublicNotifications;
+  publicNotifications.querySelector('.public-notification-all').onclick = event => { event.preventDefault(); closePublicNotifications(); handleNavigation({Slug:'updates',Label:'Updates'}); closeMobileNavigation(); };
+  document.querySelector('.header-inner').appendChild(publicNotifications);
+
+  const accountButton = document.createElement('button');
+  accountButton.id = 'portalAccountButton';
+  accountButton.type = 'button';
+  accountButton.className = 'nav-account-button';
+  const accountLabel=document.createElement('span');accountLabel.className='nav-account-label';accountLabel.textContent='Sign in';accountButton.appendChild(accountLabel);
+  accountButton.onclick = () => {
+    closeMobileNavigation();
+    openPortalAccount();
+  };
+  nav.appendChild(accountButton);
+  if (!nav.dataset.publicNotificationsReady) {
+    document.addEventListener('click', event => { if (!event.target.closest('#publicNotifications')) closePublicNotifications(); });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') closePublicNotifications(); });
+    nav.dataset.publicNotificationsReady = 'true';
+  }
+  if(typeof initializePortalAccountState==='function')initializePortalAccountState();
+}
+
+function setPortalAccountButton(signedIn) {
+  const button = document.getElementById('portalAccountButton');
+  if (button) {
+    let label=button.querySelector('.nav-account-label');
+    if(!label){label=document.createElement('span');label.className='nav-account-label';button.prepend(label);}
+    label.textContent=signedIn ? 'My account' : 'Sign in';
+    if(!signedIn){const badge=button.querySelector('.nav-notification-badge');if(badge)badge.hidden=true;button.setAttribute('aria-label','Sign in');}
+  }
+}
+
+function openPortalAccount(pending) {
+  document.getElementById('homeHero').style.display = 'none';
+  document.getElementById('homeExplore').style.display = 'none';
+  const homeTools=document.getElementById('homeTools');if(homeTools)homeTools.hidden=true;
+  document.getElementById('dynamicPage').style.display = 'none';
+  document.getElementById('mdcatHub').hidden = false;
+  window.location.hash = 'account';
+  openUserAccount(pending);
+}
+
+function setMobileNavigationOpen(open) {
+  const nav=document.getElementById('mainNavigation');const toggle=document.getElementById('menuToggle');
+  nav.classList.toggle('is-open',Boolean(open));toggle.setAttribute('aria-expanded',String(Boolean(open)));
+  if(!open){nav.querySelectorAll('.nav-item.submenu-open').forEach(item=>item.classList.remove('submenu-open'));nav.querySelectorAll('.submenu-toggle').forEach(button=>button.setAttribute('aria-expanded','false'));}
+}
+
+function closeMobileNavigation() { setMobileNavigationOpen(false); }
+
+    function renderCategories(categories) {
+
+      const grid =
+        document.getElementById(
+          'categoryGrid'
+        );
+
+      grid.innerHTML = '';
+
+      const mainCategories =
+        categories
+          .filter(
+            item =>
+              !item.ParentCategory
+          )
+          .sort(
+            (a, b) =>
+              Number(a.DisplayOrder || 0) -
+              Number(b.DisplayOrder || 0)
+          );
+
+
+      mainCategories.forEach(category => {
+
+        const card =
+          document.createElement('div');
+
+        card.className = 'card category-card';
+        card.tabIndex = 0;
+        card.setAttribute('role', 'link');
+        card.setAttribute('aria-label', 'Open ' + category.Name);
+
+        const categoryVisuals = {
+          'study': ['ST', 'Learning resources'],
+          'entry-tests': ['ET', 'Test preparation'],
+          'admissions': ['AD', 'Application guidance'],
+          'scholarships': ['SC', 'Funding opportunities'],
+          'career': ['CR', 'Career development'],
+          'ai-smart-tools': ['AI', 'Smart productivity'],
+          'community': ['CO', 'Student support'],
+          'updates': ['UP', 'Latest information'],
+          'islamic': ['IS', 'Faith and reflection'],
+          'explore': ['EX', 'Discover more']
+        };
+        const visual = categoryVisuals[category.Slug] || ['IC', 'Student portal'];
+        const top = document.createElement('div');
+        top.className = 'category-card-top';
+        const icon = document.createElement('span');
+        icon.className = 'category-icon';
+        icon.setAttribute('aria-hidden', 'true');
+        icon.textContent = visual[0];
+        const eyebrow = document.createElement('span');
+        eyebrow.className = 'category-eyebrow';
+        eyebrow.textContent = visual[1];
+        top.append(icon, eyebrow);
+
+
+        const title =
+          document.createElement('h4');
+
+        title.textContent =
+          category.Name;
+
+
+        const description =
+          document.createElement('p');
+
+        description.textContent =
+          category.Description || '';
+
+
+        const action = document.createElement('span');
+        action.className = 'category-action';
+        action.innerHTML = 'Explore <span aria-hidden="true">→</span>';
+
+        card.append(top, title, description, action);
+
+        card.onclick = function() {
+          openCategory(category);
+        };
+        card.onkeydown = function(event) {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            openCategory(category);
+          }
+        };
+
+        grid.appendChild(card);
+
+      });
+
     }
-    const adminActions=['adminSession','adminList','adminSave','adminBulk','adminArchive','adminUploadPdf'];
-    if (adminActions.includes(body.action)) {
-      const admin=adminAuthenticate_(body.idToken);
-      if (body.action==='adminSession') return jsonResponse_(adminManifest_(admin));
-      if (body.action==='adminList') return jsonResponse_(adminList_(body));
-      const adminLock=LockService.getScriptLock();
-      if (!adminLock.tryLock(10000)) mdcatError_('BUSY','The service is busy. Please retry.');
-      try {
-        let adminData;
-        if (body.action==='adminSave') adminData=adminSave_(body,admin);
-        if (body.action==='adminBulk') adminData=adminBulk_(body,admin);
-        if (body.action==='adminArchive') adminData=adminArchive_(body,admin);
-        if (body.action==='adminUploadPdf') adminData=adminUploadPdf_(body,admin);
-        adminClearPublicCache_();
-        return jsonResponse_(adminData);
-      } finally { adminLock.releaseLock(); }
+
+
+
+
+    function openCategory(category) {
+      handleNavigation({Slug: category.Slug, Label: category.Name, TargetURL: category.TargetURL || ''});
     }
-    if (!['mdcatStart','mdcatSubmit','mdcatMyResults','mdcatResult','mdcatMyProgress','mdcatResume'].includes(body.action)) mdcatError_('BAD_REQUEST','Unknown action.');
-    const uid = mdcatAuthenticate_(body.idToken);
-    const lock = LockService.getScriptLock();
-    if (!lock.tryLock(10000)) mdcatError_('BUSY','The service is busy. Please retry.');
+
+function resolveNavigationItem(item) {
+  if (!item || !portalData || !Array.isArray(portalData.navigation)) return item || {};
+  const navigation=portalData.navigation;
+  let match=item.ID ? navigation.find(row=>String(row.ID)===String(item.ID)) : null;
+  const candidates=navigation.filter(row=>String(row.Slug)===String(item.Slug));
+  if(!match && item.ParentID)match=candidates.find(row=>String(row.ParentID)===String(item.ParentID));
+  if(!match && candidates.length>1){
+    const segments=String(item.TargetURL || window.location.hash || '').replace(/^#\/?/,'').split('/').filter(Boolean);
+    const parentHint=segments.length>1?segments[segments.length-2]:'';
+    match=candidates.find(row=>{
+      const parent=navigation.find(parentRow=>String(parentRow.ID)===String(row.ParentID));
+      return parent && parent.Slug===parentHint;
+    });
+  }
+  if(!match)match=candidates[0];
+  return match ? Object.assign({},match,item) : item;
+}
+
+function getNavigationParentSlug(item) {
+  const resolved=resolveNavigationItem(item);
+  if (!resolved || !resolved.ParentID || !portalData || !Array.isArray(portalData.navigation)) return '';
+  const parent = portalData.navigation.find(row=>String(row.ID)===String(resolved.ParentID));
+  return parent ? String(parent.Slug || '') : '';
+}
+
+function getNavigationTrail(item) {
+  const navigation=portalData && Array.isArray(portalData.navigation)?portalData.navigation:[];
+  const trail=[];let current=resolveNavigationItem(item);const visited=new Set();
+  while(current && current.Slug && current.Slug!=='home' && !visited.has(String(current.ID || current.Slug))){
+    trail.unshift(current);visited.add(String(current.ID || current.Slug));
+    current=current.ParentID?navigation.find(row=>String(row.ID)===String(current.ParentID)):null;
+  }
+  return trail;
+}
+
+function renderPageBreadcrumb(item) {
+  const breadcrumb=document.getElementById('pageBreadcrumb');
+  if(!breadcrumb)return;
+  breadcrumb.replaceChildren();
+  const home=document.createElement('button');home.type='button';home.append(document.createTextNode('← Home'));home.onclick=()=>showHome();breadcrumb.appendChild(home);
+  const trail=getNavigationTrail(item);
+  trail.forEach((row,index)=>{
+    const separator=document.createElement('span');separator.setAttribute('aria-hidden','true');separator.textContent='/';breadcrumb.appendChild(separator);
+    const label=row.Label || row.Name || row.Slug;
+    if(index===trail.length-1){const current=document.createElement('span');current.className='breadcrumb-current';current.setAttribute('aria-current','page');current.textContent=label;breadcrumb.appendChild(current);}
+    else {const button=document.createElement('button');button.type='button';button.textContent=label;button.onclick=()=>handleNavigation(row);breadcrumb.appendChild(button);}
+  });
+}
+
+function portalRouteHash(item) {
+  const trail=getNavigationTrail(item);
+  const slugs=trail.map(row=>String(row.Slug || '')).filter(Boolean);
+  if(!slugs.length && item && item.Slug)slugs.push(String(item.Slug));
+  return '#/'+slugs.join('/');
+}
+
+function navigationItemForLocation() {
+  if(!portalData || !Array.isArray(portalData.navigation))return null;
+  const raw=decodeURIComponent(String(window.location.hash || '').replace(/^#\/?/,''));
+  if(!raw)return {Slug:'home',Label:'Home'};
+  if(raw==='account')return {Slug:'account',Label:'My account'};
+  if(raw.startsWith('search='))return {Slug:'search',Query:raw.slice(7)};
+  const segments=raw.split('/').filter(Boolean);const slug=segments[segments.length-1];const parentHint=segments.length>1?segments[segments.length-2]:'';
+  const candidates=portalData.navigation.filter(row=>String(row.Slug)===slug);
+  return candidates.find(row=>getNavigationParentSlug(row)===parentHint) || candidates[0] || null;
+}
+
+function navigatePortalLocation() {
+  const item=navigationItemForLocation();if(!item)return;
+  if(item.Slug==='home')return showHome({fromHistory:true});
+  if(item.Slug==='account')return openPortalAccount();
+  if(item.Slug==='search'){const input=document.getElementById('searchInput');input.value=item.Query || '';return portalSearch();}
+  handleNavigation(item,{fromHistory:true});
+}
+
+window.addEventListener('popstate',()=>{if(portalInitialRouteApplied)navigatePortalLocation();});
+
+function renderNavigationSection(parentSlug) {
+  const content=document.getElementById('dynamicPageContent');
+  const filters=document.getElementById('resourceFilters');
+  filters.innerHTML='';filters.style.display='none';content.replaceChildren();
+  const navigation=portalData && Array.isArray(portalData.navigation) ? portalData.navigation : [];
+  const parent=navigation.find(row=>row.Slug===parentSlug && !row.ParentID);
+  const children=parent ? navigation.filter(row=>String(row.ParentID)===String(parent.ID)) : [];
+  children.sort((a,b)=>Number(a.DisplayOrder||0)-Number(b.DisplayOrder||0)).forEach(child=>{
+    const card=document.createElement('article');card.className='card resource-card section-link-card';
+    const meta=document.createElement('span');meta.className='section-link-meta';meta.textContent='ICP YOUTH CIRCLE';
+    const heading=document.createElement('h4');heading.textContent=child.Label;
+    const description=document.createElement('p');
+    const category=portalData.categories && portalData.categories.find(row=>row.Slug===child.Slug);
+    description.textContent=category && category.Description ? category.Description : 'Open '+child.Label+' from ICP YOUTH CIRCLE.';
+    const button=document.createElement('button');button.type='button';button.className='resource-button';button.textContent='Open '+child.Label;
+    button.onclick=()=>handleNavigation(child);card.append(meta,heading,description,button);content.appendChild(card);
+  });
+  if (!children.length) renderSectionNotice('No sections have been published here yet.');
+}
+
+function renderSectionNotice(message) {
+  const filters=document.getElementById('resourceFilters');filters.innerHTML='';filters.style.display='none';
+  const content=document.getElementById('dynamicPageContent');content.replaceChildren();
+  const card=document.createElement('div');card.className='empty-state';
+  const mark=document.createElement('span');mark.className='empty-state-mark';mark.setAttribute('aria-hidden','true');mark.textContent='○';
+  const heading=document.createElement('h4');heading.textContent='Content is being prepared';
+  const text=document.createElement('p');text.textContent=message;
+  const action=document.createElement('button');action.type='button';action.className='empty-state-action';action.textContent='Return to home';action.onclick=showHome;
+  card.append(mark,heading,text,action);content.appendChild(card);
+}
+
+function routeContains(item,fields,terms) {
+  const text=fields.map(field=>String(item[field]||'').toLowerCase()).join(' ');
+  return terms.some(term=>text.includes(term));
+}
+
+function renderAboutPage() {
+  const settings=portalData && portalData.settings || {};
+  const filters=document.getElementById('resourceFilters');filters.innerHTML='';filters.style.display='none';
+  const content=document.getElementById('dynamicPageContent');content.replaceChildren();
+  const panel=document.createElement('section');panel.className='about-panel';
+  const intro=document.createElement('div');intro.className='about-intro';
+  const eyebrow=document.createElement('p');eyebrow.className='about-eyebrow';eyebrow.textContent='OUR PURPOSE';
+  const heading=document.createElement('h4');heading.textContent='Helping students move forward with confidence';
+  const description=document.createElement('p');description.textContent=settings.site_description || 'ICP YOUTH CIRCLE is a student resource, opportunity, guidance and community platform.';
+  intro.append(eyebrow,heading,description);
+  const pillars=document.createElement('div');pillars.className='about-pillars';
+  [
+    ['01','Learn','Find study material, test preparation and practical guidance in one place.'],
+    ['02','Connect','Reach student support, community features and trusted opportunities.'],
+    ['03','Grow','Build knowledge, confidence and skills for education and career progress.']
+  ].forEach(item=>{
+    const card=document.createElement('article');card.className='about-pillar';
+    const number=document.createElement('span');number.textContent=item[0];
+    const title=document.createElement('h5');title.textContent=item[1];
+    const text=document.createElement('p');text.textContent=item[2];
+    card.append(number,title,text);pillars.appendChild(card);
+  });
+  panel.append(intro,pillars);content.appendChild(panel);
+}
+
+function createContactIcon(type) {
+  const namespace='http://www.w3.org/2000/svg';
+  const icon=document.createElement('span');
+  icon.className='contact-icon contact-icon-'+type;
+  icon.setAttribute('aria-hidden','true');
+  const svg=document.createElementNS(namespace,'svg');
+  svg.setAttribute('viewBox','0 0 24 24');
+  svg.setAttribute('focusable','false');
+  svg.setAttribute('aria-hidden','true');
+  svg.setAttribute('fill','none');
+  svg.setAttribute('stroke','currentColor');
+  svg.setAttribute('stroke-width','1.8');
+  svg.setAttribute('stroke-linecap','round');
+  svg.setAttribute('stroke-linejoin','round');
+  const add=(name,attributes)=>{
+    const node=document.createElementNS(namespace,name);
+    Object.entries(attributes).forEach(([key,value])=>node.setAttribute(key,value));
+    svg.appendChild(node);
+  };
+  if(type==='email') {
+    add('rect',{x:'3',y:'5',width:'18',height:'14',rx:'2'});
+    add('path',{d:'m4 7 8 6 8-6'});
+  } else if(type==='whatsapp') {
+    add('path',{d:'M20.5 11.6a8.5 8.5 0 0 1-12.6 7.5L3.5 20.5l1.4-4.2a8.5 8.5 0 1 1 15.6-4.7Z'});
+    add('path',{d:'M8.2 7.8c.3-.5.6-.5.9-.5h.4c.2 0 .4.1.5.4l.8 2c.1.3.1.5-.1.7l-.6.8c-.2.2-.1.4 0 .6.5.9 1.3 1.7 2.2 2.2.2.1.4.2.6 0l.9-1.1c.2-.2.4-.3.7-.2l2 .9c.3.1.4.3.4.5 0 .4-.2 1.5-.7 2-.5.6-1.4.9-2.3.7-1.1-.2-2.7-.8-4.6-2.5-1.5-1.3-2.5-3-2.8-4.1-.3-1 .1-1.8.5-2.4Z'});
+  } else if(type==='instagram') {
+    add('rect',{x:'3',y:'3',width:'18',height:'18',rx:'5'});
+    add('circle',{cx:'12',cy:'12',r:'4'});
+    add('circle',{cx:'17.4',cy:'6.6',r:'.8',fill:'currentColor',stroke:'none'});
+  } else if(type==='facebook') {
+    add('path',{d:'M14 8h3V4h-3c-3 0-5 2-5 5v3H6v4h3v5h4v-5h3l1-4h-4V9c0-.6.4-1 1-1Z',fill:'currentColor',stroke:'none'});
+  } else if(type==='youtube') {
+    add('rect',{x:'2.5',y:'5.5',width:'19',height:'13',rx:'4'});
+    add('path',{d:'m10 9 5 3-5 3V9Z',fill:'currentColor',stroke:'none'});
+  } else if(type==='linkedin') {
+    add('rect',{x:'3',y:'3',width:'18',height:'18',rx:'2'});
+    add('circle',{cx:'7.2',cy:'8',r:'1',fill:'currentColor',stroke:'none'});
+    add('path',{d:'M7.2 11v6M11 17v-6m0 2.7c.7-1.7 5-2.2 5 1.3v2'});
+  } else if(type==='x') {
+    add('path',{d:'M5 4l14 16M19 4 5 20'});
+  } else if(type==='tiktok') {
+    add('path',{d:'M14 4v11.2a4.2 4.2 0 1 1-3.2-4.1'});
+    add('path',{d:'M14 4c.5 2.4 2 4 5 4.5'});
+  } else if(type==='telegram') {
+    add('path',{d:'m3 11 17-7-5 16-4-6-4 3 1-5 9-5-11 4Z'});
+  }
+  icon.appendChild(svg);
+  return icon;
+}
+
+function getRouteDescription(slug, label) {
+  const descriptions={
+    'study':'Access notes, past papers, MCQs, videos and study resources.',
+    'entry-tests':'Prepare for major entry tests with focused information, practice and resources.',
+    'admissions':'Find admission requirements, deadlines, merit information and application guidance.',
+    'scholarships':'Discover scholarships, financial aid and guidance for stronger applications.',
+    'career':'Explore career guidance, internships, competitions and student development opportunities.',
+    'ai-smart-tools':'Use practical AI and digital tools to study, plan and work more effectively.',
+    'community':'Connect with student support, contribute useful resources and share suggestions.',
+    'updates':'Stay informed about exams, results, merit lists and important student notices.',
+    'islamic':'Read carefully presented Islamic reminders, hadith and duas for daily reflection.',
+    'explore':'Discover study-abroad guidance, articles, information about us and official contact channels.',
+    'about':'Learn about the purpose and student-focused direction of ICP YOUTH CIRCLE.',
+    'contact':'Contact ICP YOUTH CIRCLE through an official communication channel.',
+    'notes':'Browse published study notes by subject and level.',
+    'past-papers':'Find published past papers to support focused exam preparation.',
+    'mcqs':'Practice published multiple-choice questions and check your understanding.',
+    'videos':'Explore selected educational videos and learning material.',
+    'submit-resource':'Recommend a useful student resource for administrator review.',
+    'student-help-desk':'Send a question or request support from the portal administrators.',
+    'suggestions':'Share anonymous feedback to help improve the student portal.',
+    'faq':'Search answers to frequently asked questions about the portal.'
+  };
+  return descriptions[slug] || 'Find published '+label.toLowerCase()+' information and resources from ICP YOUTH CIRCLE.';
+}
+
+function updatePortalMetadata(title,description) {
+  const pageTitle=title && title!=='ICP YOUTH CIRCLE' ? title+' | ICP YOUTH CIRCLE' : 'ICP YOUTH CIRCLE | Learn, Connect, Grow';
+  const cleanDescription=String(description || 'Student resources, opportunities, guidance and community support in one accessible portal.').replace(/\s+/g,' ').trim().slice(0,200);
+  document.title=pageTitle;
+  const set=(selector,attribute,value)=>{const node=document.querySelector(selector);if(node)node.setAttribute(attribute,value);};
+  set('meta[name="description"]','content',cleanDescription);
+  set('meta[property="og:title"]','content',pageTitle);
+  set('meta[property="og:description"]','content',cleanDescription);
+  set('meta[property="og:url"]','content',location.href);
+  set('meta[name="twitter:title"]','content',pageTitle);
+  set('meta[name="twitter:description"]','content',cleanDescription);
+}
+
+function renderContactPage() {
+  const settings=portalData && portalData.settings || {};
+  const content=document.getElementById('dynamicPageContent');
+  const filters=document.getElementById('resourceFilters');
+  filters.innerHTML='';filters.style.display='none';content.replaceChildren();
+  const panel=document.createElement('section');panel.className='contact-panel';
+  const intro=document.createElement('div');intro.className='contact-intro';
+  const eyebrow=document.createElement('p');eyebrow.className='contact-eyebrow';eyebrow.textContent='GET IN TOUCH';
+  const heading=document.createElement('h4');heading.textContent='We are here to help';
+  const description=document.createElement('p');description.textContent='Choose the official ICP YOUTH CIRCLE channel that suits you best.';
+  intro.append(eyebrow,heading,description);panel.appendChild(intro);
+  const cards=document.createElement('div');cards.className='contact-grid';
+  const addCard=(label,detail,href,iconType)=>{
+    if(!detail || !href)return;
+    const card=document.createElement('article');card.className='contact-card';
+    const mark=createContactIcon(iconType);
+    const body=document.createElement('div');
+    const title=document.createElement('h5');title.textContent=label;
+    const link=document.createElement('a');link.href=href;link.textContent=detail;link.className='contact-link';
+    if(/^https?:/i.test(href)){link.target='_blank';link.rel='noopener noreferrer';}
+    body.append(title,link);card.append(mark,body);cards.appendChild(card);
+  };
+  const email=String(settings.contact_email || '').trim();
+  if(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))addCard('Email','Send us an email','mailto:'+email,'email');
+  const whatsapp=safePortalURL(settings.whatsapp_channel);
+  addCard('WhatsApp channel','Follow our WhatsApp updates',whatsapp,'whatsapp');
+  const instagram=safePortalURL(settings.instagram_url);
+  addCard('Instagram','Follow ICP YOUTH CIRCLE',instagram,'instagram');
+  [
+    ['Facebook','Follow us on Facebook','facebook_url','facebook'],
+    ['YouTube','Watch us on YouTube','youtube_url','youtube'],
+    ['LinkedIn','Connect with us on LinkedIn','linkedin_url','linkedin'],
+    ['X','Follow us on X','x_url','x'],
+    ['TikTok','Follow us on TikTok','tiktok_url','tiktok'],
+    ['Telegram','Join us on Telegram','telegram_url','telegram']
+  ].forEach(([label,detail,key,iconType])=>{
+    const fallback=key==='x_url' ? settings.twitter_url : '';
+    addCard(label,detail,safePortalURL(settings[key] || fallback),iconType);
+  });
+  if(!cards.children.length){
+    const empty=document.createElement('p');empty.className='contact-empty';empty.textContent='Official contact details have not been published yet.';panel.appendChild(empty);
+  }else panel.appendChild(cards);
+  content.appendChild(panel);
+}
+
+function publicFormToken() {
+  const key='icp-public-form-token';
+  try {
+    let token=localStorage.getItem(key);
+    if (/^[A-Za-z0-9_-]{20,80}$/.test(token || '')) return token;
+    const bytes=new Uint8Array(24);crypto.getRandomValues(bytes);
+    token=Array.from(bytes,byte=>byte.toString(16).padStart(2,'0')).join('');
+    localStorage.setItem(key,token);return token;
+  } catch (_) {
+    return String(Date.now())+Math.random().toString(36).slice(2)+Math.random().toString(36).slice(2);
+  }
+}
+
+async function submitPublicPortalForm(action, values) {
+  const response=await fetch(API_BASE_URL,{
+    method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body:JSON.stringify(Object.assign({action:action,submissionToken:publicFormToken()},values))
+  });
+  if (!response.ok) throw new Error('The portal service could not be reached.');
+  const result=await response.json();
+  if (!result.success) throw new Error(result.error && result.error.message ? result.error.message : 'Unable to submit the form.');
+  return result.data;
+}
+
+function publicFormField(label, name, type, required, options) {
+  const wrapper=document.createElement('label');wrapper.className='portal-form-field';
+  const title=document.createElement('span');title.textContent=label+(required?' *':'');wrapper.appendChild(title);
+  let input;
+  if (type==='textarea') { input=document.createElement('textarea');input.rows=5; }
+  else if (type==='select') {
+    input=document.createElement('select');
+    const empty=document.createElement('option');empty.value='';empty.textContent='Select one';input.appendChild(empty);
+    options.forEach(value=>{const option=document.createElement('option');option.value=value;option.textContent=value;input.appendChild(option);});
+  } else { input=document.createElement('input');input.type=type; }
+  input.name=name;input.required=required;input.autocomplete=name==='email'?'email':name==='name'?'name':'off';
+  wrapper.appendChild(input);return wrapper;
+}
+
+function renderPublicPortalForm(kind) {
+  const content=document.getElementById('dynamicPageContent');
+  const filters=document.getElementById('resourceFilters');filters.innerHTML='';filters.style.display='none';content.replaceChildren();
+  const resource=kind==='resource';
+  const feedback=kind==='feedback';
+  const card=document.createElement('article');card.className='card portal-form-card';
+  const intro=document.createElement('p');
+  intro.textContent=resource ? 'Share a useful, legal student resource for administrator review. Submitting it does not publish it automatically.' : feedback ? 'Share an anonymous suggestion or portal experience. Do not include names, email addresses, passwords, identity documents or payment details.' : 'Send a question or support request to the ICP YOUTH CIRCLE administrators. Do not include passwords, identity documents or payment details.';
+  const form=document.createElement('form');form.className='portal-form';form.noValidate=false;
+  const fields=resource ? [
+    ['Your name','name','text',true],['Email','email','email',true],['Resource title','title','text',true],
+    ['Resource type','resourceType','select',true,['Notes','Past Paper','Book','Video','Course','Website','Tool','Other']],
+    ['Subject','subject','text',false],['Level or class','level','text',false],['Resource link','url','url',true],
+    ['Why is this useful?','description','textarea',false]
+  ] : feedback ? [
+    ['Feedback category','category','select',true,['Suggestion','Portal experience','Content correction','Accessibility','Technical problem','Other']],
+    ['Your feedback','message','textarea',true]
+  ] : [
+    ['Your name','name','text',true],['Email','email','email',true],
+    ['Request type','requestType','select',true,['Resource request','Study guidance','Portal problem','Correction','Suggestion','Other']],
+    ['Subject','subject','text',true],['How can we help?','message','textarea',true]
+  ];
+  fields.forEach(field=>form.appendChild(publicFormField(field[0],field[1],field[2],field[3],field[4] || [])));
+  const trap=document.createElement('label');trap.className='portal-form-trap';trap.setAttribute('aria-hidden','true');trap.textContent='Website';
+  const trapInput=document.createElement('input');trapInput.name='website';trapInput.tabIndex=-1;trapInput.autocomplete='off';trap.appendChild(trapInput);form.appendChild(trap);
+  const consent=document.createElement('label');consent.className='portal-form-consent';
+  const consentInput=document.createElement('input');consentInput.type='checkbox';consentInput.required=true;
+  consent.append(consentInput,document.createTextNode(resource ? ' I confirm this link is safe to review and I have permission to share it.' : feedback ? ' I confirm that this feedback contains no private or sensitive information.' : ' I agree that administrators may use my email to respond to this request.'));
+  const submit=document.createElement('button');submit.type='submit';submit.className='resource-button';submit.textContent=resource?'Send for review':feedback?'Send anonymous feedback':'Send request';
+  const status=document.createElement('p');status.className='portal-form-status';status.setAttribute('role','status');status.setAttribute('aria-live','polite');
+  form.append(consent,submit,status);
+  form.addEventListener('submit',async event=>{
+    event.preventDefault();if(!form.reportValidity()) return;
+    submit.disabled=true;status.className='portal-form-status';status.textContent='Sending…';
+    const values=Object.fromEntries(new FormData(form).entries());
     try {
-      let data;
-      if (body.action === 'mdcatStart') data = mdcatStart_(uid, body);
-      if (body.action === 'mdcatSubmit') data = mdcatSubmit_(uid, body);
-      if (body.action === 'mdcatResume') data = mdcatResume_(uid, body.attemptId);
-      if (body.action === 'mdcatResult') data = mdcatResult_(uid, body.attemptId);
-      if (body.action === 'mdcatMyResults') data = mdcatMyResults_(uid);
-      if (body.action === 'mdcatMyProgress') data = mdcatProgress_(uid, false);
-      return jsonResponse_(data);
-    } finally { lock.releaseLock(); }
+      if(feedback)values.pageURL=location.href;
+      const result=await submitPublicPortalForm(resource?'publicSubmitResource':feedback?'publicFeedback':'publicHelpRequest',values);
+      form.reset();status.className='portal-form-status portal-form-success';
+      status.textContent=(resource?'Resource submitted':feedback?'Feedback submitted':'Request submitted')+' successfully. Reference: '+result.id+'.';
+      if(!resource && !feedback){
+        let track=form.querySelector('.track-request-button');if(!track){track=document.createElement('button');track.type='button';track.className='secondary-button track-request-button';track.textContent='Track in My account';track.onclick=()=>openPortalAccount();form.appendChild(track);}
+      }
+    } catch(error) { status.className='portal-form-status portal-form-error';status.textContent=error.message || 'Unable to submit the form.'; }
+    finally { submit.disabled=false; }
+  });
+  card.append(intro,form);content.appendChild(card);
+}
+
+function handleNavigation(item,options={}) {
+
+  navigationVersion += 1;
+  closeMDCATHub();
+  document.getElementById('mdcatEntryLink').hidden = true;
+  item=resolveNavigationItem(item);
+
+  if (item.Slug === 'mdcat' || item.Slug === 'mdcat-2027') {
+    openMDCATHub(options);
+    return;
+  }
+
+  if (item.Slug === 'home') {
+    showHome(options);
+    return;
+  }
+
+  const title =
+    document.getElementById('dynamicPageTitle');
+
+  const description =
+    document.getElementById('dynamicPageDescription');
+
+  const content =
+    document.getElementById('dynamicPageContent');
+
+  const itemLabel=item.Label || item.Name || 'Portal';
+  const parentSlug=getNavigationParentSlug(item);
+  title.textContent = itemLabel;
+
+  description.textContent = getRouteDescription(item.Slug, itemLabel);
+  updatePortalMetadata(itemLabel,description.textContent);
+  renderPageBreadcrumb(item);
+
+  content.innerHTML = '';
+
+const resourceCategories = {
+  'notes': 'Notes',
+  'past-papers': 'Past Papers',
+  'study-resources': 'Study Resources'
+};
+
+if (resourceCategories[item.Slug]) {
+  loadResourcesByCategory(
+    resourceCategories[item.Slug]
+  );
+} else if (item.Slug === 'mcqs') {
+  loadMCQs();
+} else if (item.Slug === 'videos') {
+  loadVideos();
+} else if (['admissions','college-admissions','university-admissions','eligibility','deadlines','admission-guides'].includes(item.Slug) || (item.Slug==='merit-lists'&&parentSlug==='admissions')) {
+  loadAdmissions(item.Slug,parentSlug);
+} else if (['scholarships','pakistan-scholarships','international-scholarships','financial-aid','scholarship-guides'].includes(item.Slug)) {
+  loadScholarships(item.Slug);
+} else if (['career','career-guidance','internships','competitions','student-programs','portfolio-guidance','mentors'].includes(item.Slug)) {
+  loadOpportunities(item.Slug);
+} else if (
+  item.Slug === 'updates' ||
+  item.Slug === 'announcements' || item.Slug === 'exam-updates' || item.Slug === 'results' ||
+  item.Slug === 'important-notices' || (item.Slug === 'merit-lists' && parentSlug === 'updates')
+) {
+  loadAnnouncements(item.Slug,parentSlug);
+} else if (
+  item.Slug === 'ai-smart-tools' ||
+  item.Slug === 'ai-tools' || item.Slug === 'ai-assistant' || item.Slug === 'smart-tools' || item.Slug === 'study-tools'
+) {
+  loadAITools(item.Slug);
+} else if (
+  item.Slug === 'islamic' ||
+  item.Slug === 'hadith' ||
+  item.Slug === 'islamic-reminders' ||
+  item.Slug === 'duas-motivation'
+) {
+  loadIslamicContent(item.Slug);
+} else if (item.Slug === 'blog' || item.Slug === 'study-abroad') {
+  loadBlog(item.Slug);
+} else if (
+  item.Slug === 'entry-tests' ||
+  item.Slug === 'mdcat-info' ||
+  item.Slug === 'nums' ||
+  item.Slug === 'etea' ||
+  item.Slug === 'ecat' ||
+  item.Slug === 'nust-net' ||
+  item.Slug === 'other-tests'
+) {
+  loadEntryTests(item.Slug === 'mdcat-info' ? 'mdcat' : item.Slug);
+} else if (['study','community','explore'].includes(item.Slug)) {
+  renderNavigationSection(item.Slug);
+} else if (item.Slug === 'about') {
+  renderAboutPage();
+} else if (item.Slug === 'contact') {
+  renderContactPage();
+} else if (item.Slug === 'prep-tracker') {
+  renderSectionNotice('No public preparation tracker has been published yet. MDCAT students can use My activity and Study plan inside the MDCAT 2027 hub.');
+} else if (item.Slug === 'submit-resource') {
+  renderPublicPortalForm('resource');
+} else if (item.Slug === 'student-help-desk') {
+  renderPublicPortalForm('help');
+} else if (item.Slug === 'suggestions') {
+  renderPublicPortalForm('feedback');
+} else if (item.Slug === 'faq' || item.Slug === 'faqs' || item.Slug === 'frequently-asked-questions') {
+  loadPortalFAQs();
+} else if (item.Slug === 'forum') {
+  renderSectionNotice(itemLabel+' is not publicly available yet. An official link will appear here when it is published.');
+} else {
+  renderSectionNotice('No published content is available in '+itemLabel+' yet.');
+}
+
+  document.getElementById(
+    'homeHero'
+  ).style.display = 'none';
+
+  document.getElementById(
+    'homeExplore'
+  ).style.display = 'none';
+
+  const homeTools=document.getElementById('homeTools');if(homeTools)homeTools.hidden=true;
+
+  document.getElementById(
+    'dynamicPage'
+  ).style.display = 'block';
+
+  if(!options.fromHistory){
+    const target=portalRouteHash(item);
+    if(window.location.hash!==target)history.pushState({portal:true},'',target);
+  }
+
+  window.scrollTo({
+    top: 0,
+    behavior: 'smooth'
+  });
+}
+function showHome(options={}) {
+
+  navigationVersion += 1;
+  closeMDCATHub();
+  updatePortalMetadata('ICP YOUTH CIRCLE','Student resources, opportunities, guidance and community support in one accessible portal.');
+
+  document.getElementById(
+    'dynamicPage'
+  ).style.display = 'none';
+
+  document.getElementById(
+    'homeHero'
+  ).style.display = 'block';
+
+  document.getElementById(
+    'homeExplore'
+  ).style.display = 'block';
+
+  const homeTools=document.getElementById('homeTools');if(homeTools)homeTools.hidden=homeTools.dataset.active!=='true';
+
+  if(!options.fromHistory && (window.location.hash || window.location.search)) history.pushState({portal:true},'',window.location.pathname);
+
+  window.scrollTo({
+    top: 0,
+    behavior: 'smooth'
+  });
+}
+function loadResourcesByCategory(categoryName) {
+  const requestVersion = navigationVersion;
+
+  const content =
+    document.getElementById('dynamicPageContent');
+
+  content.innerHTML =
+    '<p>Loading resources...</p>';
+
+loadPublicModule('resources', {category: categoryName})
+  .then(data => {
+    if (requestVersion !== navigationVersion) return;
+    renderResourceCards(data);
+  })
+  .catch(error => {
+    console.error(
+      'Resources error:',
+      error
+    );
+
+  if (requestVersion === navigationVersion) showResourceError(error);
+  });
+  }
+
+function renderResourceCards(resources) {
+
+  currentResources = resources || [];
+
+  buildResourceFilters(currentResources);
+
+  displayFilteredResources();
+}
+function buildResourceFilters(resources) {
+
+  const container =
+    document.getElementById('resourceFilters');
+
+  if (!resources || resources.length === 0) {
+    container.innerHTML = '';
+    container.style.display = 'none';
+    return;
+  }
+
+  container.style.display = 'grid';
+
+  const levels =
+    getUniqueValues(resources, 'Level');
+
+  const subjects =
+    getUniqueValues(resources, 'Subject');
+
+  const years =
+    getUniqueValues(resources, 'Year');
+
+  const institutions =
+    getUniqueValues(resources, 'Institution');
+
+  container.innerHTML = `
+    ${createFilterSelect(
+      'filterLevel',
+      'All Levels',
+      levels
+    )}
+
+    ${createFilterSelect(
+      'filterSubject',
+      'All Subjects',
+      subjects
+    )}
+
+    ${createFilterSelect(
+      'filterYear',
+      'All Years',
+      years
+    )}
+
+    ${createFilterSelect(
+      'filterInstitution',
+      'All Institutions',
+      institutions
+    )}
+  `;
+
+  container
+    .querySelectorAll('select')
+    .forEach(select => {
+
+      select.addEventListener(
+        'change',
+        displayFilteredResources
+      );
+
+    });
+}
+function getUniqueValues(resources, field) {
+
+  return [
+    ...new Set(
+      resources
+        .map(item =>
+          String(item[field] || '').trim()
+        )
+        .filter(Boolean)
+    )
+  ].sort();
+}
+function createFilterSelect(
+  id,
+  defaultLabel,
+  values
+) {
+
+  const options = values
+    .map(value =>
+      `<option value="${escapeHtml(value)}">
+        ${escapeHtml(value)}
+      </option>`
+    )
+    .join('');
+
+  return `
+    <select id="${id}">
+      <option value="">
+        ${defaultLabel}
+      </option>
+      ${options}
+    </select>
+  `;
+}
+function displayFilteredResources() {
+
+  const level =
+    document.getElementById('filterLevel')
+      ?.value || '';
+
+  const subject =
+    document.getElementById('filterSubject')
+      ?.value || '';
+
+  const year =
+    document.getElementById('filterYear')
+      ?.value || '';
+
+  const institution =
+    document.getElementById(
+      'filterInstitution'
+    )?.value || '';
+
+  const filtered =
+    currentResources.filter(resource => {
+
+      return (
+        (!level ||
+          resource.Level === level) &&
+
+        (!subject ||
+          resource.Subject === subject) &&
+
+        (!year ||
+          String(resource.Year) === year) &&
+
+        (!institution ||
+          resource.Institution === institution)
+      );
+
+    });
+
+  drawResourceCards(filtered);
+}
+
+function drawResourceCards(resources) {
+
+  const content =
+    document.getElementById(
+      'dynamicPageContent'
+    );
+
+  content.innerHTML = '';
+
+  if (!resources || resources.length === 0) {
+
+    content.innerHTML =
+      '<p>No matching resources found.</p>';
+
+    return;
+  }
+
+  resources.forEach(resource => {
+
+    const card =
+      document.createElement('div');
+
+    card.className =
+      'card resource-card';
+
+
+    const resourceThumbnailURL=safePortalURL(resource.ThumbnailURL);
+    if (resourceThumbnailURL) {
+
+      const image =
+        document.createElement('img');
+
+      image.src = resourceThumbnailURL;
+      image.loading = 'lazy';
+      image.decoding = 'async';
+
+      image.alt =
+        resource.Title || 'Resource';
+
+      image.className =
+        'resource-thumbnail';
+
+      card.appendChild(image);
+    }
+
+
+    const body =
+      document.createElement('div');
+
+    body.className =
+      'resource-card-body';
+
+
+    const badges =
+      document.createElement('div');
+
+    badges.className =
+      'resource-badges';
+
+
+    if (resource.ResourceType) {
+
+      const typeBadge =
+        document.createElement('span');
+
+      typeBadge.className =
+        'resource-badge';
+
+      typeBadge.textContent =
+        resource.ResourceType;
+
+      badges.appendChild(typeBadge);
+    }
+
+
+    if (
+      String(resource.Featured)
+        .toLowerCase() === 'yes'
+    ) {
+
+      const featured =
+        document.createElement('span');
+
+      featured.className =
+        'resource-badge featured-badge';
+
+      featured.textContent =
+        'Featured';
+
+      badges.appendChild(featured);
+    }
+
+
+    if (badges.children.length > 0) {
+      body.appendChild(badges);
+    }
+
+
+    const title =
+      document.createElement('h4');
+
+    title.textContent =
+      resource.Title ||
+      'Untitled Resource';
+
+    body.appendChild(title);
+
+
+    if (resource.Description) {
+
+      const description =
+        document.createElement('p');
+
+      description.textContent =
+        resource.Description;
+
+      body.appendChild(description);
+    }
+
+
+    const meta =
+      document.createElement('div');
+
+    meta.className =
+      'resource-meta';
+
+    meta.textContent = [
+      resource.Subject,
+      resource.Level,
+      resource.Institution,
+      resource.Year
+    ]
+      .filter(Boolean)
+      .join(' • ');
+
+    if (meta.textContent) {
+      body.appendChild(meta);
+    }
+
+
+    const resourceFileURL=safePortalURL(resource.FileURL);
+    if (resourceFileURL) {
+
+      const link =
+        document.createElement('a');
+
+      link.href = resourceFileURL;
+
+      link.target =
+        '_blank';
+
+      link.rel =
+        'noopener noreferrer';
+
+      const isPdf=String(resource.ResourceType || '').trim().toLowerCase()==='pdf';
+      link.textContent = isPdf ? 'View PDF' : 'Open Resource';
+
+      link.className =
+        'resource-button';
+
+      body.appendChild(link);
+
+      const downloadURL=isPdf ? googleDriveDownloadURL(resourceFileURL) : '';
+      if (downloadURL) {
+        const download=document.createElement('a');
+        download.href=downloadURL;download.target='_blank';download.rel='noopener noreferrer';
+        download.textContent='Download PDF';download.className='resource-button';
+        body.appendChild(download);
+      }
+    }
+
+    const bookmark=document.createElement('button');
+    const bookmarked=isPortalResourceBookmarked(resource);
+    bookmark.type='button';bookmark.className='resource-button';bookmark.textContent=bookmarked?'Saved ✓':'Save resource';
+    bookmark.setAttribute('aria-pressed',String(bookmarked));bookmark.onclick=()=>togglePortalResourceBookmark(resource,bookmark);
+    body.appendChild(bookmark);
+    appendPortalShareButton(body,resource,'resource');
+
+
+    card.appendChild(body);
+
+    content.appendChild(card);
+
+  });
+}
+function escapeHtml(value) {
+
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function showResourceError(error) {
+  const content =
+    document.getElementById('dynamicPageContent');
+
+  content.innerHTML =
+    '<p>Unable to load resources right now.</p>';
+
+  console.error(error);
+}
+function loadMCQs() {
+  const requestVersion = navigationVersion;
+
+  const content =
+    document.getElementById(
+      'dynamicPageContent'
+    );
+
+  const filters =
+    document.getElementById(
+      'resourceFilters'
+    );
+
+  filters.style.display = 'none';
+
+  content.innerHTML =
+    '<p>Loading MCQs...</p>';
+
+ loadPublicModule('mcqs')
+  .then(data => {
+    if (requestVersion !== navigationVersion) return;
+    renderMCQs(data);
+  })
+  .catch(error => {
+    console.error(
+      'MCQ error:',
+      error
+    );
+
+  if (requestVersion === navigationVersion) showMCQError(error);
+  });
+  }
+
+function renderMCQs(mcqs) {
+
+  currentMCQs = mcqs || [];
+
+  buildMCQFilters(currentMCQs);
+
+  addMockTestButton();
+
+  displayFilteredMCQs();
+}
+function addMockTestButton() {
+
+  const filters =
+    document.getElementById(
+      'resourceFilters'
+    );
+
+  if (!filters) {
+    return;
+  }
+
+  let button =
+    document.getElementById(
+      'startMockTestButton'
+    );
+
+  if (button) {
+    return;
+  }
+
+  button =
+    document.createElement('button');
+
+  button.id =
+    'startMockTestButton';
+
+  button.type =
+    'button';
+
+  button.textContent =
+    'Start Mock Test';
+
+  button.style.padding =
+    '11px 16px';
+
+  button.style.border =
+    'none';
+
+  button.style.borderRadius =
+    '8px';
+
+  button.style.background =
+    '#991b2f';
+
+  button.style.color =
+    '#ffffff';
+
+  button.style.fontWeight =
+    'bold';
+
+  button.style.cursor =
+    'pointer';
+
+  button.onclick =
+    startMockTest;
+
+  filters.appendChild(button);
+}
+function startMockTest() {
+
+  if (!activeQuizMCQs.length) {
+    alert(
+      'No MCQs are available for this mock test.'
+    );
+    return;
+  }
+
+  mockTestActive = true;
+  mockTestSubmitted = false;
+  mockTestAnswers = {};
+
+  currentMCQIndex = 0;
+  mcqScore = 0;
+  mcqAnswered = 0;
+
+  drawMCQs(activeQuizMCQs);
+}
+function buildMCQFilters(mcqs) {
+
+  const filters =
+    document.getElementById(
+      'resourceFilters'
+    );
+
+  if (!mcqs || mcqs.length === 0) {
+    filters.innerHTML = '';
+    filters.style.display = 'none';
+    return;
+  }
+
+  filters.style.display = 'grid';
+
+  const subjects =
+    getUniqueValues(mcqs, 'Subject');
+
+  const levels =
+    getUniqueValues(mcqs, 'Level');
+
+  const entryTests =
+    getUniqueValues(mcqs, 'EntryTest');
+
+  const difficulties =
+    getUniqueValues(mcqs, 'Difficulty');
+
+  filters.innerHTML = `
+    ${createFilterSelect(
+      'mcqSubject',
+      'All Subjects',
+      subjects
+    )}
+
+    ${createFilterSelect(
+      'mcqLevel',
+      'All Levels',
+      levels
+    )}
+
+    ${createFilterSelect(
+      'mcqEntryTest',
+      'All Entry Tests',
+      entryTests
+    )}
+
+    ${createFilterSelect(
+      'mcqDifficulty',
+      'All Difficulties',
+      difficulties
+    )}
+  `;
+
+  filters
+    .querySelectorAll('select')
+    .forEach(select => {
+
+      select.addEventListener(
+        'change',
+        displayFilteredMCQs
+      );
+
+    });
+}
+function displayFilteredMCQs() {
+
+  const subject =
+    document.getElementById(
+      'mcqSubject'
+    )?.value || '';
+
+  const level =
+    document.getElementById(
+      'mcqLevel'
+    )?.value || '';
+
+  const entryTest =
+    document.getElementById(
+      'mcqEntryTest'
+    )?.value || '';
+
+  const difficulty =
+    document.getElementById(
+      'mcqDifficulty'
+    )?.value || '';
+
+  const filtered =
+    currentMCQs.filter(mcq => {
+
+      return (
+        (!subject ||
+          mcq.Subject === subject) &&
+
+        (!level ||
+          mcq.Level === level) &&
+
+        (!entryTest ||
+          mcq.EntryTest === entryTest) &&
+
+        (!difficulty ||
+          mcq.Difficulty === difficulty)
+      );
+
+    });
+
+activeQuizMCQs = filtered;
+currentMCQIndex = 0;
+mcqScore = 0;
+mcqAnswered = 0;
+
+drawMCQs(activeQuizMCQs);
+}
+function drawMCQs(mcqs) {
+
+  const content =
+    document.getElementById(
+      'dynamicPageContent'
+    );
+
+  content.innerHTML = '';
+
+  if (!mcqs || mcqs.length === 0) {
+
+    content.innerHTML =
+      '<p>No MCQs are available yet.</p>';
+
+    return;
+  }
+
+  if (currentMCQIndex < 0) {
+    currentMCQIndex = 0;
+  }
+
+  if (currentMCQIndex >= mcqs.length) {
+    currentMCQIndex = mcqs.length - 1;
+  }
+
+  const mcq = mcqs[currentMCQIndex];
+
+  const topBar =
+    document.createElement('div');
+
+  topBar.style.display = 'flex';
+  topBar.style.justifyContent = 'space-between';
+  topBar.style.alignItems = 'center';
+  topBar.style.gap = '12px';
+  topBar.style.marginBottom = '20px';
+  topBar.style.flexWrap = 'wrap';
+
+
+  const counter =
+    document.createElement('div');
+
+  counter.style.fontWeight = 'bold';
+
+  counter.textContent =
+    'Question ' +
+    (currentMCQIndex + 1) +
+    ' of ' +
+    mcqs.length;
+
+
+  const scoreBox =
+    document.createElement('div');
+
+  scoreBox.id = 'mcqScoreBox';
+
+  scoreBox.style.fontWeight = 'bold';
+
+  scoreBox.textContent =
+    'Score: ' +
+    mcqScore +
+    ' / ' +
+    mcqAnswered;
+
+
+  topBar.appendChild(counter);
+  topBar.appendChild(scoreBox);
+
+  content.appendChild(topBar);
+
+
+  const card =
+    document.createElement('div');
+
+  card.className = 'card';
+
+  card.style.cursor = 'default';
+
+
+  const question =
+    document.createElement('h4');
+
+  question.textContent =
+    mcq.Question || 'Question';
+
+  card.appendChild(question);
+
+
+  const meta =
+    document.createElement('p');
+
+  meta.textContent = [
+    mcq.Subject,
+    mcq.Topic,
+    mcq.Level,
+    mcq.EntryTest,
+    mcq.Difficulty
+  ]
+    .filter(Boolean)
+    .join(' • ');
+
+  if (meta.textContent) {
+    card.appendChild(meta);
+  }
+
+
+  const optionsContainer =
+    document.createElement('div');
+
+  optionsContainer.style.marginTop = '18px';
+
+
+  const options = [
+    ['A', mcq.OptionA],
+    ['B', mcq.OptionB],
+    ['C', mcq.OptionC],
+    ['D', mcq.OptionD]
+  ];
+
+
+  const feedback =
+    document.createElement('div');
+
+  feedback.style.marginTop = '16px';
+  feedback.style.fontWeight = 'bold';
+
+
+  const explanation =
+    document.createElement('div');
+
+  explanation.style.marginTop = '10px';
+  explanation.style.display = 'none';
+
+
+  options.forEach(([letter, text]) => {
+
+    if (!text) {
+      return;
+    }
+
+    const button =
+      document.createElement('button');
+
+    button.type = 'button';
+
+    button.textContent =
+      letter + '. ' + text;
+
+    button.style.display = 'block';
+    button.style.width = '100%';
+    button.style.textAlign = 'left';
+    button.style.margin = '8px 0';
+    button.style.padding = '12px';
+    button.style.border =
+      '1px solid #dbe0e6';
+    button.style.borderRadius = '8px';
+    button.style.background = '#ffffff';
+    button.style.cursor = 'pointer';
+
+
+    button.onclick = function() {
+
+      const allButtons =
+        optionsContainer
+          .querySelectorAll('button');
+
+      allButtons.forEach(btn => {
+        btn.disabled = true;
+        btn.style.cursor = 'default';
+      });
+
+
+      const correct =
+        String(
+          mcq.CorrectOption || ''
+        )
+          .trim()
+          .toUpperCase();
+
+
+      mcqAnswered++;
+
+      if (letter === correct) {
+        mcqScore++;
+      }
+
+
+      if (letter === correct) {
+
+        feedback.textContent =
+          'Correct answer.';
+
+        button.style.background =
+          '#dcfce7';
+
+        button.style.borderColor =
+          '#16a34a';
+
+      } else {
+
+        feedback.textContent =
+          'Incorrect answer.';
+
+        button.style.background =
+          '#fee2e2';
+
+        button.style.borderColor =
+          '#dc2626';
+
+
+        allButtons.forEach(btn => {
+
+          if (
+            btn.textContent
+              .startsWith(
+                correct + '.'
+              )
+          ) {
+
+            btn.style.background =
+              '#dcfce7';
+
+            btn.style.borderColor =
+              '#16a34a';
+          }
+
+        });
+      }
+
+
+      const currentScoreBox =
+        document.getElementById(
+          'mcqScoreBox'
+        );
+
+      if (currentScoreBox) {
+        currentScoreBox.textContent =
+          'Score: ' +
+          mcqScore +
+          ' / ' +
+          mcqAnswered;
+      }
+
+
+      if (mcq.Explanation) {
+
+        explanation.textContent =
+          'Explanation: ' +
+          mcq.Explanation;
+
+        explanation.style.display =
+          'block';
+      }
+
+    };
+
+
+    optionsContainer.appendChild(
+      button
+    );
+  });
+
+
+  card.appendChild(optionsContainer);
+  card.appendChild(feedback);
+  card.appendChild(explanation);
+
+  content.appendChild(card);
+
+
+  const controls =
+    document.createElement('div');
+
+  controls.style.display = 'flex';
+  controls.style.justifyContent = 'space-between';
+  controls.style.gap = '10px';
+  controls.style.marginTop = '20px';
+  controls.style.flexWrap = 'wrap';
+
+
+  const previousButton =
+    document.createElement('button');
+
+  previousButton.textContent =
+    '← Previous';
+
+  previousButton.disabled =
+    currentMCQIndex === 0;
+
+  previousButton.onclick = function() {
+
+    if (currentMCQIndex > 0) {
+      currentMCQIndex--;
+      drawMCQs(activeQuizMCQs);
+    }
+  };
+
+
+  const restartButton =
+    document.createElement('button');
+
+  restartButton.textContent =
+    'Restart Quiz';
+
+  restartButton.onclick = function() {
+
+    currentMCQIndex = 0;
+    mcqScore = 0;
+    mcqAnswered = 0;
+
+    drawMCQs(activeQuizMCQs);
+  };
+
+
+  const nextButton =
+    document.createElement('button');
+
+  nextButton.textContent =
+    'Next →';
+
+  nextButton.disabled =
+    currentMCQIndex ===
+    mcqs.length - 1;
+
+  nextButton.onclick = function() {
+
+    if (
+      currentMCQIndex <
+      mcqs.length - 1
+    ) {
+
+      currentMCQIndex++;
+
+      drawMCQs(activeQuizMCQs);
+    }
+  };
+  const submitMockButton =
+  document.createElement('button');
+
+submitMockButton.textContent =
+  'Submit Mock Test';
+
+submitMockButton.style.display =
+  mockTestActive
+    ? 'inline-block'
+    : 'none';
+
+submitMockButton.onclick = function() {
+  submitMockTest();
+};
+
+
+  [
+  previousButton,
+  restartButton,
+  nextButton,
+  submitMockButton
+]
+    .forEach(button => {
+
+      button.style.padding = '10px 16px';
+      button.style.border =
+        '1px solid #dbe0e6';
+      button.style.borderRadius = '8px';
+      button.style.background = '#ffffff';
+      button.style.cursor =
+        button.disabled
+          ? 'default'
+          : 'pointer';
+
+    });
+
+
+  controls.appendChild(previousButton);
+  controls.appendChild(restartButton);
+  controls.appendChild(nextButton);
+  controls.appendChild(submitMockButton);
+
+  content.appendChild(controls);
+}
+function submitMockTest() {
+
+  mockTestSubmitted = true;
+  mockTestActive = false;
+
+  const total =
+    activeQuizMCQs.length;
+
+  const correct =
+    mcqScore;
+
+  const answered =
+    mcqAnswered;
+
+  const incorrect =
+    answered - correct;
+
+  const unanswered =
+    total - answered;
+
+  const percentage =
+    total > 0
+      ? Math.round(
+          (correct / total) * 100
+        )
+      : 0;
+
+  const content =
+    document.getElementById(
+      'dynamicPageContent'
+    );
+
+  content.innerHTML = `
+    <div class="card">
+      <h3>Mock Test Result</h3>
+
+      <p>
+        Score:
+        <strong>${correct} / ${total}</strong>
+      </p>
+
+      <p>
+        Percentage:
+        <strong>${percentage}%</strong>
+      </p>
+
+      <p>
+        Correct:
+        <strong>${correct}</strong>
+      </p>
+
+      <p>
+        Incorrect:
+        <strong>${incorrect}</strong>
+      </p>
+
+      <p>
+        Unanswered:
+        <strong>${unanswered}</strong>
+      </p>
+
+      <button
+        type="button"
+        onclick="restartMockTest()"
+        style="
+          margin-top:15px;
+          padding:10px 16px;
+          border:none;
+          border-radius:8px;
+          background:#991b2f;
+          color:white;
+          font-weight:bold;
+          cursor:pointer;
+        ">
+        Restart Mock Test
+      </button>
+    </div>
+  `;
+}
+function restartMockTest() {
+
+  mockTestActive = true;
+  mockTestSubmitted = false;
+  mockTestAnswers = {};
+
+  currentMCQIndex = 0;
+  mcqScore = 0;
+  mcqAnswered = 0;
+
+  drawMCQs(activeQuizMCQs);
+}
+function showMCQError(error) {
+  const content =
+    document.getElementById(
+      'dynamicPageContent'
+    );
+
+  content.innerHTML =
+    '<p>Unable to load MCQs right now.</p>';
+
+  console.error(error);
+}
+function loadVideos() {
+  const requestVersion = navigationVersion;
+
+  const content =
+    document.getElementById(
+      'dynamicPageContent'
+    );
+
+  const filters =
+    document.getElementById(
+      'resourceFilters'
+    );
+
+  filters.style.display = 'none';
+
+  content.innerHTML =
+    '<p>Loading videos...</p>';
+
+loadPublicModule('videos')
+  .then(data => {
+    if (requestVersion !== navigationVersion) return;
+    renderVideos(data);
+  })
+  .catch(error => {
+    console.error(
+      'Videos error:',
+      error
+    );
+
+  if (requestVersion === navigationVersion) showVideoError(error);
+  });
+  }
+
+function renderVideos(videos) {
+
+  currentVideos = videos || [];
+
+  buildVideoFilters(currentVideos);
+
+  displayFilteredVideos();
+}
+function buildVideoFilters(videos) {
+
+  const filters =
+    document.getElementById(
+      'resourceFilters'
+    );
+
+  if (!videos || videos.length === 0) {
+    filters.innerHTML = '';
+    filters.style.display = 'none';
+    return;
+  }
+
+  filters.style.display = 'grid';
+
+  const subjects =
+    getUniqueValues(videos, 'Subject');
+
+  const levels =
+    getUniqueValues(videos, 'Level');
+
+  const categories =
+    getUniqueValues(videos, 'Category');
+
+  const platforms =
+    getUniqueValues(videos, 'Platform');
+
+  filters.innerHTML = `
+    ${createFilterSelect(
+      'videoSubject',
+      'All Subjects',
+      subjects
+    )}
+
+    ${createFilterSelect(
+      'videoLevel',
+      'All Levels',
+      levels
+    )}
+
+    ${createFilterSelect(
+      'videoCategory',
+      'All Categories',
+      categories
+    )}
+
+    ${createFilterSelect(
+      'videoPlatform',
+      'All Platforms',
+      platforms
+    )}
+  `;
+
+  filters
+    .querySelectorAll('select')
+    .forEach(select => {
+
+      select.addEventListener(
+        'change',
+        displayFilteredVideos
+      );
+
+    });
+}
+function displayFilteredVideos() {
+
+  const subject =
+    document.getElementById(
+      'videoSubject'
+    )?.value || '';
+
+  const level =
+    document.getElementById(
+      'videoLevel'
+    )?.value || '';
+
+  const category =
+    document.getElementById(
+      'videoCategory'
+    )?.value || '';
+
+  const platform =
+    document.getElementById(
+      'videoPlatform'
+    )?.value || '';
+
+  const filtered =
+    currentVideos.filter(video => {
+
+      return (
+        (!subject ||
+          video.Subject === subject) &&
+
+        (!level ||
+          video.Level === level) &&
+
+        (!category ||
+          video.Category === category) &&
+
+        (!platform ||
+          video.Platform === platform)
+      );
+
+    });
+
+  drawVideoCards(filtered);
+}
+function drawVideoCards(videos) {
+
+  const content =
+    document.getElementById(
+      'dynamicPageContent'
+    );
+
+  content.innerHTML = '';
+
+  if (!videos || videos.length === 0) {
+    content.innerHTML =
+      '<p>No matching videos found.</p>';
+    return;
+  }
+
+  videos.forEach(video => {
+
+    const card =
+      document.createElement('div');
+
+    card.className =
+      'card resource-card';
+
+    const videoThumbnailURL=safePortalURL(video.ThumbnailURL);
+    if (videoThumbnailURL) {
+
+      const image =
+        document.createElement('img');
+
+      image.src = videoThumbnailURL;
+      image.loading = 'lazy';
+      image.decoding = 'async';
+      image.alt = video.Title || 'Video';
+      image.className = 'resource-thumbnail';
+
+      card.appendChild(image);
+    }
+
+    const body =
+      document.createElement('div');
+
+    body.className =
+      'resource-card-body';
+
+    const badges =
+  document.createElement('div');
+
+badges.className =
+  'resource-badges';
+
+if (video.Platform) {
+
+  const platformBadge =
+    document.createElement('span');
+
+  platformBadge.className =
+    'resource-badge';
+
+  platformBadge.textContent =
+    video.Platform;
+
+  badges.appendChild(platformBadge);
+}
+
+if (
+  String(video.Featured || '')
+    .toLowerCase() === 'yes'
+) {
+
+  const featuredBadge =
+    document.createElement('span');
+
+  featuredBadge.className =
+    'resource-badge featured-badge';
+
+  featuredBadge.textContent =
+    'Featured';
+
+  badges.appendChild(featuredBadge);
+}
+
+if (badges.children.length > 0) {
+  body.appendChild(badges);
+}
+
+    const title =
+      document.createElement('h4');
+
+    title.textContent =
+      video.Title || 'Untitled Video';
+
+    body.appendChild(title);
+
+    const meta =
+      document.createElement('div');
+
+    meta.className =
+      'resource-meta';
+
+    meta.textContent = [
+      video.Subject,
+      video.Level,
+      video.Platform,
+      video.Duration
+    ]
+      .filter(Boolean)
+      .join(' • ');
+
+    if (meta.textContent) {
+      body.appendChild(meta);
+    }
+
+    if (video.Description) {
+
+      const description =
+        document.createElement('p');
+
+      description.textContent =
+        video.Description;
+
+      description.style.marginTop = '12px';
+
+      body.appendChild(description);
+    }
+
+    const videoURL=safePortalURL(video.VideoURL);
+    if (videoURL) {
+
+      const link =
+        document.createElement('a');
+
+      link.href = videoURL;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = 'Watch Video';
+      link.className = 'resource-button';
+
+      body.appendChild(link);
+    }
+
+    card.appendChild(body);
+    content.appendChild(card);
+  });
+}
+
+function showVideoError(error) {
+
+  const content =
+    document.getElementById(
+      'dynamicPageContent'
+    );
+
+  content.innerHTML =
+    '<p>Unable to load videos right now.</p>';
+
+  console.error(error);
+}
+function loadAdmissions(slug='admissions',parentSlug='') {
+  const requestVersion=navigationVersion;
+
+  const content =
+    document.getElementById(
+      'dynamicPageContent'
+    );
+
+  const filters =
+    document.getElementById(
+      'resourceFilters'
+    );
+
+  filters.style.display = 'none';
+
+  content.innerHTML =
+    '<p>Loading admissions...</p>';
+
+loadPublicModule('admissions')
+  .then(data => {
+    if (requestVersion !== navigationVersion) return;
+    renderAdmissions(filterAdmissionsForRoute(data,slug,parentSlug));
+  })
+  .catch(error => {
+    console.error(
+      'Admissions error:',
+      error
+    );
+
+  if (requestVersion === navigationVersion) showAdmissionsError(error);
+  });
+  }
+
+function filterAdmissionsForRoute(items,slug,parentSlug) {
+  if (slug==='college-admissions') return items.filter(item=>routeContains(item,['DegreeLevel','AdmissionType','Institution','Program'],['college','intermediate','fsc']));
+  if (slug==='university-admissions') return items.filter(item=>routeContains(item,['DegreeLevel','AdmissionType','Institution','Program'],['university','bachelor','undergraduate','graduate','master','phd']));
+  if (slug==='eligibility') return items.filter(item=>String(item.Eligibility||'').trim());
+  if (slug==='deadlines') return items.filter(item=>String(item.Deadline||'').trim());
+  if (slug==='merit-lists'&&parentSlug==='admissions') return items.filter(item=>String(item.MeritListDate||'').trim());
+  if (slug==='admission-guides') return items.filter(item=>routeContains(item,['Program','AdmissionType','Description'],['guide','application','how to apply']));
+  return items;
+}
+
+function loadScholarships(slug='scholarships') {
+  const requestVersion=navigationVersion;
+  const content =
+    document.getElementById('dynamicPageContent');
+
+  const filters =
+    document.getElementById('resourceFilters');
+
+  filters.innerHTML = '';
+  filters.style.display = 'none';
+
+  content.innerHTML =
+    '<p>Loading scholarships...</p>';
+
+ loadPublicModule('scholarships')
+  .then(data => {
+    if (requestVersion !== navigationVersion) return;
+    renderScholarships(filterScholarshipsForRoute(data,slug));
+  })
+  .catch(error => {
+    console.error(
+      'Scholarships error:',
+      error
+    );
+
+  if (requestVersion === navigationVersion) showScholarshipsError(error);
+  });
+  }
+
+function filterScholarshipsForRoute(items,slug) {
+  if (slug==='pakistan-scholarships') return items.filter(item=>String(item.Country||'').toLowerCase().includes('pakistan'));
+  if (slug==='international-scholarships') return items.filter(item=>String(item.Country||'').trim()&&!String(item.Country).toLowerCase().includes('pakistan'));
+  if (slug==='financial-aid') return items.filter(item=>routeContains(item,['Name','Type','Description','Benefits'],['financial aid','grant','bursary','need-based','need based']));
+  if (slug==='scholarship-guides') return items.filter(item=>routeContains(item,['Name','Type','Description'],['guide','how to apply','application']));
+  return items;
+}
+
+function loadOpportunities(slug='career') {
+  const requestVersion=navigationVersion;
+  const content =
+    document.getElementById('dynamicPageContent');
+
+  const filters =
+    document.getElementById('resourceFilters');
+
+  filters.innerHTML = '';
+  filters.style.display = 'none';
+
+  content.innerHTML =
+    '<p>Loading opportunities...</p>';
+
+ loadPublicModule('opportunities')
+  .then(data => {
+    if (requestVersion !== navigationVersion) return;
+    renderOpportunities(filterOpportunitiesForRoute(data,slug));
+  })
+  .catch(error => {
+    console.error(
+      'Opportunities error:',
+      error
+    );
+
+  if (requestVersion === navigationVersion) showOpportunitiesError(error);
+  });
+  }
+
+function filterOpportunitiesForRoute(items,slug) {
+  const terms={
+    'career-guidance':['career guidance','career counselling','career counseling'],
+    internships:['internship'],competitions:['competition','contest','hackathon'],
+    'student-programs':['student program','fellowship','exchange program'],
+    'portfolio-guidance':['portfolio'],'mentors':['mentor','mentorship']
+  }[slug];
+  return terms ? items.filter(item=>routeContains(item,['Title','Type','Description'],terms)) : items;
+}
+
+function loadAnnouncements(slug='updates',parentSlug='') {
+  const requestVersion=navigationVersion;
+  const content =
+    document.getElementById('dynamicPageContent');
+
+  const filters =
+    document.getElementById('resourceFilters');
+
+  filters.innerHTML = '';
+  filters.style.display = 'none';
+
+  content.innerHTML =
+    '<p>Loading announcements...</p>';
+
+ loadPublicModule('announcements')
+  .then(data => {
+    if (requestVersion !== navigationVersion) return;
+    renderAnnouncements(filterAnnouncementsForRoute(data,slug,parentSlug));
+  })
+  .catch(error => {
+    console.error(
+      'Announcements error:',
+      error
+    );
+
+  if (requestVersion === navigationVersion) showAnnouncementsError(error);
+  });
+  }
+
+function filterAnnouncementsForRoute(items,slug,parentSlug) {
+  const terms=slug==='exam-updates'?['exam','test']:
+    slug==='results'?['result']:
+    slug==='important-notices'?['important notice','notice']:
+    slug==='merit-lists'&&parentSlug==='updates'?['merit list']:null;
+  return terms ? items.filter(item=>routeContains(item,['Title','Category','Summary','Content'],terms)) : items;
+}
+
+function loadAITools(slug='ai-smart-tools') {
+  const requestVersion=navigationVersion;
+  const content =
+    document.getElementById('dynamicPageContent');
+
+  const filters =
+    document.getElementById('resourceFilters');
+
+  filters.innerHTML = '';
+  filters.style.display = 'none';
+
+  content.innerHTML =
+    '<p>Loading AI tools...</p>';
+
+ loadPublicModule('aiTools')
+  .then(data => {
+    if (requestVersion !== navigationVersion) return;
+    renderAITools(filterAIToolsForRoute(data,slug));
+  })
+  .catch(error => {
+    console.error(
+      'AI Tools error:',
+      error
+    );
+
+  if (requestVersion === navigationVersion) showAIToolsError(error);
+  });
+  }
+
+function filterAIToolsForRoute(items,slug) {
+  const terms=slug==='ai-assistant'?['assistant','chatbot']:
+    slug==='smart-tools'?['smart','productivity','utility']:
+    slug==='study-tools'?['study','student','education','learning']:null;
+  return terms ? items.filter(item=>routeContains(item,['Name','Category','Description','BestFor'],terms)) : items;
+}
+  
+function loadIslamicContent(slug) {
+  const requestVersion = navigationVersion;
+  const title =
+    document.getElementById('dynamicPageTitle');
+
+  const content =
+    document.getElementById('dynamicPageContent');
+
+  const filters =
+    document.getElementById('resourceFilters');
+
+  const pageTitles = {
+    'islamic': 'Islamic',
+    'hadith': 'Hadith',
+    'islamic-reminders': 'Islamic Reminders',
+    'duas-motivation': 'Duas / Motivation'
+  };
+
+  title.textContent =
+    pageTitles[slug] || 'Islamic Content';
+
+  filters.innerHTML = '';
+  filters.style.display = 'none';
+
+  content.innerHTML =
+    '<p>Loading Islamic content...</p>';
+
+  loadPublicModule('islamicContent')
+    .then(data => {
+      if (requestVersion !== navigationVersion) return;
+      renderIslamicContent(
+        data,
+        slug
+      );
+    })
+    .catch(error => {
+      console.error(
+        'Islamic Content error:',
+        error
+      );
+
+      if (requestVersion === navigationVersion) showIslamicContentError(error);
+    });
+}
+
+function renderIslamicContent(items, slug) {
+  currentIslamicContent =
+    items || [];
+
+  const typeBySlug = {
+    'hadith': 'hadith',
+    'islamic-reminders': 'islamic reminder',
+    'duas-motivation': 'dua / motivation'
+  };
+
+  const requiredType =
+    typeBySlug[slug] || '';
+
+  if (requiredType) {
+    currentIslamicContent =
+      currentIslamicContent.filter(item =>
+        String(item.Type || '')
+          .trim()
+          .toLowerCase() === requiredType
+      );
+  }
+
+  buildIslamicFilters(
+    currentIslamicContent
+  );
+
+  displayFilteredIslamicContent();
+}
+
+function buildIslamicFilters(items) {
+  const filters =
+    document.getElementById('resourceFilters');
+
+  if (!items || items.length === 0) {
+    filters.innerHTML = '';
+    filters.style.display = 'none';
+    return;
+  }
+
+  filters.style.display = 'grid';
+
+  const types =
+    getUniqueValues(items, 'Type');
+
+  filters.innerHTML = `
+    ${createFilterSelect(
+      'islamicType',
+      'All Types',
+      types
+    )}
+  `;
+
+  filters
+    .querySelectorAll('select')
+    .forEach(select => {
+      select.addEventListener(
+        'change',
+        displayFilteredIslamicContent
+      );
+    });
+}
+
+function displayFilteredIslamicContent() {
+  const type =
+    document.getElementById(
+      'islamicType'
+    )?.value || '';
+
+  const filtered =
+    currentIslamicContent.filter(item =>
+      !type || item.Type === type
+    );
+
+  drawIslamicCards(filtered);
+}
+
+function drawIslamicCards(items) {
+  const content =
+    document.getElementById(
+      'dynamicPageContent'
+    );
+
+  content.innerHTML = '';
+
+  if (!items || items.length === 0) {
+    content.innerHTML =
+      '<p>No matching Islamic content found.</p>';
+    return;
+  }
+
+  items.forEach(item => {
+    const card =
+      document.createElement('div');
+
+    card.className =
+      'card resource-card';
+
+    const body =
+      document.createElement('div');
+
+    body.className =
+      'resource-card-body';
+
+    const badges =
+      document.createElement('div');
+
+    badges.className =
+      'resource-badges';
+
+    if (item.Type) {
+      const typeBadge =
+        document.createElement('span');
+
+      typeBadge.className =
+        'resource-badge';
+
+      typeBadge.textContent =
+        item.Type;
+
+      badges.appendChild(typeBadge);
+    }
+
+    if (
+      String(item.Featured || '')
+        .toLowerCase() === 'yes'
+    ) {
+      const featuredBadge =
+        document.createElement('span');
+
+      featuredBadge.className =
+        'resource-badge featured-badge';
+
+      featuredBadge.textContent =
+        'Featured';
+
+      badges.appendChild(featuredBadge);
+    }
+
+    if (badges.children.length > 0) {
+      body.appendChild(badges);
+    }
+
+    const title =
+      document.createElement('h4');
+
+    title.textContent =
+      item.Title || 'Islamic Content';
+
+    body.appendChild(title);
+
+    if (item.ArabicText) {
+      const arabic =
+        document.createElement('p');
+
+      arabic.textContent =
+        item.ArabicText;
+
+      arabic.dir = 'rtl';
+      arabic.style.textAlign = 'right';
+      arabic.style.fontSize = '1.25rem';
+      arabic.style.lineHeight = '2';
+      arabic.style.marginTop = '14px';
+
+      body.appendChild(arabic);
+    }
+
+    if (item.UrduTranslation) {
+      const urdu =
+        document.createElement('p');
+
+      urdu.textContent =
+        item.UrduTranslation;
+
+      urdu.dir = 'rtl';
+      urdu.style.textAlign = 'right';
+      urdu.style.marginTop = '12px';
+
+      body.appendChild(urdu);
+    }
+
+    if (item.EnglishTranslation) {
+      const english =
+        document.createElement('p');
+
+      english.textContent =
+        item.EnglishTranslation;
+
+      english.style.marginTop = '12px';
+
+      body.appendChild(english);
+    }
+
+    if (item.Reference) {
+      const reference =
+        document.createElement('p');
+
+      reference.textContent =
+        'Reference: ' + item.Reference;
+
+      reference.style.fontWeight = 'bold';
+      reference.style.marginTop = '12px';
+
+      body.appendChild(reference);
+    }
+
+    if (item.Description) {
+      const description =
+        document.createElement('p');
+
+      description.textContent =
+        item.Description;
+
+      description.style.marginTop = '10px';
+
+      body.appendChild(description);
+    }
+
+    const sourceURL=safePortalURL(item.SourceURL);
+    if (sourceURL) {
+      const link =
+        document.createElement('a');
+
+      link.href = sourceURL;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = 'View Source';
+      link.className = 'resource-button';
+
+      body.appendChild(link);
+    }
+
+    card.appendChild(body);
+    content.appendChild(card);
+  });
+}
+
+function showIslamicContentError(error) {
+  const content =
+    document.getElementById(
+      'dynamicPageContent'
+    );
+
+  content.innerHTML =
+    '<p>Unable to load Islamic content right now.</p>';
+
+  console.error(
+    'Islamic Content error:',
+    error
+  );
+}
+
+function loadEntryTests(slug) {
+  const requestVersion = navigationVersion;
+  document.getElementById('mdcatEntryLink').hidden =
+    slug !== 'entry-tests' && slug !== 'mdcat';
+  const title =
+    document.getElementById('dynamicPageTitle');
+
+  const content =
+    document.getElementById('dynamicPageContent');
+
+  const filters =
+    document.getElementById('resourceFilters');
+
+  const pageTitles = {
+    'entry-tests': 'Entry Tests',
+    'mdcat': 'MDCAT',
+    'nums': 'NUMS',
+    'etea': 'ETEA',
+    'ecat': 'ECAT',
+    'nust-net': 'NUST NET',
+    'other-tests': 'Other Tests'
+  };
+
+  title.textContent =
+    pageTitles[slug] || 'Entry Tests';
+
+  filters.innerHTML = '';
+  filters.style.display = 'none';
+
+  content.innerHTML =
+    '<p>Loading entry tests...</p>';
+
+  loadPublicModule('entryTests')
+    .then(data => {
+      if (requestVersion !== navigationVersion) return;
+
+      renderEntryTests(
+        data,
+        slug
+      );
+    })
+    .catch(error => {
+      console.error(
+        'Entry Tests error:',
+        error
+      );
+
+      if (requestVersion !== navigationVersion) return;
+      showEntryTestsError(error);
+    });
+}
+
+function renderEntryTests(items, slug) {
+  currentEntryTests =
+    items || [];
+
+  if (slug && slug !== 'entry-tests') {
+    currentEntryTests =
+      currentEntryTests.filter(item =>
+        String(item.Slug || '')
+          .trim()
+          .toLowerCase() ===
+        String(slug)
+          .trim()
+          .toLowerCase()
+      );
+  }
+
+  buildEntryTestFilters(
+    currentEntryTests
+  );
+
+  displayFilteredEntryTests();
+}
+
+function buildEntryTestFilters(items) {
+  const filters =
+    document.getElementById('resourceFilters');
+
+  if (!items || items.length === 0) {
+    filters.innerHTML = '';
+    filters.style.display = 'none';
+    return;
+  }
+
+  filters.style.display = 'grid';
+
+  const organizations =
+    getUniqueValues(
+      items,
+      'Organization'
+    );
+
+  filters.innerHTML = `
+    ${createFilterSelect(
+      'entryTestOrganization',
+      'All Organizations',
+      organizations
+    )}
+  `;
+
+  filters
+    .querySelectorAll('select')
+    .forEach(select => {
+      select.addEventListener(
+        'change',
+        displayFilteredEntryTests
+      );
+    });
+}
+
+function displayFilteredEntryTests() {
+  const organization =
+    document.getElementById(
+      'entryTestOrganization'
+    )?.value || '';
+
+  const filtered =
+    currentEntryTests.filter(item =>
+      !organization ||
+      item.Organization === organization
+    );
+
+  drawEntryTestCards(filtered);
+}
+
+function drawEntryTestCards(items) {
+  const content =
+    document.getElementById(
+      'dynamicPageContent'
+    );
+
+  content.innerHTML = '';
+
+  if (!items || items.length === 0) {
+    content.innerHTML =
+      '<p>No matching entry tests found.</p>';
+    return;
+  }
+
+  items.forEach(item => {
+    const card =
+      document.createElement('div');
+
+    card.className =
+      'card resource-card';
+
+    const body =
+      document.createElement('div');
+
+    body.className =
+      'resource-card-body';
+
+    const title =
+      document.createElement('h4');
+
+    title.textContent =
+      item.Name || 'Entry Test';
+
+    body.appendChild(title);
+
+    if (item.Organization) {
+      const organization =
+        document.createElement('p');
+
+      organization.textContent =
+        item.Organization;
+
+      organization.style.fontWeight =
+        'bold';
+
+      body.appendChild(organization);
+    }
+
+    if (item.Description) {
+      const description =
+        document.createElement('p');
+
+      description.textContent =
+        item.Description;
+
+      description.style.marginTop =
+        '10px';
+
+      body.appendChild(description);
+    }
+
+    if (item.Eligibility) {
+      const eligibility =
+        document.createElement('p');
+
+      eligibility.textContent =
+        'Eligibility: ' +
+        item.Eligibility;
+
+      eligibility.style.marginTop =
+        '10px';
+
+      body.appendChild(eligibility);
+    }
+
+    if (item.RegistrationStart) {
+      const opening =
+        document.createElement('p');
+
+      opening.textContent =
+        'Registration opens: ' +
+        formatPortalDate(
+          item.RegistrationStart
+        );
+
+      opening.style.marginTop =
+        '10px';
+
+      body.appendChild(opening);
+    }
+
+    if (item.RegistrationDeadline) {
+      const deadline =
+        document.createElement('p');
+
+      deadline.textContent =
+        'Registration deadline: ' +
+        formatPortalDate(
+          item.RegistrationDeadline
+        );
+
+      deadline.style.marginTop =
+        '10px';
+
+      body.appendChild(deadline);
+    }
+
+    if (item.TestDate) {
+      const testDate =
+        document.createElement('p');
+
+      testDate.textContent =
+        'Test date: ' +
+        formatPortalDate(
+          item.TestDate
+        );
+
+      testDate.style.marginTop =
+        '10px';
+
+      body.appendChild(testDate);
+    }
+
+    const entryTestURL=safePortalURL(item.OfficialURL);
+    if (entryTestURL) {
+      const link =
+        document.createElement('a');
+
+      link.href = entryTestURL;
+
+      link.target =
+        '_blank';
+
+      link.rel =
+        'noopener noreferrer';
+
+      link.textContent =
+        'Official Details';
+
+      link.className =
+        'resource-button';
+
+      body.appendChild(link);
+    }
+    appendPortalShareButton(body,item,'test');
+
+    card.appendChild(body);
+    content.appendChild(card);
+  });
+}
+
+function showEntryTestsError(error) {
+  const content =
+    document.getElementById(
+      'dynamicPageContent'
+    );
+
+  content.innerHTML =
+    '<p>Unable to load entry tests right now.</p>';
+
+  console.error(
+    'Entry Tests error:',
+    error
+  );
+}
+
+function loadBlog(slug='blog') {
+  const requestVersion=navigationVersion;
+  const content =
+    document.getElementById('dynamicPageContent');
+
+  const filters =
+    document.getElementById('resourceFilters');
+
+  filters.innerHTML = '';
+  filters.style.display = 'none';
+
+  content.innerHTML =
+    '<p>Loading blog posts...</p>';
+
+  loadPublicModule('blog')
+    .then(data => {
+      if (requestVersion !== navigationVersion) return;
+      const posts=data;
+      renderBlog(slug==='study-abroad' ? posts.filter(item=>routeContains(item,['Title','Category','Summary','Content'],['study abroad','international education'])) : posts);
+    })
+    .catch(error => {
+      console.error(
+        'Blog error:',
+        error
+      );
+
+      if (requestVersion === navigationVersion) showBlogError(error);
+    });
+}
+
+function renderBlog(posts) {
+  currentBlogPosts =
+    posts || [];
+
+  buildBlogFilters(
+    currentBlogPosts
+  );
+
+  displayFilteredBlog();
+}
+
+function buildBlogFilters(posts) {
+  const filters =
+    document.getElementById('resourceFilters');
+
+  if (!posts || posts.length === 0) {
+    filters.innerHTML = '';
+    filters.style.display = 'none';
+    return;
+  }
+
+  filters.style.display = 'grid';
+
+  const categories =
+    getUniqueValues(
+      posts,
+      'Category'
+    );
+
+  const authors =
+    getUniqueValues(
+      posts,
+      'Author'
+    );
+
+  filters.innerHTML = `
+    ${createFilterSelect(
+      'blogCategory',
+      'All Categories',
+      categories
+    )}
+
+    ${createFilterSelect(
+      'blogAuthor',
+      'All Authors',
+      authors
+    )}
+  `;
+
+  filters
+    .querySelectorAll('select')
+    .forEach(select => {
+      select.addEventListener(
+        'change',
+        displayFilteredBlog
+      );
+    });
+}
+
+function displayFilteredBlog() {
+  const category =
+    document.getElementById(
+      'blogCategory'
+    )?.value || '';
+
+  const author =
+    document.getElementById(
+      'blogAuthor'
+    )?.value || '';
+
+  const filtered =
+    currentBlogPosts.filter(item => {
+      return (
+        (!category ||
+          item.Category === category) &&
+        (!author ||
+          item.Author === author)
+      );
+    });
+
+  drawBlogCards(filtered);
+}
+
+function drawBlogCards(posts) {
+  const content =
+    document.getElementById(
+      'dynamicPageContent'
+    );
+
+  content.innerHTML = '';
+
+  if (!posts || posts.length === 0) {
+    content.innerHTML =
+      '<p>No matching blog posts found.</p>';
+    return;
+  }
+
+  posts.forEach(item => {
+    const card =
+      document.createElement('article');
+
+    card.className =
+      'card resource-card';
+
+    const blogThumbnailURL=safePortalURL(item.ThumbnailURL);
+    if (blogThumbnailURL) {
+      const image =
+        document.createElement('img');
+
+      image.src = blogThumbnailURL;
+      image.loading = 'lazy';
+      image.decoding = 'async';
+      image.alt =
+        item.Title || 'Blog post';
+
+      image.className =
+        'resource-thumbnail';
+
+      card.appendChild(image);
+    }
+
+    const body =
+      document.createElement('div');
+
+    body.className =
+      'resource-card-body';
+
+    const badges =
+      document.createElement('div');
+
+    badges.className =
+      'resource-badges';
+
+    if (item.Category) {
+      const categoryBadge =
+        document.createElement('span');
+
+      categoryBadge.className =
+        'resource-badge';
+
+      categoryBadge.textContent =
+        item.Category;
+
+      badges.appendChild(
+        categoryBadge
+      );
+    }
+
+    if (
+      String(item.Featured || '')
+        .toLowerCase() === 'yes'
+    ) {
+      const featuredBadge =
+        document.createElement('span');
+
+      featuredBadge.className =
+        'resource-badge featured-badge';
+
+      featuredBadge.textContent =
+        'Featured';
+
+      badges.appendChild(
+        featuredBadge
+      );
+    }
+
+    if (badges.children.length > 0) {
+      body.appendChild(badges);
+    }
+
+    const title =
+      document.createElement('h4');
+
+    title.textContent =
+      item.Title || 'Blog Post';
+
+    body.appendChild(title);
+
+    const metaParts = [];
+
+    if (item.Author) {
+      metaParts.push(
+        'By ' + item.Author
+      );
+    }
+
+    if (item.PublishDate) {
+      metaParts.push(
+        formatPortalDate(
+          item.PublishDate
+        )
+      );
+    }
+
+    if (metaParts.length > 0) {
+      const meta =
+        document.createElement('div');
+
+      meta.className =
+        'resource-meta';
+
+      meta.textContent =
+        metaParts.join(' • ');
+
+      body.appendChild(meta);
+    }
+
+    if (item.Summary) {
+      const summary =
+        document.createElement('p');
+
+      summary.textContent =
+        item.Summary;
+
+      summary.style.marginTop =
+        '10px';
+
+      body.appendChild(summary);
+    }
+
+    if (item.Content) {
+      const details =
+        document.createElement('details');
+
+      details.style.marginTop =
+        '12px';
+
+      const summaryToggle =
+        document.createElement('summary');
+
+      summaryToggle.textContent =
+        'Read Article';
+
+      summaryToggle.style.cursor =
+        'pointer';
+
+      summaryToggle.style.fontWeight =
+        'bold';
+
+      const articleText =
+        document.createElement('p');
+
+      articleText.textContent =
+        item.Content;
+
+      articleText.style.marginTop =
+        '12px';
+
+      details.appendChild(
+        summaryToggle
+      );
+
+      details.appendChild(
+        articleText
+      );
+
+      body.appendChild(details);
+    }
+
+    card.appendChild(body);
+    content.appendChild(card);
+  });
+}
+
+function showBlogError(error) {
+  const content =
+    document.getElementById(
+      'dynamicPageContent'
+    );
+
+  content.innerHTML =
+    '<p>Unable to load blog posts right now.</p>';
+
+  console.error(
+    'Blog error:',
+    error
+  );
+}
+
+function renderAITools(tools) {
+  currentAITools =
+    tools || [];
+
+  buildAIToolFilters(
+    currentAITools
+  );
+
+  displayFilteredAITools();
+}
+function buildAIToolFilters(tools) {
+  const filters =
+    document.getElementById('resourceFilters');
+
+  if (!tools || tools.length === 0) {
+    filters.innerHTML = '';
+    filters.style.display = 'none';
+    return;
+  }
+
+  filters.style.display = 'grid';
+
+  const categories =
+    getUniqueValues(
+      tools,
+      'Category'
+    );
+
+  const pricingTypes =
+    getUniqueValues(
+      tools,
+      'PricingType'
+    );
+
+  filters.innerHTML = `
+    ${createFilterSelect(
+      'aiToolCategory',
+      'All Categories',
+      categories
+    )}
+
+    ${createFilterSelect(
+      'aiToolPricing',
+      'All Pricing Types',
+      pricingTypes
+    )}
+  `;
+
+  filters
+    .querySelectorAll('select')
+    .forEach(select => {
+      select.addEventListener(
+        'change',
+        displayFilteredAITools
+      );
+    });
+}
+function displayFilteredAITools() {
+  const category =
+    document.getElementById(
+      'aiToolCategory'
+    )?.value || '';
+
+  const pricing =
+    document.getElementById(
+      'aiToolPricing'
+    )?.value || '';
+
+  const filtered =
+    currentAITools.filter(item => {
+      return (
+        (!category ||
+          item.Category === category) &&
+
+        (!pricing ||
+          item.PricingType === pricing)
+      );
+    });
+
+  drawAIToolCards(filtered);
+}
+function drawAIToolCards(tools) {
+  const content =
+    document.getElementById(
+      'dynamicPageContent'
+    );
+
+  content.innerHTML = '';
+
+  if (!tools || tools.length === 0) {
+    content.innerHTML =
+      '<p>No matching AI tools found.</p>';
+
+    return;
+  }
+
+  tools.forEach(item => {
+    const card =
+      document.createElement('div');
+
+    card.className =
+      'card resource-card';
+
+
+    const body =
+      document.createElement('div');
+
+    body.className =
+      'resource-card-body';
+
+
+    const toolLogoURL=safePortalURL(item.LogoURL);
+    if (toolLogoURL) {
+      const logo =
+        document.createElement('img');
+
+      logo.src = toolLogoURL;
+      logo.loading = 'lazy';
+      logo.decoding = 'async';
+
+      logo.alt =
+        item.Name || 'AI Tool';
+
+      logo.style.maxWidth =
+        '70px';
+
+      logo.style.maxHeight =
+        '70px';
+
+      logo.style.objectFit =
+        'contain';
+
+      logo.style.marginBottom =
+        '12px';
+
+      body.appendChild(logo);
+    }
+
+
+    const badges =
+      document.createElement('div');
+
+    badges.className =
+      'resource-badges';
+
+
+    if (item.Category) {
+      const categoryBadge =
+        document.createElement('span');
+
+      categoryBadge.className =
+        'resource-badge';
+
+      categoryBadge.textContent =
+        item.Category;
+
+      badges.appendChild(
+        categoryBadge
+      );
+    }
+
+
+    if (item.PricingType) {
+      const pricingBadge =
+        document.createElement('span');
+
+      pricingBadge.className =
+        'resource-badge';
+
+      pricingBadge.textContent =
+        item.PricingType;
+
+      badges.appendChild(
+        pricingBadge
+      );
+    }
+
+
+    if (
+      String(item.Featured || '')
+        .toLowerCase() === 'yes'
+    ) {
+      const featuredBadge =
+        document.createElement('span');
+
+      featuredBadge.className =
+        'resource-badge featured-badge';
+
+      featuredBadge.textContent =
+        'Featured';
+
+      badges.appendChild(
+        featuredBadge
+      );
+    }
+
+
+    if (badges.children.length > 0) {
+      body.appendChild(badges);
+    }
+
+
+    const title =
+      document.createElement('h4');
+
+    title.textContent =
+      item.Name ||
+      'AI Tool';
+
+    body.appendChild(title);
+
+
+    if (item.BestFor) {
+      const bestFor =
+        document.createElement('p');
+
+      bestFor.textContent =
+        'Best for: ' +
+        item.BestFor;
+
+      bestFor.style.fontWeight =
+        'bold';
+
+      body.appendChild(bestFor);
+    }
+
+
+    if (item.Description) {
+      const description =
+        document.createElement('p');
+
+      description.textContent =
+        item.Description;
+
+      description.style.marginTop =
+        '10px';
+
+      body.appendChild(description);
+    }
+
+
+    const toolURL=safePortalURL(item.ToolURL);
+    if (toolURL) {
+      const link =
+        document.createElement('a');
+
+      link.href = toolURL;
+
+      link.target =
+        '_blank';
+
+      link.rel =
+        'noopener noreferrer';
+
+      link.textContent =
+        'Open Tool';
+
+      link.className =
+        'resource-button';
+
+      body.appendChild(link);
+    }
+
+
+    card.appendChild(body);
+
+    content.appendChild(card);
+  });
+}
+function showAIToolsError(error) {
+  const content =
+    document.getElementById(
+      'dynamicPageContent'
+    );
+
+  content.innerHTML =
+    '<p>Unable to load AI tools right now.</p>';
+
+  console.error(
+    'AI Tools error:',
+    error
+  );
+}
+
+function renderAnnouncements(announcements) {
+  currentAnnouncements =
+    announcements || [];
+
+  buildAnnouncementFilters(
+    currentAnnouncements
+  );
+
+  displayFilteredAnnouncements();
+}
+function buildAnnouncementFilters(announcements) {
+  const filters =
+    document.getElementById('resourceFilters');
+
+  if (
+    !announcements ||
+    announcements.length === 0
+  ) {
+    filters.innerHTML = '';
+    filters.style.display = 'none';
+    return;
+  }
+
+  filters.style.display = 'grid';
+
+  const categories =
+    getUniqueValues(
+      announcements,
+      'Category'
+    );
+
+  const priorities =
+    getUniqueValues(
+      announcements,
+      'Priority'
+    );
+
+  filters.innerHTML = `
+    ${createFilterSelect(
+      'announcementCategory',
+      'All Categories',
+      categories
+    )}
+
+    ${createFilterSelect(
+      'announcementPriority',
+      'All Priorities',
+      priorities
+    )}
+  `;
+
+  filters
+    .querySelectorAll('select')
+    .forEach(select => {
+      select.addEventListener(
+        'change',
+        displayFilteredAnnouncements
+      );
+    });
+}
+function displayFilteredAnnouncements() {
+  const category =
+    document.getElementById(
+      'announcementCategory'
+    )?.value || '';
+
+  const priority =
+    document.getElementById(
+      'announcementPriority'
+    )?.value || '';
+
+  const filtered =
+    currentAnnouncements.filter(item => {
+      return (
+        (!category ||
+          item.Category === category) &&
+
+        (!priority ||
+          item.Priority === priority)
+      );
+    });
+
+  drawAnnouncementCards(filtered);
+}
+function drawAnnouncementCards(announcements) {
+  const content =
+    document.getElementById(
+      'dynamicPageContent'
+    );
+
+  content.innerHTML = '';
+
+  if (
+    !announcements ||
+    announcements.length === 0
+  ) {
+    content.innerHTML =
+      '<p>No matching announcements found.</p>';
+
+    return;
+  }
+
+  announcements.forEach(item => {
+
+    const card =
+      document.createElement('div');
+
+    card.className =
+      'card resource-card';
+
+
+    const body =
+      document.createElement('div');
+
+    body.className =
+      'resource-card-body';
+
+
+    const badges =
+      document.createElement('div');
+
+    badges.className =
+      'resource-badges';
+
+
+    if (item.Category) {
+
+      const categoryBadge =
+        document.createElement('span');
+
+      categoryBadge.className =
+        'resource-badge';
+
+      categoryBadge.textContent =
+        item.Category;
+
+      badges.appendChild(
+        categoryBadge
+      );
+    }
+
+
+    if (item.Priority) {
+
+      const priorityBadge =
+        document.createElement('span');
+
+      priorityBadge.className =
+        'resource-badge';
+
+      priorityBadge.textContent =
+        item.Priority;
+
+      badges.appendChild(
+        priorityBadge
+      );
+    }
+
+
+    if (
+      String(item.Featured || '')
+        .toLowerCase() === 'yes'
+    ) {
+
+      const featuredBadge =
+        document.createElement('span');
+
+      featuredBadge.className =
+        'resource-badge featured-badge';
+
+      featuredBadge.textContent =
+        'Featured';
+
+      badges.appendChild(
+        featuredBadge
+      );
+    }
+
+
+    if (badges.children.length > 0) {
+      body.appendChild(badges);
+    }
+
+
+    const title =
+      document.createElement('h4');
+
+    title.textContent =
+      item.Title ||
+      'Announcement';
+
+    body.appendChild(title);
+
+
+    if (item.PublishDate) {
+
+      const publishDate =
+        document.createElement('p');
+
+      publishDate.textContent =
+        'Published: ' +
+        formatPortalDate(
+          item.PublishDate
+        );
+
+      body.appendChild(
+        publishDate
+      );
+    }
+
+
+    if (item.Summary) {
+
+      const summary =
+        document.createElement('p');
+
+      summary.textContent =
+        item.Summary;
+
+      summary.style.marginTop =
+        '10px';
+
+      body.appendChild(summary);
+    }
+
+
+    if (item.Content) {
+
+      const fullContent =
+        document.createElement('p');
+
+      fullContent.textContent =
+        item.Content;
+
+      fullContent.style.marginTop =
+        '10px';
+
+      body.appendChild(
+        fullContent
+      );
+    }
+
+
+    if (item.ExpiryDate) {
+
+      const expiry =
+        document.createElement('p');
+
+      expiry.textContent =
+        'Valid until: ' +
+        formatPortalDate(
+          item.ExpiryDate
+        );
+
+      expiry.style.marginTop =
+        '10px';
+
+      body.appendChild(expiry);
+    }
+
+
+    const announcementURL=safePortalURL(item.OfficialURL);
+    if (announcementURL) {
+
+      const link =
+        document.createElement('a');
+
+      link.href = announcementURL;
+
+      link.target =
+        '_blank';
+
+      link.rel =
+        'noopener noreferrer';
+
+      link.textContent =
+        String(item.ButtonText || 'Official Details')
+          .trim()
+          .slice(0, 80) ||
+        'Official Details';
+
+      link.className =
+        'resource-button';
+
+      body.appendChild(link);
+    }
+    appendPortalShareButton(body,item,'announcement');
+
+
+    card.appendChild(body);
+
+    content.appendChild(card);
+  });
+}
+function showAnnouncementsError(error) {
+  const content =
+    document.getElementById(
+      'dynamicPageContent'
+    );
+
+  content.innerHTML =
+    '<p>Unable to load announcements right now.</p>';
+
+  console.error(
+    'Announcements error:',
+    error
+  );
+}
+
+function renderOpportunities(opportunities) {
+  currentOpportunities = opportunities || [];
+
+  buildOpportunityFilters(currentOpportunities);
+
+  displayFilteredOpportunities();
+}
+function buildOpportunityFilters(opportunities) {
+  const filters =
+    document.getElementById('resourceFilters');
+
+  if (!opportunities || opportunities.length === 0) {
+    filters.innerHTML = '';
+    filters.style.display = 'none';
+    return;
+  }
+
+  filters.style.display = 'grid';
+
+  const organizations =
+    getUniqueValues(opportunities, 'Organization');
+
+  const types =
+    getUniqueValues(opportunities, 'Type');
+
+  const locations =
+    getUniqueValues(opportunities, 'Location');
+
+  filters.innerHTML = `
+    ${createFilterSelect(
+      'opportunityOrganization',
+      'All Organizations',
+      organizations
+    )}
+
+    ${createFilterSelect(
+      'opportunityType',
+      'All Types',
+      types
+    )}
+
+    ${createFilterSelect(
+      'opportunityLocation',
+      'All Locations',
+      locations
+    )}
+    <select id="opportunityClosing"><option value="">All deadlines</option><option value="closing">Closing in 30 days</option></select>
+  `;
+
+  filters
+    .querySelectorAll('select')
+    .forEach(select => {
+      select.addEventListener(
+        'change',
+        displayFilteredOpportunities
+      );
+    });
+}
+
+
+function displayFilteredOpportunities() {
+  const organization =
+    document.getElementById(
+      'opportunityOrganization'
+    )?.value || '';
+
+  const type =
+    document.getElementById(
+      'opportunityType'
+    )?.value || '';
+
+  const location =
+    document.getElementById(
+      'opportunityLocation'
+    )?.value || '';
+
+  const closing=document.getElementById('opportunityClosing')?.value || '';
+
+  const filtered =
+    currentOpportunities.filter(item => {
+      return (
+        (!organization ||
+          item.Organization === organization) &&
+
+        (!type ||
+          item.Type === type) &&
+
+        (!location ||
+          item.Location === location) &&
+        (!closing || portalDeadlineIsClosingSoon(item.Deadline,30))
+      );
+    });
+
+  drawOpportunityCards(filtered);
+}
+function drawOpportunityCards(opportunities) {
+  const content =
+    document.getElementById('dynamicPageContent');
+
+  content.innerHTML = '';
+
+  if (!opportunities || opportunities.length === 0) {
+    content.innerHTML =
+      '<p>No matching opportunities found.</p>';
+    return;
+  }
+
+  opportunities.forEach(item => {
+    const card =
+      document.createElement('div');
+
+    card.className =
+      'card resource-card';
+
+    const body =
+      document.createElement('div');
+
+    body.className =
+      'resource-card-body';
+
+    const badges =
+      document.createElement('div');
+
+    badges.className =
+      'resource-badges';
+
+    if (item.Type) {
+      const typeBadge =
+        document.createElement('span');
+
+      typeBadge.className =
+        'resource-badge';
+
+      typeBadge.textContent =
+        item.Type;
+
+      badges.appendChild(typeBadge);
+    }
+
+    if (
+      String(item.Featured || '')
+        .toLowerCase() === 'yes'
+    ) {
+      const featuredBadge =
+        document.createElement('span');
+
+      featuredBadge.className =
+        'resource-badge featured-badge';
+
+      featuredBadge.textContent =
+        'Featured';
+
+      badges.appendChild(featuredBadge);
+    }
+
+    if (badges.children.length > 0) {
+      body.appendChild(badges);
+    }
+
+    const title =
+      document.createElement('h4');
+
+    title.textContent =
+      item.Title ||
+      'Student Opportunity';
+
+    body.appendChild(title);
+
+    if (item.Organization) {
+      const organization =
+        document.createElement('p');
+
+      organization.textContent =
+        item.Organization;
+
+      organization.style.fontWeight =
+        'bold';
+
+      body.appendChild(organization);
+    }
+
+    if (item.Location) {
+      const location =
+        document.createElement('p');
+
+      location.textContent =
+        'Location: ' + item.Location;
+
+      body.appendChild(location);
+    }
+
+    if (item.Eligibility) {
+      const eligibility =
+        document.createElement('p');
+
+      eligibility.textContent =
+        'Eligibility: ' +
+        item.Eligibility;
+
+      eligibility.style.marginTop =
+        '10px';
+
+      body.appendChild(eligibility);
+    }
+
+    if (item.Deadline) {
+      const deadline =
+        document.createElement('p');
+
+      deadline.textContent =
+        'Deadline: ' +
+        formatPortalDate(item.Deadline);
+
+      deadline.style.marginTop =
+        '10px';
+
+      body.appendChild(deadline);
+    }
+
+    if (item.Description) {
+      const description =
+        document.createElement('p');
+
+      description.textContent =
+        item.Description;
+
+      description.style.marginTop =
+        '10px';
+
+      body.appendChild(description);
+    }
+
+    const opportunityURL=safePortalURL(item.OfficialURL);
+    if (opportunityURL) {
+      const link =
+        document.createElement('a');
+
+      link.href = opportunityURL;
+
+      link.target =
+        '_blank';
+
+      link.rel =
+        'noopener noreferrer';
+
+      link.textContent =
+        'Official Details';
+
+      link.className =
+        'resource-button';
+
+      body.appendChild(link);
+    }
+
+    card.appendChild(body);
+    content.appendChild(card);
+  });
+}
+
+function showOpportunitiesError(error) {
+  const content =
+    document.getElementById('dynamicPageContent');
+
+  content.innerHTML =
+    '<p>Unable to load opportunities right now.</p>';
+
+  console.error('Opportunities error:', error);
+}
+function renderScholarships(scholarships) {
+  currentScholarships = scholarships || [];
+
+  buildScholarshipFilters(currentScholarships);
+
+  displayFilteredScholarships();
+}
+function buildScholarshipFilters(scholarships) {
+  const filters =
+    document.getElementById('resourceFilters');
+
+  if (!scholarships || scholarships.length === 0) {
+    filters.innerHTML = '';
+    filters.style.display = 'none';
+    return;
+  }
+
+  filters.style.display = 'grid';
+
+  const providers =
+    getUniqueValues(scholarships, 'Provider');
+
+  const types =
+    getUniqueValues(scholarships, 'Type');
+
+  const countries =
+    getUniqueValues(scholarships, 'Country');
+
+  filters.innerHTML = `
+    ${createFilterSelect(
+      'scholarshipProvider',
+      'All Providers',
+      providers
+    )}
+
+    ${createFilterSelect(
+      'scholarshipType',
+      'All Types',
+      types
+    )}
+
+    ${createFilterSelect(
+      'scholarshipCountry',
+      'All Countries',
+      countries
+    )}
+    <select id="scholarshipClosing"><option value="">All deadlines</option><option value="closing">Closing in 30 days</option></select>
+  `;
+
+  filters
+    .querySelectorAll('select')
+    .forEach(select => {
+      select.addEventListener(
+        'change',
+        displayFilteredScholarships
+      );
+    });
+}
+
+
+function displayFilteredScholarships() {
+  const provider =
+    document.getElementById(
+      'scholarshipProvider'
+    )?.value || '';
+
+  const type =
+    document.getElementById(
+      'scholarshipType'
+    )?.value || '';
+
+  const country =
+    document.getElementById(
+      'scholarshipCountry'
+    )?.value || '';
+
+  const closing=document.getElementById('scholarshipClosing')?.value || '';
+
+  const filtered =
+    currentScholarships.filter(item => {
+      return (
+        (!provider ||
+          item.Provider === provider) &&
+
+        (!type ||
+          item.Type === type) &&
+
+        (!country ||
+          item.Country === country) &&
+        (!closing || portalDeadlineIsClosingSoon(item.Deadline,30))
+      );
+    });
+
+  drawScholarshipCards(filtered);
+}
+function drawScholarshipCards(scholarships) {
+  const content =
+    document.getElementById('dynamicPageContent');
+
+  content.innerHTML = '';
+
+  if (!scholarships || scholarships.length === 0) {
+    content.innerHTML =
+      '<p>No matching scholarships found.</p>';
+    return;
+  }
+
+  scholarships.forEach(item => {
+    const card =
+      document.createElement('div');
+
+    card.className =
+      'card resource-card';
+
+    const body =
+      document.createElement('div');
+
+    body.className =
+      'resource-card-body';
+
+    const badges =
+      document.createElement('div');
+
+    badges.className =
+      'resource-badges';
+
+    if (item.Type) {
+      const typeBadge =
+        document.createElement('span');
+
+      typeBadge.className =
+        'resource-badge';
+
+      typeBadge.textContent =
+        item.Type;
+
+      badges.appendChild(typeBadge);
+    }
+
+    if (
+      String(item.Featured || '')
+        .toLowerCase() === 'yes'
+    ) {
+      const featuredBadge =
+        document.createElement('span');
+
+      featuredBadge.className =
+        'resource-badge featured-badge';
+
+      featuredBadge.textContent =
+        'Featured';
+
+      badges.appendChild(featuredBadge);
+    }
+
+    if (badges.children.length > 0) {
+      body.appendChild(badges);
+    }
+
+    const title =
+      document.createElement('h4');
+
+    title.textContent =
+      item.Name ||
+      'Scholarship Opportunity';
+
+    body.appendChild(title);
+
+    if (item.Provider) {
+      const provider =
+        document.createElement('p');
+
+      provider.textContent =
+        item.Provider;
+
+      provider.style.fontWeight =
+        'bold';
+
+      body.appendChild(provider);
+    }
+
+    if (item.Country) {
+      const country =
+        document.createElement('p');
+
+      country.textContent =
+        'Country: ' + item.Country;
+
+      body.appendChild(country);
+    }
+
+    if (item.Eligibility) {
+      const eligibility =
+        document.createElement('p');
+
+      eligibility.textContent =
+        'Eligibility: ' +
+        item.Eligibility;
+
+      eligibility.style.marginTop =
+        '10px';
+
+      body.appendChild(eligibility);
+    }
+
+    if (item.Benefits) {
+      const benefits =
+        document.createElement('p');
+
+      benefits.textContent =
+        'Benefits: ' +
+        item.Benefits;
+
+      benefits.style.marginTop =
+        '10px';
+
+      body.appendChild(benefits);
+    }
+
+    if (item.Deadline) {
+      const deadline =
+        document.createElement('p');
+
+      deadline.textContent =
+        'Deadline: ' +
+        formatPortalDate(item.Deadline);
+
+      deadline.style.marginTop =
+        '10px';
+
+      body.appendChild(deadline);
+    }
+
+    if (item.Description) {
+      const description =
+        document.createElement('p');
+
+      description.textContent =
+        item.Description;
+
+      description.style.marginTop =
+        '10px';
+
+      body.appendChild(description);
+    }
+
+    const scholarshipURL=safePortalURL(item.OfficialURL);
+    if (scholarshipURL) {
+      const link =
+        document.createElement('a');
+
+      link.href = scholarshipURL;
+
+      link.target =
+        '_blank';
+
+      link.rel =
+        'noopener noreferrer';
+
+      link.textContent =
+        'Official Details';
+
+      link.className =
+        'resource-button';
+
+      body.appendChild(link);
+    }
+    appendPortalShareButton(body,item,'scholarship');
+
+    card.appendChild(body);
+    content.appendChild(card);
+  });
+}
+
+function showScholarshipsError(error) {
+  const content =
+    document.getElementById('dynamicPageContent');
+
+  content.innerHTML =
+    '<p>Unable to load scholarships right now.</p>';
+
+  console.error('Scholarships error:', error);
+}
+function renderAdmissions(admissions) {
+
+  currentAdmissions = admissions || [];
+
+  buildAdmissionsFilters(currentAdmissions);
+
+  displayFilteredAdmissions();
+}
+
+function buildAdmissionsFilters(admissions) {
+
+  const filters =
+    document.getElementById(
+      'resourceFilters'
+    );
+
+  if (!admissions || admissions.length === 0) {
+    filters.innerHTML = '';
+    filters.style.display = 'none';
+    return;
+  }
+
+  filters.style.display = 'grid';
+
+  const institutions =
+    getUniqueValues(admissions, 'Institution');
+
+  const degreeLevels =
+    getUniqueValues(admissions, 'DegreeLevel');
+
+  const admissionTypes =
+    getUniqueValues(admissions, 'AdmissionType');
+
+  const entryTests =
+    getUniqueValues(admissions, 'EntryTest');
+
+  filters.innerHTML = `
+    ${createFilterSelect(
+      'admissionInstitution',
+      'All Institutions',
+      institutions
+    )}
+
+    ${createFilterSelect(
+      'admissionDegreeLevel',
+      'All Degree Levels',
+      degreeLevels
+    )}
+
+    ${createFilterSelect(
+      'admissionType',
+      'All Admission Types',
+      admissionTypes
+    )}
+
+    ${createFilterSelect(
+      'admissionEntryTest',
+      'All Entry Tests',
+      entryTests
+    )}
+    <select id="admissionClosing"><option value="">All deadlines</option><option value="closing">Closing in 30 days</option></select>
+  `;
+
+  filters
+    .querySelectorAll('select')
+    .forEach(select => {
+
+      select.addEventListener(
+        'change',
+        displayFilteredAdmissions
+      );
+
+    });
+}
+function displayFilteredAdmissions() {
+
+  const institution =
+    document.getElementById(
+      'admissionInstitution'
+    )?.value || '';
+
+  const degreeLevel =
+    document.getElementById(
+      'admissionDegreeLevel'
+    )?.value || '';
+
+  const admissionType =
+    document.getElementById(
+      'admissionType'
+    )?.value || '';
+
+  const entryTest =
+    document.getElementById(
+      'admissionEntryTest'
+    )?.value || '';
+
+  const closing=document.getElementById('admissionClosing')?.value || '';
+
+  const filtered =
+    currentAdmissions.filter(item => {
+
+      return (
+        (!institution ||
+          item.Institution === institution) &&
+
+        (!degreeLevel ||
+          item.DegreeLevel === degreeLevel) &&
+
+        (!admissionType ||
+          item.AdmissionType === admissionType) &&
+
+        (!entryTest ||
+          item.EntryTest === entryTest) &&
+        (!closing || portalDeadlineIsClosingSoon(item.Deadline,30))
+      );
+
+    });
+
+  drawAdmissionCards(filtered);
+}
+function drawAdmissionCards(admissions) {
+
+  const content =
+    document.getElementById(
+      'dynamicPageContent'
+    );
+
+  content.innerHTML = '';
+
+  if (!admissions || admissions.length === 0) {
+
+    content.innerHTML =
+      '<p>No matching admissions found.</p>';
+
+    return;
+  }
+
+  admissions.forEach(item => {
+
+    const card =
+      document.createElement('div');
+
+    card.className =
+      'card resource-card';
+
+
+    const body =
+      document.createElement('div');
+
+    body.className =
+      'resource-card-body';
+
+
+    const badges =
+      document.createElement('div');
+
+    badges.className =
+      'resource-badges';
+
+
+    if (item.DegreeLevel) {
+
+      const degreeBadge =
+        document.createElement('span');
+
+      degreeBadge.className =
+        'resource-badge';
+
+      degreeBadge.textContent =
+        item.DegreeLevel;
+
+      badges.appendChild(degreeBadge);
+    }
+
+
+    if (
+      String(item.Featured || '')
+        .toLowerCase() === 'yes'
+    ) {
+
+      const featuredBadge =
+        document.createElement('span');
+
+      featuredBadge.className =
+        'resource-badge featured-badge';
+
+      featuredBadge.textContent =
+        'Featured';
+
+      badges.appendChild(featuredBadge);
+    }
+
+
+    if (badges.children.length > 0) {
+      body.appendChild(badges);
+    }
+
+
+    const title =
+      document.createElement('h4');
+
+    title.textContent =
+      item.Program ||
+      'Admission Opportunity';
+
+    body.appendChild(title);
+
+
+    if (item.Institution) {
+
+      const institution =
+        document.createElement('p');
+
+      institution.textContent =
+        item.Institution;
+
+      institution.style.fontWeight =
+        'bold';
+
+      body.appendChild(institution);
+    }
+
+
+    const meta =
+      document.createElement('div');
+
+    meta.className =
+      'resource-meta';
+
+    meta.textContent = [
+      item.AdmissionType,
+      item.EntryTest
+    ]
+      .filter(Boolean)
+      .join(' • ');
+
+    if (meta.textContent) {
+      body.appendChild(meta);
+    }
+
+
+    if (item.Eligibility) {
+
+      const eligibility =
+        document.createElement('p');
+
+      eligibility.textContent =
+        'Eligibility: ' +
+        item.Eligibility;
+
+      eligibility.style.marginTop =
+        '12px';
+
+      body.appendChild(eligibility);
+    }
+
+
+    if (item.Deadline) {
+
+      const deadline =
+        document.createElement('p');
+
+      deadline.textContent =
+        'Deadline: ' +
+        formatPortalDate(
+          item.Deadline
+        );
+
+      deadline.style.marginTop =
+        '10px';
+
+      body.appendChild(deadline);
+    }
+
+
+    if (item.Description) {
+
+      const description =
+        document.createElement('p');
+
+      description.textContent =
+        item.Description;
+
+      description.style.marginTop =
+        '10px';
+
+      body.appendChild(description);
+    }
+
+
+    const admissionURL=safePortalURL(item.OfficialURL);
+    if (admissionURL) {
+
+      const link =
+        document.createElement('a');
+
+      link.href = admissionURL;
+
+      link.target =
+        '_blank';
+
+      link.rel =
+        'noopener noreferrer';
+
+      link.textContent =
+        'Official Details';
+
+      link.className =
+        'resource-button';
+
+      body.appendChild(link);
+    }
+
+
+    card.appendChild(body);
+
+    content.appendChild(card);
+  });
+}
+
+function formatPortalDate(value) {
+
+  if (!value) {
+    return '';
+  }
+
+  const date =
+    new Date(value);
+
+  if (isNaN(date.getTime())) {
+    return String(value);
+  }
+
+  return date.toLocaleDateString(
+    'en-GB',
+    {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    }
+  );
+}
+function portalDeadlineIsClosingSoon(value,days) {
+  if(!value)return false;
+  const deadline=new Date(value);
+  if(Number.isNaN(deadline.getTime()))return false;
+  deadline.setHours(23,59,59,999);
+  const remaining=deadline.getTime()-Date.now();
+  return remaining>=0 && remaining<=Number(days || 30)*86400000;
+}
+function showAdmissionsError(error) {
+
+  const content =
+    document.getElementById(
+      'dynamicPageContent'
+    );
+
+  content.innerHTML =
+    '<p>Unable to load admissions right now.</p>';
+
+  console.error(error);
+}
+const PORTAL_SEARCH_CACHE_KEY='icp-search-index-v1';
+const PORTAL_SEARCH_ROUTES=new Set(['study','notes','past-papers','study-resources','videos','mcqs','admissions','scholarships','career','updates','ai-tools','islamic','hadith','blog','entry-tests','mdcat','nums','etea','ecat','nust-net','other-tests']);
+
+function readPortalSearchCache() {
+  try {
+    const cached=JSON.parse(localStorage.getItem(PORTAL_SEARCH_CACHE_KEY));
+    if (!cached || Date.now()-Number(cached.savedAt)>30*60*1000 || !Array.isArray(cached.data)) return null;
+    return cached.data.filter(isValidSearchItem);
+  } catch (_) { return null; }
+}
+
+function isValidSearchItem(item) {
+  return item && typeof item==='object' && !Array.isArray(item) && typeof item.Title==='string' && item.Title.trim() &&
+    typeof item.Kind==='string' && PORTAL_SEARCH_ROUTES.has(String(item.Route||''));
+}
+
+async function loadPortalSearchIndex(force=false) {
+  if (!force && portalSearchIndex) return portalSearchIndex;
+  if (!force) {
+    const cached=readPortalSearchCache();
+    if (cached && cached.length) { portalSearchIndex=cached; return cached; }
+  }
+  if (portalSearchPromise) return portalSearchPromise;
+  portalSearchPromise=(async()=>{
+    const controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),60000);
+    try {
+      const response=await fetch(API_BASE_URL+'?action=searchIndex',{signal:controller.signal});
+      if (!response.ok) throw new Error('HTTP '+response.status);
+      const result=await response.json();
+      if (!result || result.success!==true || !Array.isArray(result.data)) throw new Error('Invalid search response.');
+      const rows=result.data.filter(isValidSearchItem);
+      portalSearchIndex=rows;
+      try {
+        const value=JSON.stringify({savedAt:Date.now(),data:rows});
+        if (value.length<2000000) localStorage.setItem(PORTAL_SEARCH_CACHE_KEY,value);
+      } catch (_) {}
+      return rows;
+    } finally { clearTimeout(timeout); }
+  })();
+  try { return await portalSearchPromise; }
+  finally { portalSearchPromise=null; }
+}
+
+function normalizePortalSearch(value) {
+  return String(value||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/g,' ').trim();
+}
+
+function rankPortalSearch(items,query) {
+  const normalized=normalizePortalSearch(query);
+  const terms=[...new Set(normalized.split(/\s+/).filter(Boolean))];
+  return items.map(item=>{
+    const title=normalizePortalSearch(item.Title);
+    const description=normalizePortalSearch(item.Description);
+    const keywords=normalizePortalSearch(item.Keywords);
+    const kind=normalizePortalSearch(item.Kind);
+    const haystack=[title,description,keywords,kind].join(' ');
+    if (!terms.every(term=>haystack.includes(term))) return null;
+    let score=terms.reduce((total,term)=>total+(title.includes(term)?30:0)+(keywords.includes(term)?12:0)+(description.includes(term)?6:0)+(kind.includes(term)?4:0),0);
+    if (title===normalized) score+=200;
+    else if (title.startsWith(normalized)) score+=100;
+    else if (title.includes(normalized)) score+=50;
+    return {item,score};
+  }).filter(Boolean).sort((a,b)=>b.score-a.score || a.item.Title.localeCompare(b.item.Title)).map(row=>row.item);
+}
+
+function showPortalSearchResults(query,items) {
+  const content=document.getElementById('dynamicPageContent');
+  content.replaceChildren();
+  const total=items.length;
+  const summary=document.createElement('p');summary.className='mdcat-wide';
+  summary.textContent=total ? total+' result'+(total===1?'':'s')+' found.' : 'No published content matched “'+query+'”.';
+  content.appendChild(summary);
+  items.slice(0,50).forEach(item=>{
+    const card=document.createElement('article');card.className='card resource-card';
+    const badges=document.createElement('div');badges.className='resource-badges';
+    const badge=document.createElement('span');badge.className='resource-badge';badge.textContent=item.Kind;badges.appendChild(badge);
+    const title=document.createElement('h4');title.textContent=item.Title;
+    const description=document.createElement('p');description.textContent=item.Description || item.Keywords || 'Open this portal result.';
+    const button=document.createElement('button');button.type='button';button.className='resource-button';button.textContent='Open';
+    button.setAttribute('aria-label','Open '+item.Title);button.onclick=()=>openPortalSearchResult(item);
+    card.append(badges,title,description,button);content.appendChild(card);
+  });
+  if (total>50) {
+    const limit=document.createElement('p');limit.className='mdcat-wide';limit.textContent='Showing the 50 most relevant results. Add another word to narrow your search.';content.appendChild(limit);
+  }
+}
+
+function openPortalSearchResult(item) {
+  if (item.Route!=='mdcat') {
+    handleNavigation({Slug:item.Route,Label:item.Kind});
+    return;
+  }
+  openMDCATHub();
+  const subject={ID:item.SubjectID,Name:item.SubjectName || 'MDCAT'};
+  const unit={ID:item.UnitID,SubjectID:item.SubjectID,Name:item.UnitName || 'Unit'};
+  const chapter={ID:item.ChapterID,UnitID:item.UnitID,SubjectID:item.SubjectID,Name:item.ChapterName || 'Chapter'};
+  if (item.MDCATLevel==='subject') return openMDCATUnits(subject);
+  if (item.MDCATLevel==='unit' && item.SubjectID) return openMDCATChapters(subject,{ID:item.ID,SubjectID:item.SubjectID,Name:item.Title});
+  if (item.MDCATLevel==='chapter' && item.UnitID) return openMDCATTopics(subject,unit,{ID:item.ID,UnitID:item.UnitID,SubjectID:item.SubjectID,Name:item.Title});
+  if (['topic','question'].includes(item.MDCATLevel)) {
+    const scope={SubjectID:item.SubjectID,UnitID:item.UnitID,ChapterID:item.ChapterID,TopicID:item.TopicID || (item.MDCATLevel==='topic'?item.ID:'')};
+    return openMDCATPractice(Object.fromEntries(Object.entries(scope).filter(([,value])=>value)),item.Title);
+  }
+  if (item.MDCATLevel==='test') return openMDCATCollection('tests');
+  if (item.MDCATLevel==='daily') return openMDCATCollection('daily');
+  if (item.MDCATLevel==='update') return openMDCATCollection('updates');
+}
+
+async function portalSearch() {
+  const input=document.getElementById('searchInput');
+  const query=input.value.trim().slice(0,80);
+  if (query.length<2) {
+    input.setCustomValidity('Enter at least two characters to search.');input.reportValidity();input.focus();return;
+  }
+  input.setCustomValidity('');
+  navigationVersion+=1;const requestVersion=navigationVersion;closeMDCATHub();
+  document.getElementById('homeHero').style.display='none';document.getElementById('homeExplore').style.display='none';
+  document.getElementById('dynamicPage').style.display='block';document.getElementById('dynamicPageTitle').textContent='Search results';
+  document.getElementById('dynamicPageDescription').textContent='Searching ICP YOUTH CIRCLE for “'+query+'”.';
+  document.getElementById('resourceFilters').style.display='none';
+  const content=document.getElementById('dynamicPageContent');content.innerHTML='<p>Searching published portal content…</p>';
+  window.location.hash='search='+encodeURIComponent(query);window.scrollTo({top:0,behavior:'smooth'});
+  try {
+    const index=await loadPortalSearchIndex();
+    if (requestVersion!==navigationVersion) return;
+    const results=rankPortalSearch(index,query);
+    document.getElementById('dynamicPageDescription').textContent='Results for “'+query+'”.';
+    showPortalSearchResults(query,results);
   } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({success:false,error:{
-      code:error.mdcatCode || 'SERVICE_ERROR', message:error.mdcatCode ? error.message : 'Unable to complete the request. Please retry.'
-    }})).setMimeType(ContentService.MimeType.JSON);
+    if (requestVersion!==navigationVersion) return;
+    content.replaceChildren();
+    const message=document.createElement('p');message.textContent='Search is temporarily unavailable. Please try again.';
+    const retry=document.createElement('button');retry.type='button';retry.className='resource-button';retry.textContent='Retry search';retry.onclick=()=>{portalSearchIndex=null;portalSearch();};
+    content.append(message,retry);console.error('Portal search error:',error);
   }
 }
 
-// Run once after deploying this version. It preserves existing sheets and records.
-function setupUniversalTestsAndNotifications_() {
-  const spreadsheet=getSpreadsheet_();
-  const definitions=[
-    [CONFIG.SHEETS.TEST_CATALOG,['ID','Name','Slug','Description','TestType','Route','Engine','DisplayOrder','Status','CreatedAt','UpdatedAt']],
-    [CONFIG.SHEETS.NOTIFICATIONS,['ID','Title','Message','Audience','TestID','LinkURL','PublishAt','ExpiresAt','DisplayOrder','Status','CreatedAt','UpdatedAt','Category','Priority','IsPinned','ReminderType','ReminderAt']],
-    [CONFIG.SHEETS.NOTIFICATION_READS,['ID','UserID','NotificationID','ReadAt','Status','CreatedAt','UpdatedAt']],
-    [CONFIG.SHEETS.NOTIFICATION_PREFERENCES,['ID','UserID','GeneralUpdates','TestNotices','DeadlineReminders','StudyPlanReminders','Status','CreatedAt','UpdatedAt']]
-  ];
-  definitions.forEach(([name,headers])=>{
-    let sheet=spreadsheet.getSheetByName(name);
-    if (!sheet) sheet=spreadsheet.insertSheet(name);
-    if (sheet.getLastRow()===0) sheet.getRange(1,1,1,headers.length).setValues([headers]);
-    const actual=(sheet.getDataRange().getValues()[0] || []).map(value=>String(value).replace(/\uFEFF/g,'').trim()).filter(Boolean);
-    if(new Set(actual).size!==actual.length || !actual.includes('ID')) mdcatError_('SETUP_REQUIRED',name+' has missing or duplicate headers.');
-    const missing=headers.filter(header=>!actual.includes(header));
-    if(missing.length) sheet.getRange(1,actual.length+1,1,missing.length).setValues([missing]);
-  });
-  const catalog=getSheetData_(CONFIG.SHEETS.TEST_CATALOG);
-  if (!catalog.some(row=>String(row.Slug).trim().toLowerCase()==='mdcat')) {
-    const now=new Date();
-    getSheet_(CONFIG.SHEETS.TEST_CATALOG).appendRow([
-      'TST-MDCAT','MDCAT','mdcat','Medical and Dental College Admission Test preparation and scored practice.',
-      'Entry Test','mdcat','MDCAT',1,'Active',now,now
-    ]);
-  }
-  adminClearPublicCache_();
-  return 'Test_Catalog and Notifications are ready. MDCAT is connected to the universal test catalog.';
-}
 
-// Run once after deploying the portal-enhancements version. Existing sheets and rows are preserved.
-function setupPortalEnhancements() {
-  const spreadsheet=getSpreadsheet_();
-  const definitions=[
-    [CONFIG.SHEETS.FAQS,['ID','Question','Answer','Category','DisplayOrder','Status','CreatedAt','UpdatedAt']],
-    [CONFIG.SHEETS.FEEDBACK,['ID','Category','Message','PageURL','Status','SubmittedAt','CreatedAt','UpdatedAt']],
-    [CONFIG.SHEETS.RESOURCES,['ID','Title','Slug','Category','Level','Subject','Institution','Year','ResourceType','Description','FileURL','ThumbnailURL','Featured','DisplayOrder','Status','CreatedAt','UpdatedAt','PublishAt','ExpiresAt']],
-    [CONFIG.SHEETS.SCHOLARSHIPS,['ID','Name','Provider','Type','Country','Eligibility','Benefits','OpeningDate','Deadline','OfficialURL','Description','Featured','Status','CreatedAt','UpdatedAt','PublishAt','ExpiresAt']],
-    [CONFIG.SHEETS.ANNOUNCEMENTS,['ID','Title','Category','Summary','Content','PublishDate','ExpiryDate','OfficialURL','ButtonText','DisplayOrder','Priority','Featured','Status','CreatedAt','UpdatedAt','PublishAt','ExpiresAt']],
-    [CONFIG.SHEETS.COUNTDOWNS,['ID','Title','Description','TargetDateTime','AfterMessage','OfficialURL','ButtonText','DisplayOrder','Status','CreatedAt','UpdatedAt','PublishAt','ExpiresAt']],
-    [CONFIG.SHEETS.NOTIFICATIONS,['ID','Title','Message','Audience','TestID','LinkURL','PublishAt','ExpiresAt','DisplayOrder','Status','CreatedAt','UpdatedAt','Category','Priority','IsPinned','ReminderType','ReminderAt']]
-  ];
-  definitions.forEach(([name,headers])=>{
-    let sheet=spreadsheet.getSheetByName(name);
-    if (!sheet) sheet=spreadsheet.insertSheet(name);
-    if (sheet.getLastRow()===0) sheet.getRange(1,1,1,headers.length).setValues([headers]);
-    const actual=(sheet.getDataRange().getValues()[0] || []).map(value=>String(value).replace(/\uFEFF/g,'').trim()).filter(Boolean);
-    const missing=headers.filter(header=>!actual.includes(header));
-    if (new Set(actual).size!==actual.length) mdcatError_('SETUP_REQUIRED',name+' has duplicate headers.');
-    if (missing.length) sheet.getRange(1,actual.length+1,1,missing.length).setValues([missing]);
-    sheet.setFrozenRows(1);
-  });
-  adminClearPublicCache_();
-  return 'Scheduled publishing, previews, FAQs, Feedback and Public Countdowns are ready. Existing rows were preserved.';
-}
+    function showError(error) {
 
-// Run once from the Apps Script editor. Never called by the public website.
-function setupMDCATScoring_() {
-  const spreadsheet = getSpreadsheet_();
-  const definitions = [
-    [MDCAT_SCORING_.sessions,MDCAT_SCORING_.sessionHeaders],
-    [MDCAT_SCORING_.snapshots,MDCAT_SCORING_.snapshotHeaders],
-    [CONFIG.SHEETS.MDCAT_TEST_ATTEMPTS,MDCAT_SCORING_.attemptHeaders],
-    [CONFIG.SHEETS.MDCAT_ATTEMPT_ANSWERS,MDCAT_SCORING_.answerHeaders],
-    [CONFIG.SHEETS.MDCAT_PROGRESS,MDCAT_SCORING_.progressHeaders]
-  ];
-  definitions.forEach(([name,headers]) => {
-    let sheet = spreadsheet.getSheetByName(name);
-    if (!sheet) sheet = spreadsheet.insertSheet(name);
-    if (sheet.getLastRow() === 0) sheet.getRange(1,1,1,headers.length).setValues([headers]);
-    mdcatTable_(name,headers);
-  });
-  return 'Scoring sheets validated. Firebase configuration and enablement are separate steps.';
-}
+      document.getElementById(
+        'loading'
+      ).innerHTML =
+        'Unable to load the portal.<br><br>' +
+        error.message;
 
-function mdcatTable_(name, required) {
-  const sheet = getSheet_(name);
-  const values = sheet.getDataRange().getValues();
-  const headers = (values[0] || []).map(value=>String(value).replace(/\uFEFF/g,'').trim());
-  if ((required || ['ID']).some(key=>!headers.includes(key)) || new Set(headers.filter(Boolean)).size !== headers.filter(Boolean).length) mdcatError_('SETUP_REQUIRED','A scoring sheet has missing or duplicate headers.');
-  const rows = values.slice(1).map((row,index)=>{
-    const record = {_row:index+2};
-    headers.forEach((key,i)=>{if(key) record[key]=row[i];});
-    return record;
-  }).filter(row=>row.ID);
-  return {sheet:sheet,headers:headers,rows:rows};
-}
-
-function mdcatCell_(value) {
-  if (value == null) return '';
-  if (typeof value === 'string' && /^[=+@\-]/.test(value)) return "'"+value;
-  return value;
-}
-
-function mdcatPut_(name, record) {
-  const table = mdcatTable_(name);
-  const matches = table.rows.filter(row=>String(row.ID)===String(record.ID));
-  if (matches.length>1) mdcatError_('SETUP_REQUIRED','Duplicate record IDs need administrator review.');
-  const old=matches[0];
-  const merged=Object.assign({},old || {},record);
-  const values=table.headers.map(key=>mdcatCell_(merged[key]));
-  table.sheet.getRange(old ? old._row : table.sheet.getLastRow()+1,1,1,values.length).setValues([values]);
-  return merged;
-}
-
-function mdcatPutMany_(name,records) {
-  const table=mdcatTable_(name);
-  const byId=new Map();
-  table.rows.forEach(row=>{if(byId.has(String(row.ID))) mdcatError_('SETUP_REQUIRED','Duplicate saved record IDs.');byId.set(String(row.ID),row);});
-  const append=[];
-  records.forEach(record=>{
-    const old=byId.get(String(record.ID));
-    const merged=Object.assign({},old || {},record);
-    const row=table.headers.map(key=>mdcatCell_(merged[key]));
-    if(old)table.sheet.getRange(old._row,1,1,row.length).setValues([row]);else append.push(row);
-  });
-  if(append.length)table.sheet.getRange(table.sheet.getLastRow()+1,1,append.length,table.headers.length).setValues(append);
-}
-
-function mdcatSession_(uid,id) {
-  if (typeof id !== 'string' || !/^MDA-[a-zA-Z0-9-]{20,80}$/.test(id)) mdcatError_('NOT_FOUND','Attempt not found.');
-  const matches=mdcatTable_(MDCAT_SCORING_.sessions).rows.filter(row=>row.ID===id && row.UserID===uid);
-  if (matches.length!==1) mdcatError_('NOT_FOUND','Attempt not found.');
-  return matches[0];
-}
-
-function mdcatScopeMatches_(question,context) {
-  return ['SubjectID','UnitID','ChapterID','TopicID'].every(key=>!context[key] || String(context[key])===String(question[key]));
-}
-
-function mdcatActiveRecord_(sheet,id) {
-  const rows=getActiveSheetData_(sheet).filter(row=>String(row.ID)===String(id));
-  if(rows.length!==1) mdcatError_('CONTENT_UNAVAILABLE','This content is unavailable.');
-  return rows[0];
-}
-
-function mdcatNumber_(value,min,max) {
-  const number=Number(value);
-  if(value === '' || value == null || !Number.isFinite(number) || number<min || number>max) mdcatError_('CONTENT_UNAVAILABLE','The practice set configuration needs review.');
-  return number;
-}
-
-function mdcatSelect_(mode,contextId) {
-  const bank=getActiveSheetData_(CONFIG.SHEETS.MDCAT_QUESTION_BANK);
-  let context,questions,links=[],minutes,title,passing=0;
-  if(mode==='test') {
-    context=mdcatActiveRecord_(CONFIG.SHEETS.MDCAT_TESTS,contextId);
-    links=getActiveSheetData_(CONFIG.SHEETS.MDCAT_TEST_QUESTIONS).filter(row=>String(row.TestID)===String(contextId))
-      .sort((a,b)=>(Number(a.DisplayOrder)||0)-(Number(b.DisplayOrder)||0));
-    if(new Set(links.map(row=>String(row.QuestionID))).size!==links.length) mdcatError_('CONTENT_UNAVAILABLE','Duplicate test question links.');
-    questions=links.map(link=>{
-      const matches=bank.filter(question=>String(question.ID)===String(link.QuestionID));
-      if(matches.length!==1) mdcatError_('CONTENT_UNAVAILABLE','A linked question is unavailable.');
-      return Object.assign({},matches[0],{Marks:mdcatNumber_(link.Marks,0.01,100),NegativeMarks:mdcatNumber_(link.NegativeMarks,0,100)});
-    });
-    if(questions.length!==mdcatNumber_(context.TotalQuestions,1,MDCAT_SCORING_.maxQuestions)) mdcatError_('CONTENT_UNAVAILABLE','Test question count is inconsistent.');
-    passing=mdcatNumber_(context.PassingPercentage,0,100);
-    minutes=mdcatNumber_(context.DurationMinutes,1,240);
-    title=context.Title;
-  } else if(mode==='daily') {
-    context=mdcatActiveRecord_(CONFIG.SHEETS.MDCAT_DAILY_PRACTICE,contextId);
-    const count=mdcatNumber_(context.QuestionCount,1,MDCAT_SCORING_.maxQuestions);
-    if(!Number.isInteger(count)) mdcatError_('CONTENT_UNAVAILABLE','Question count must be a whole number.');
-    questions=bank.filter(question=>mdcatScopeMatches_(question,context) && (!context.Difficulty || String(question.Difficulty).toLowerCase()===String(context.Difficulty).toLowerCase())).slice(0,count);
-    if(questions.length!==count) mdcatError_('CONTENT_UNAVAILABLE','Not enough published questions for this set.');
-    minutes=mdcatNumber_(context.DurationMinutes,1,240);
-    title=context.Title;
-  } else if(mode==='topic') {
-    context=mdcatActiveRecord_(CONFIG.SHEETS.MDCAT_TOPICS,contextId);
-    context=Object.assign({},context,{TopicID:context.ID});
-    questions=bank.filter(question=>mdcatScopeMatches_(question,context));
-    minutes=120;
-    title=context.Name;
-  } else mdcatError_('BAD_REQUEST','Choose a test, daily set or topic.');
-  if(!questions.length || questions.length>MDCAT_SCORING_.maxQuestions || new Set(questions.map(row=>String(row.ID))).size!==questions.length) mdcatError_('CONTENT_UNAVAILABLE','Question selection needs review.');
-  questions=questions.map(question=>{
-    if(!question.ID || !mdcatScopeMatches_(question,context) || !String(question.Question || '').trim() ||
-      !/^[ABCD]$/.test(String(question.CorrectOption).trim().toUpperCase()) ||
-      ['OptionA','OptionB','OptionC','OptionD'].some(key=>!String(question[key] || '').trim())) mdcatError_('CONTENT_UNAVAILABLE','A question needs administrator review.');
-    for(const key of ['Question','OptionA','OptionB','OptionC','OptionD','Explanation']) {
-      if(String(question[key] || '').length>12000) mdcatError_('CONTENT_UNAVAILABLE','Question text exceeds the supported length.');
     }
-    return Object.assign({},question,{CorrectOption:String(question.CorrectOption).trim().toUpperCase(),Marks:mode==='test'?question.Marks:1,NegativeMarks:mode==='test'?question.NegativeMarks:0});
-  });
-  if(/^yes$/i.test(String(context.RandomizeQuestions))) {
-    for(let i=questions.length-1;i>0;i--) {const j=Math.floor(Math.random()*(i+1)); [questions[i],questions[j]]=[questions[j],questions[i]];}
-  }
-  return {questions:questions,minutes:minutes,title:String(title || 'MDCAT practice'),passing:passing,randomizeOptions:/^yes$/i.test(String(context.RandomizeOptions))};
-}
-
-function mdcatStart_(uid,body) {
-  if(typeof body.requestId!=='string' || !/^[a-zA-Z0-9-]{20,80}$/.test(body.requestId) || typeof body.contextId!=='string' || body.contextId.length>100) mdcatError_('BAD_REQUEST','Invalid start request.');
-  const sessions=mdcatTable_(MDCAT_SCORING_.sessions).rows;
-  const existing=sessions.find(row=>row.UserID===uid && row.RequestID===body.requestId);
-  if(existing) {
-    if(existing.Mode!==body.mode || existing.ContextID!==body.contextId) mdcatError_('BAD_REQUEST','Start request has already been used for different content.');
-    if(existing.Status==='Building') mdcatError_('SETUP_REQUIRED','This start was interrupted. Start a new attempt.');
-    return mdcatResume_(uid,existing.ID);
-  }
-  const now=Date.now();
-  if(sessions.filter(row=>row.UserID===uid && now-new Date(row.StartedAt).getTime()<86400000).length>=MDCAT_SCORING_.maxStartsPerDay) mdcatError_('RATE_LIMIT','Daily practice-start limit reached. Please return later.');
-  const selected=mdcatSelect_(body.mode,body.contextId);
-  const id='MDA-'+Utilities.getUuid();
-  const session={ID:id,UserID:uid,RequestID:body.requestId,Mode:body.mode,ContextID:body.contextId,Title:selected.title,StartedAt:new Date(now).toISOString(),DeadlineAt:new Date(now+selected.minutes*60000).toISOString(),SubmittedAt:'',Status:'Building',AnswersJSON:'',TotalQuestions:selected.questions.length,PassingPercentage:selected.passing,RandomizeOptions:selected.randomizeOptions?'Yes':'No'};
-  mdcatPut_(MDCAT_SCORING_.sessions,session);
-  // Store answer keys only in the private snapshot sheet, never the start response.
-  const table=mdcatTable_(MDCAT_SCORING_.snapshots,MDCAT_SCORING_.snapshotHeaders);
-  const snapshots=selected.questions.map((question,index)=>Object.assign({},question,{ID:id+':'+index,AttemptID:id,QuestionID:String(question.ID),DisplayOrder:index+1}));
-  table.sheet.getRange(table.sheet.getLastRow()+1,1,snapshots.length,table.headers.length).setValues(snapshots.map(row=>table.headers.map(key=>mdcatCell_(row[key]))));
-  SpreadsheetApp.flush();
-  session.Status='Open'; mdcatPut_(MDCAT_SCORING_.sessions,session);
-  return mdcatResume_(uid,id);
-}
-
-function mdcatSnapshots_(session) {
-  const rows=mdcatTable_(MDCAT_SCORING_.snapshots).rows.filter(row=>row.AttemptID===session.ID).sort((a,b)=>Number(a.DisplayOrder)-Number(b.DisplayOrder));
-  if(rows.length!==Number(session.TotalQuestions) || new Set(rows.map(row=>row.QuestionID)).size!==rows.length) mdcatError_('SETUP_REQUIRED','Attempt snapshot is incomplete.');
-  return rows;
-}
-
-function mdcatResume_(uid,id) {
-  const session=mdcatSession_(uid,id);
-  if(session.Status==='Submitted' || session.Status==='Finalizing') return mdcatSubmit_(uid,{attemptId:id});
-  if(session.Status!=='Open') mdcatError_('CONTENT_UNAVAILABLE','Attempt is unavailable.');
-  if(Date.now()>new Date(session.DeadlineAt).getTime()) mdcatError_('EXPIRED','This attempt has expired. Start a new attempt.');
-  const questions=mdcatSnapshots_(session).map(row=>({ID:row.QuestionID,Question:row.Question,OptionA:row.OptionA,OptionB:row.OptionB,OptionC:row.OptionC,OptionD:row.OptionD,SubjectID:row.SubjectID,UnitID:row.UnitID,ChapterID:row.ChapterID,TopicID:row.TopicID}));
-  return {attemptId:session.ID,title:session.Title,questions:questions,deadline:session.DeadlineAt,serverNow:new Date().toISOString(),randomizeOptions:session.RandomizeOptions==='Yes',status:'Open'};
-}
-
-function mdcatSubmit_(uid,body) {
-  const session=mdcatSession_(uid,body.attemptId);
-  if(session.Status==='Submitted') return mdcatResult_(uid,session.ID);
-  const snapshots=mdcatSnapshots_(session);
-  if(session.Status==='Open') {
-    // A small transport allowance is explicit; the browser stops input at the displayed deadline.
-    if(Date.now()>new Date(session.DeadlineAt).getTime()+30000) mdcatError_('EXPIRED','Submission arrived after the time allowance. This attempt was not graded.');
-    if(!Array.isArray(body.answers) || body.answers.length>snapshots.length) mdcatError_('BAD_REQUEST','Invalid answers.');
-    const allowed=new Set(snapshots.map(row=>String(row.QuestionID)));
-    const answers=Object.create(null);
-    body.answers.forEach(answer=>{
-      if(!answer || !allowed.has(String(answer.questionId)) || Object.prototype.hasOwnProperty.call(answers,String(answer.questionId)) || !/^[ABCD]$/.test(answer.option)) mdcatError_('BAD_REQUEST','Invalid or duplicate answer.');
-      answers[String(answer.questionId)]=answer.option;
-    });
-    session.AnswersJSON=JSON.stringify(answers);
-    session.SubmittedAt=new Date().toISOString();
-    session.Status='Finalizing';
-    mdcatPut_(MDCAT_SCORING_.sessions,session);
-  }
-  if(session.Status!=='Finalizing') mdcatError_('CONTENT_UNAVAILABLE','Attempt is unavailable.');
-  const result=mdcatGrade_(session,snapshots,JSON.parse(session.AnswersJSON));
-  mdcatPutMany_(CONFIG.SHEETS.MDCAT_ATTEMPT_ANSWERS,result.answers.map((answer,index)=>({
-    ID:session.ID+':'+index,AttemptID:session.ID,UserID:uid,TestID:session.Mode==='test'?session.ContextID:'',QuestionID:answer.questionId,
-    SelectedOption:answer.selectedOption,CorrectOption:answer.correctOption,IsCorrect:answer.isCorrect,MarksAwarded:answer.marksAwarded,
-    TimeSpentSeconds:'',AnsweredAt:session.SubmittedAt,CreatedAt:session.SubmittedAt,UpdatedAt:session.SubmittedAt
-  })));
-  mdcatPut_(CONFIG.SHEETS.MDCAT_TEST_ATTEMPTS,{
-    ID:session.ID,UserID:uid,TestID:session.Mode==='test'?session.ContextID:'',StartedAt:session.StartedAt,SubmittedAt:session.SubmittedAt,
-    TotalQuestions:result.total,AttemptedQuestions:result.answered,CorrectAnswers:result.correct,WrongAnswers:result.wrong,
-    Unanswered:result.unanswered,Score:result.score,Percentage:result.percentage,TimeTakenSeconds:result.seconds,
-    Status:'Submitted',CreatedAt:session.StartedAt,UpdatedAt:session.SubmittedAt
-  });
-  // Rebuild from committed answers, so replay after partial writes cannot double-count progress.
-  mdcatProgress_(uid,true);
-  session.Status='Submitted'; mdcatPut_(MDCAT_SCORING_.sessions,session);
-  return result;
-}
-
-function mdcatGrade_(session,questions,answers) {
-  let correct=0,wrong=0,score=0,maxScore=0,answered=0;
-  const review=questions.map(question=>{
-    const selected=answers[String(question.QuestionID)] || '';
-    const isCorrect=Boolean(selected && selected===question.CorrectOption);
-    const marks=selected ? (isCorrect ? Number(question.Marks) : -Number(question.NegativeMarks)) : 0;
-    if(selected) {answered++; if(isCorrect) correct++; else wrong++;}
-    score+=marks; maxScore+=Number(question.Marks);
-    return {questionId:question.QuestionID,question:question.Question,options:{A:question.OptionA,B:question.OptionB,C:question.OptionC,D:question.OptionD},selectedOption:selected,correctOption:question.CorrectOption,isCorrect:isCorrect,marksAwarded:marks,explanation:question.Explanation || ''};
-  });
-  const percentage=Math.max(0,Math.round(score/maxScore*10000)/100);
-  return {attemptId:session.ID,status:'Submitted',title:session.Title,total:questions.length,answered:answered,correct:correct,wrong:wrong,unanswered:questions.length-answered,
-    score:Math.round(score*100)/100,maxScore:maxScore,percentage:percentage,passed:session.Mode==='test'?percentage>=Number(session.PassingPercentage):null,
-    seconds:Math.max(0,Math.round((Math.min(new Date(session.SubmittedAt).getTime(),new Date(session.DeadlineAt).getTime())-new Date(session.StartedAt).getTime())/1000)),answers:review};
-}
-
-function mdcatResult_(uid,id) {
-  const session=mdcatSession_(uid,id);
-  if(session.Status!=='Submitted') mdcatError_('NOT_READY','This attempt has not been submitted.');
-  return mdcatGrade_(session,mdcatSnapshots_(session),JSON.parse(session.AnswersJSON));
-}
-
-function mdcatMyResults_(uid) {
-  return mdcatTable_(MDCAT_SCORING_.sessions).rows.filter(row=>row.UserID===uid && ['Submitted','Open','Finalizing'].includes(row.Status))
-    .sort((a,b)=>new Date(b.StartedAt)-new Date(a.StartedAt)).slice(0,100)
-    .map(row=>({attemptId:row.ID,title:row.Title,status:row.Status,startedAt:row.StartedAt,deadline:row.DeadlineAt}));
-}
-
-function mdcatProgress_(uid,persist) {
-  const topicNames=new Map(getActiveSheetData_(CONFIG.SHEETS.MDCAT_TOPICS).map(row=>[String(row.ID),row.Name]));
-  const subjectNames=new Map(getActiveSheetData_(CONFIG.SHEETS.MDCAT_SUBJECTS).map(row=>[String(row.ID),row.Name]));
-  const committed=new Map(mdcatTable_(CONFIG.SHEETS.MDCAT_TEST_ATTEMPTS).rows.filter(row=>row.UserID===uid && row.Status==='Submitted').map(row=>[row.ID,row]));
-  const snapshotMap=new Map(mdcatTable_(MDCAT_SCORING_.snapshots).rows.filter(row=>committed.has(row.AttemptID)).map(row=>[row.AttemptID+':'+row.QuestionID,row]));
-  const groups={};
-  mdcatTable_(CONFIG.SHEETS.MDCAT_ATTEMPT_ANSWERS).rows.filter(row=>row.UserID===uid && committed.has(row.AttemptID) && row.SelectedOption).forEach(row=>{
-    const question=snapshotMap.get(row.AttemptID+':'+row.QuestionID);
-    if(!question) mdcatError_('SETUP_REQUIRED','Progress snapshot missing.');
-    const key=JSON.stringify([question.SubjectID,question.UnitID,question.ChapterID,question.TopicID]);
-    if(!groups[key]) groups[key]={SubjectID:question.SubjectID,UnitID:question.UnitID,ChapterID:question.ChapterID,TopicID:question.TopicID,QuestionsAttempted:0,CorrectAnswers:0,WrongAnswers:0,LastPracticedAt:''};
-    const group=groups[key]; group.QuestionsAttempted++;
-    if(row.IsCorrect===true || String(row.IsCorrect).toLowerCase()==='true') group.CorrectAnswers++; else group.WrongAnswers++;
-    if(String(row.AnsweredAt)>String(group.LastPracticedAt)) group.LastPracticedAt=row.AnsweredAt;
-  });
-  const result=Object.keys(groups).map(key=>{
-    const row=groups[key]; row.AccuracyPercentage=Math.round(row.CorrectAnswers/row.QuestionsAttempted*10000)/100;
-    row.TopicName=topicNames.get(String(row.TopicID)) || 'Topic progress';
-    row.SubjectName=subjectNames.get(String(row.SubjectID)) || '';
-    if(persist) {
-      const digest=Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,uid+':'+key).map(byte=>('0'+(byte&255).toString(16)).slice(-2)).join('');
-      mdcatPut_(CONFIG.SHEETS.MDCAT_PROGRESS,Object.assign({},row,{ID:'MDP-'+digest,UserID:uid,AverageTimeSeconds:'',WeaknessScore:'',MasteryLevel:'',Status:'Active',UpdatedAt:new Date().toISOString()}));
-    }
-    return row;
-  });
-  return result;
-}
