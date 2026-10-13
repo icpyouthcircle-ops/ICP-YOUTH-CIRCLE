@@ -1,4 +1,4 @@
-const CACHE_NAME = 'icp-portal-shell-20261013-v9';
+const CACHE_NAME = 'icp-portal-shell-20261013-v10';
 const SHELL_ASSETS = [
   './',
   './index.html',
@@ -8,14 +8,14 @@ const SHELL_ASSETS = [
   './assets/icons/icon-512.png',
   './assets/icons/icon-maskable-512.png',
   './css/style.css?v=20260927-publishing-suite',
-  './js/app.js?v=20261013-lazy-performance',
+  './js/app.js?v=20261013-speed-v2',
   './js/portal-extras.js?v=20260927-publishing-suite',
   './assets/social/portal-share-1200x630.png'
 ];
 const LAZY_ASSETS = [
-  './js/mdcat.js?v=20261013-lazy-performance',
-  './js/mdcat-study.js?v=20261013-lazy-performance',
-  './js/mdcat-account.js?v=20261013-lazy-performance'
+  './js/mdcat.js?v=20261013-speed-v2',
+  './js/mdcat-study.js?v=20261013-speed-v2',
+  './js/mdcat-account.js?v=20261013-speed-v2'
 ];
 
 self.addEventListener('install', event => {
