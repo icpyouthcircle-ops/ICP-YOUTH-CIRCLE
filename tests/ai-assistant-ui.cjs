@@ -36,7 +36,7 @@ const {pathToFileURL}=require('node:url');
     await page.getByLabel('Message ICP AI Assistant').fill('Explain cell structure');
     await page.getByRole('button',{name:'Send',exact:true}).click();
     await page.getByText('Biology Cell Notes',{exact:true}).waitFor();
-    assert.equal(await page.evaluate(()=>window.aiTestRequest.provider),'Gemini');await page.getByText('Gemini',{exact:true}).waitFor();
+    assert.equal(await page.evaluate(()=>window.aiTestRequest.provider),'Gemini');await page.locator('.icp-ai-provider-badge',{hasText:'Gemini'}).waitFor();
     assert.equal(await page.locator('.icp-ai-answer script').count(),0,'Assistant content must render as text, never executable HTML.');
     assert.equal(await page.getByText('<script>unsafe()</script>',{exact:false}).count(),1);
     await page.getByText('Verified sources',{exact:false}).waitFor();
