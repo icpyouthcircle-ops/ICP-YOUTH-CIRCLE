@@ -1,6 +1,8 @@
 // Read the public MDCAT hierarchy; other portal modules stay separate.
 let mdcatRequest = null;
 const MDCAT_PUBLIC_CACHE_PREFIX = 'icp-mdcat-public-v1:';
+const MDCAT_PUBLIC_CACHE_TTL = 15 * 60 * 1000;
+const MDCAT_PUBLIC_STALE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 const MDCAT_LIVE_SITE = location.hostname === 'icpyouthcircle-ops.github.io';
 const MDCAT_SUBJECTS_BOOTSTRAP = [
   {ID:'MDS-001',Name:'Biology',Slug:'biology',Description:'MDCAT Biology subject hub containing syllabus-based topics, resources, MCQs, practice, revision and tests.',Icon:'',DisplayOrder:1},
@@ -27,11 +29,12 @@ function mdcatStorePublicCache(key, data) {
   } catch (_) {}
 }
 
-function mdcatReadPublicCache(key) {
+function mdcatReadPublicCache(key, allowStale=false) {
   if (!MDCAT_LIVE_SITE) return null;
   try {
     const value = JSON.parse(localStorage.getItem(MDCAT_PUBLIC_CACHE_PREFIX + key));
-    if (!value || Date.now() - Number(value.savedAt) > 15 * 60 * 1000 || !Array.isArray(value.data)) return null;
+    const age=Date.now()-Number(value && value.savedAt || 0);
+    if (!value || !Array.isArray(value.data) || age>MDCAT_PUBLIC_CACHE_TTL && (!allowStale || age>MDCAT_PUBLIC_STALE_MAX_AGE)) return null;
     return value.data;
   } catch (_) { return null; }
 }
@@ -39,8 +42,13 @@ function mdcatReadPublicCache(key) {
 async function mdcatPublicRequest(action, params, controller) {
   const url = mdcatPublicURL(action,params);
   const key = url.searchParams.toString();
-  const cached = mdcatReadPublicCache(key);
-  if (cached) return cached;
+  const cached = mdcatReadPublicCache(key,true);
+  if (cached) {
+    fetch(url).then(response=>response.ok?response.json():null).then(result=>{
+      if (result && result.success === true && Array.isArray(result.data)) mdcatStorePublicCache(key,result.data);
+    }).catch(()=>{});
+    return cached;
+  }
   if (MDCAT_LIVE_SITE && action === 'mdcatSubjects') {
     // Show the stable subject directory instantly and refresh it for the next visit.
     fetch(url).then(response=>response.ok?response.json():null).then(result=>{
