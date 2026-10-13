@@ -29,9 +29,15 @@ const sourceLookup=backend.context.aiSources_;backend.context.aiSources_=()=>{th
 const general=ok(backend.call('aiChat',alice,{conversationId:chat.conversationId,message:'Why is the sky blue?',provider:'OpenAI',mode:'Explain',language:'English',verifiedOnly:false,requestId:'request-00000000000000000003'}));backend.context.aiSources_=sourceLookup;
 assert.equal(general.message.payload.provider,'OpenAI');assert.equal(general.message.payload.grounded,false);assert.equal(general.message.payload.sources.length,0);assert.equal(backend.rows('AI_Messages').length,6);
 
+const normalFetch=backend.context.UrlFetchApp.fetch;
+backend.context.UrlFetchApp.fetch=(url,options)=>url.includes('generativelanguage.googleapis.com')?{getResponseCode:()=>503,getContentText:()=>'{"error":{"message":"temporary"}}'}:normalFetch(url,options);
+const fallback=ok(backend.call('aiChat',alice,{conversationId:chat.conversationId,message:'Explain gravity even if Gemini is unavailable',provider:'Gemini',mode:'Explain',language:'English',verifiedOnly:false,requestId:'request-00000000000000000004'}));
+backend.context.UrlFetchApp.fetch=normalFetch;
+assert.equal(fallback.message.payload.provider,'OpenAI');assert.equal(fallback.message.payload.fallbackFrom,'Gemini');assert.equal(backend.rows('AI_Messages').length,8);
+
 const history=ok(backend.call('aiListConversations',alice));assert.equal(history.length,1);assert.equal(history[0].id,chat.conversationId);
 bad(backend.call('aiLoadConversation',bob,{conversationId:chat.conversationId}),'NOT_FOUND');
-const loaded=ok(backend.call('aiLoadConversation',alice,{conversationId:chat.conversationId}));assert.equal(loaded.messages.length,6);
+const loaded=ok(backend.call('aiLoadConversation',alice,{conversationId:chat.conversationId}));assert.equal(loaded.messages.length,8);
 
 ok(backend.call('aiSaveMessage',alice,{messageId:chat.message.id,saved:true}));assert.equal(backend.rows('AI_Messages').find(row=>row.ID===chat.message.id).Saved,'Yes');
 ok(backend.call('aiFeedback',alice,{messageId:chat.message.id,rating:'Helpful'}));assert.equal(backend.rows('AI_Feedback').length,1);
@@ -43,4 +49,4 @@ assert.ok(openAI.length>=2);assert.ok(openAI.every(call=>call.options.headers.Au
 assert.equal(JSON.stringify(chat).includes('sk-test-'),false,'Secrets must never appear in client responses.');
 assert.equal(JSON.stringify(gemini).includes('AIza-test-'),false,'Gemini secrets must never appear in client responses.');
 
-console.log('PASS ICP AI backend: OpenAI and Gemini providers, broad general answers without ICP lookup, optional grounding, auth, structured responses, idempotency, privacy, saved answers, feedback, archive, and server-only credentials.');
+console.log('PASS ICP AI backend: OpenAI and Gemini providers, resilient provider fallback, broad general answers without ICP lookup, optional grounding, auth, structured responses, idempotency, privacy, saved answers, feedback, archive, and server-only credentials.');
