@@ -7,9 +7,15 @@ const SCHEDULED_MODULE_CACHE_TTL = 60 * 1000;
 const SCHEDULED_PUBLIC_MODULES = new Set(['resources','scholarships','announcements','countdowns','publicNotifications']);
 const PUBLIC_NOTIFICATION_SEEN_KEY = 'icp-public-notifications-seen-v1';
 const PUBLIC_NOTIFICATION_LIFETIME = 24 * 60 * 60 * 1000;
+const PORTAL_MDCAT_SCRIPTS = [
+  'js/mdcat.js?v=20261013-lazy-performance',
+  'js/mdcat-study.js?v=20261013-lazy-performance',
+  'js/mdcat-account.js?v=20261013-lazy-performance'
+];
 const publicModuleMemory = new Map();
 const publicModuleRequests = new Map();
 let publicNotificationRequest = null;
+let portalMDCATLoadPromise = null;
 let portalRenderFingerprint = '';
 const PORTAL_BOOKMARKS_KEY = 'icp-student-bookmarks-v1';
 const PORTAL_BOOTSTRAP_DATA = {
@@ -92,6 +98,46 @@ function safePortalURL(value) {
     const url=new URL(raw,window.location.href);
     return ['http:','https:'].includes(url.protocol) ? url.href : '';
   } catch (_) { return ''; }
+}
+
+function appendPortalFeatureScript(src) {
+  return new Promise((resolve,reject)=>{
+    const existing=document.querySelector('script[data-portal-feature="'+src+'"]');
+    if (existing) {
+      if (existing.dataset.loaded==='true') resolve();
+      else {
+        existing.addEventListener('load',resolve,{once:true});
+        existing.addEventListener('error',()=>reject(new Error('Unable to load a portal feature.')),{once:true});
+      }
+      return;
+    }
+    const script=document.createElement('script');
+    script.src=src;script.async=false;script.dataset.portalFeature=src;
+    script.onload=()=>{script.dataset.loaded='true';resolve();};
+    script.onerror=()=>reject(new Error('Unable to load a portal feature.'));
+    document.body.appendChild(script);
+  });
+}
+
+function loadPortalMDCATFeatures() {
+  if (typeof openMDCATHub==='function' && typeof openUserAccount==='function') return Promise.resolve();
+  if (!portalMDCATLoadPromise) {
+    portalMDCATLoadPromise=PORTAL_MDCAT_SCRIPTS.reduce(
+      (chain,src)=>chain.then(()=>appendPortalFeatureScript(src)),Promise.resolve()
+    ).then(async()=>{
+      if (typeof openMDCATHub!=='function' || typeof openUserAccount!=='function') throw new Error('Portal features did not initialize.');
+      if (typeof initializePortalAccountState==='function') await initializePortalAccountState();
+    }).catch(error=>{portalMDCATLoadPromise=null;throw error;});
+  }
+  return portalMDCATLoadPromise;
+}
+
+function closePortalMDCATHub() {
+  if (typeof closeMDCATHub==='function') closeMDCATHub();
+  else {
+    const hub=document.getElementById('mdcatHub');
+    if (hub) hub.hidden=true;
+  }
 }
 
 function googleDriveDownloadURL(value) {
@@ -647,14 +693,22 @@ function setPortalAccountButton(signedIn) {
   }
 }
 
-function openPortalAccount(pending) {
+async function openPortalAccount(pending) {
   document.getElementById('homeHero').style.display = 'none';
   document.getElementById('homeExplore').style.display = 'none';
   const homeTools=document.getElementById('homeTools');if(homeTools)homeTools.hidden=true;
   document.getElementById('dynamicPage').style.display = 'none';
   document.getElementById('mdcatHub').hidden = false;
   window.location.hash = 'account';
-  openUserAccount(pending);
+  document.getElementById('mdcatHubTitle').textContent='Loading your account…';
+  document.getElementById('mdcatStatus').textContent='Loading secure account features…';
+  try {
+    await loadPortalMDCATFeatures();
+    openUserAccount(pending);
+  } catch (error) {
+    document.getElementById('mdcatStatus').textContent='Unable to load account features. Check your connection and try again.';
+    console.error('Account feature error:',error);
+  }
 }
 
 function setMobileNavigationOpen(open) {
@@ -1127,12 +1181,19 @@ function renderPublicPortalForm(kind) {
 function handleNavigation(item,options={}) {
 
   navigationVersion += 1;
-  closeMDCATHub();
+  const requestVersion=navigationVersion;
+  closePortalMDCATHub();
   document.getElementById('mdcatEntryLink').hidden = true;
   item=resolveNavigationItem(item);
 
   if (item.Slug === 'mdcat' || item.Slug === 'mdcat-2027') {
-    openMDCATHub(options);
+    return loadPortalMDCATFeatures().then(()=>{
+      if (requestVersion===navigationVersion) openMDCATHub(options);
+    }).catch(error=>{
+      if (requestVersion!==navigationVersion) return;
+      renderSectionNotice('Unable to load MDCAT features. Check your connection and try again.');
+      console.error('MDCAT feature error:',error);
+    });
     return;
   }
 
@@ -1259,7 +1320,7 @@ if (resourceCategories[item.Slug]) {
 function showHome(options={}) {
 
   navigationVersion += 1;
-  closeMDCATHub();
+  closePortalMDCATHub();
   updatePortalMetadata('ICP YOUTH CIRCLE','Student resources, opportunities, guidance and community support in one accessible portal.');
 
   document.getElementById(
@@ -5358,11 +5419,13 @@ function showPortalSearchResults(query,items) {
   }
 }
 
-function openPortalSearchResult(item) {
+async function openPortalSearchResult(item) {
   if (item.Route!=='mdcat') {
     handleNavigation({Slug:item.Route,Label:item.Kind});
     return;
   }
+  try { await loadPortalMDCATFeatures(); }
+  catch (error) { console.error('MDCAT feature error:',error); return; }
   openMDCATHub();
   const subject={ID:item.SubjectID,Name:item.SubjectName || 'MDCAT'};
   const unit={ID:item.UnitID,SubjectID:item.SubjectID,Name:item.UnitName || 'Unit'};
@@ -5386,7 +5449,7 @@ async function portalSearch() {
     input.setCustomValidity('Enter at least two characters to search.');input.reportValidity();input.focus();return;
   }
   input.setCustomValidity('');
-  navigationVersion+=1;const requestVersion=navigationVersion;closeMDCATHub();
+  navigationVersion+=1;const requestVersion=navigationVersion;closePortalMDCATHub();
   document.getElementById('homeHero').style.display='none';document.getElementById('homeExplore').style.display='none';
   document.getElementById('dynamicPage').style.display='block';document.getElementById('dynamicPageTitle').textContent='Search results';
   document.getElementById('dynamicPageDescription').textContent='Searching ICP YOUTH CIRCLE for “'+query+'”.';

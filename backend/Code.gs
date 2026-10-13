@@ -844,7 +844,7 @@ function doGet(e) {
     }
 
     if (action === 'portalBundle') {
-      return cachedPublicJsonResponse_('portalBundle',getPublicPortalBundle_,60);
+      return cachedPublicJsonResponse_('portalBundle',getPublicPortalBundle_,300);
     }
 
     if (action === 'mcqs') {
@@ -860,7 +860,7 @@ function doGet(e) {
     }
 
     if (action === 'scholarships') {
-      return cachedPublicJsonResponse_('scholarships',getPublicScholarships_,60);
+      return cachedPublicJsonResponse_('scholarships',getPublicScholarships_,300);
     }
 
     if (action === 'opportunities') {

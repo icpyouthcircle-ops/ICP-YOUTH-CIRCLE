@@ -46,10 +46,10 @@ fs.mkdirSync(path.join(__dirname,'../test-results'),{recursive:true});
     });
     await page.goto(pathToFileURL(path.join(__dirname,'../index.html')).href);
     await page.locator('#app').waitFor({state:'visible'});
+    await page.evaluate(()=>handleNavigation({Slug:'mdcat',Label:'MDCAT'}));
     assert.equal(await page.evaluate(()=>mdcatCalendarDate('2026-09-23T19:00:00Z')),'2026-09-24');
     assert.equal(await page.evaluate(()=>mdcatCalendarDate('2026-09-24')),'2026-09-24');
     assert.equal(await page.evaluate(()=>mdcatCalendarDate('invalid')),'');
-    await page.evaluate(()=>handleNavigation({Slug:'mdcat',Label:'MDCAT'}));
     const tool=name=>page.getByRole('navigation',{name:'MDCAT tools'}).getByRole('button',{name,exact:true});
     for(const name of ['Biology','Chemistry','Physics','English','Logical Reasoning']) {
       await page.getByRole('button',{name:'View '+name+' units',exact:true}).click();
