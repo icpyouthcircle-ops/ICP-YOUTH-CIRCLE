@@ -1187,7 +1187,7 @@ function handleNavigation(item,options={}) {
   item=resolveNavigationItem(item);
 
   if (item.Slug === 'mdcat' || item.Slug === 'mdcat-2027') {
-    loadPortalMDCATFeatures().then(()=>{
+    return loadPortalMDCATFeatures().then(()=>{
       if (requestVersion===navigationVersion) openMDCATHub(options);
     }).catch(error=>{
       if (requestVersion!==navigationVersion) return;
