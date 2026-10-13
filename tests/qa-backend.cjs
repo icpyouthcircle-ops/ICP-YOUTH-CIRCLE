@@ -2,7 +2,7 @@ const assert=require('node:assert/strict');
 const {createBackend}=require('./scoring-harness.cjs');
 
 const backend=createBackend();
-backend.context.setupQASystem_();
+backend.context.setupQASystem();
 backend.addSheet('QNA_Contributors',[{ID:'QAC-1',Email:'teacher@example.test',DisplayName:'Ms Ayesha',Role:'Teacher',Status:'Active'}]);
 const alice=backend.token('alice',{}, {email:'alice@example.test'});
 const teacher=backend.token('teacher',{}, {email:'teacher@example.test'});
