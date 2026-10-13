@@ -14,12 +14,14 @@ const PORTAL_MDCAT_SCRIPTS = [
   'js/mdcat-account.js?v=20261013-speed-v2'
 ];
 const PORTAL_QA_SCRIPT = 'js/qa.js?v=20261013-community-v1';
+const PORTAL_AI_SCRIPT = 'js/assistant.js?v=20261013-ai-v1';
 const publicModuleMemory = new Map();
 const publicModuleRequests = new Map();
 const portalFeaturePrefetches = new Set();
 let publicNotificationRequest = null;
 let portalMDCATLoadPromise = null;
 let portalQALoadPromise = null;
+let portalAILoadPromise = null;
 let portalRenderFingerprint = '';
 const PORTAL_BOOKMARKS_KEY = 'icp-student-bookmarks-v1';
 const PORTAL_BOOTSTRAP_DATA = {
@@ -139,6 +141,10 @@ function prefetchPortalRoute(slug) {
   if (['community','questions'].includes(route)) {
     const link=document.createElement('link');link.rel='prefetch';link.as='script';link.href=PORTAL_QA_SCRIPT;document.head.appendChild(link);
   }
+  if (['ai-smart-tools','ai-assistant'].includes(route) && !portalFeaturePrefetches.has(PORTAL_AI_SCRIPT)) {
+    portalFeaturePrefetches.add(PORTAL_AI_SCRIPT);
+    const link=document.createElement('link');link.rel='prefetch';link.as='script';link.href=PORTAL_AI_SCRIPT;document.head.appendChild(link);
+  }
   if (route==='study') {
     ['Notes','Past Papers','Study Resources'].forEach(category=>loadPublicModule('resources',{category}).catch(()=>{}));
   } else if (route==='notes') loadPublicModule('resources',{category:'Notes'}).catch(()=>{});
@@ -153,6 +159,24 @@ function loadPortalQAFeatures() {
     if(typeof openPortalQA!=='function')throw new Error('Student Q&A did not initialize.');
   }).catch(error=>{portalQALoadPromise=null;throw error;});
   return portalQALoadPromise;
+}
+
+function loadPortalAIFeatures() {
+  if(typeof openICPAssistant==='function')return Promise.resolve();
+  if(!portalAILoadPromise)portalAILoadPromise=appendPortalFeatureScript(PORTAL_AI_SCRIPT).then(()=>{
+    if(typeof openICPAssistant!=='function')throw new Error('ICP AI Assistant did not initialize.');
+  }).catch(error=>{portalAILoadPromise=null;throw error;});
+  return portalAILoadPromise;
+}
+
+function mountICPAssistantLauncher() {
+  if(document.getElementById('icpAiLauncher'))return;
+  const button=document.createElement('button');button.id='icpAiLauncher';button.className='icp-ai-launcher';button.type='button';
+  button.setAttribute('aria-label','Open ICP AI Assistant');button.title='Open ICP AI Assistant';
+  const mark=document.createElement('span');mark.className='icp-ai-launcher-mark';mark.textContent='AI';
+  const label=document.createElement('span');label.className='icp-ai-launcher-label';label.textContent='Ask ICP';button.append(mark,label);
+  button.onclick=()=>handleNavigation({Slug:'ai-assistant',Label:'AI Assistant',ParentID:'NAV-007'});
+  addPortalIntentPrefetch(button,'ai-assistant');document.body.appendChild(button);
 }
 
 function addPortalIntentPrefetch(node,slug) {
@@ -491,6 +515,8 @@ function registerPortalServiceWorker() {
       renderCategories(
         data.categories || []
       );
+
+      mountICPAssistantLauncher();
 
       if (!publicNotificationRequest) {
         publicNotificationRequest = loadPublicModule('publicNotifications')
@@ -1069,6 +1095,7 @@ function getRouteDescription(slug, label) {
     'scholarships':'Discover scholarships, financial aid and guidance for stronger applications.',
     'career':'Explore career guidance, internships, competitions and student development opportunities.',
     'ai-smart-tools':'Use practical AI and digital tools to study, plan and work more effectively.',
+    'ai-assistant':'Get clear study help with verified ICP sources, guided practice and private conversation history.',
     'community':'Connect with student support, contribute useful resources and share suggestions.',
     'updates':'Stay informed about exams, results, merit lists and important student notices.',
     'islamic':'Read carefully presented Islamic reminders, hadith and duas for daily reflection.',
@@ -1266,6 +1293,8 @@ function handleNavigation(item,options={}) {
   const content =
     document.getElementById('dynamicPageContent');
 
+  content.className = 'grid';
+
   const itemLabel=item.Label || item.Name || 'Portal';
   const parentSlug=getNavigationParentSlug(item);
   title.textContent = itemLabel;
@@ -1282,7 +1311,10 @@ const resourceCategories = {
   'study-resources': 'Study Resources'
 };
 
-if (resourceCategories[item.Slug]) {
+if (item.Slug === 'ai-assistant') {
+  content.innerHTML='<p>Loading ICP AI Assistant…</p>';
+  loadPortalAIFeatures().then(()=>{if(requestVersion===navigationVersion)openICPAssistant();}).catch(error=>{if(requestVersion===navigationVersion)renderSectionNotice(error.message||'Unable to load ICP AI Assistant.');});
+} else if (resourceCategories[item.Slug]) {
   loadResourcesByCategory(
     resourceCategories[item.Slug]
   );
@@ -1304,7 +1336,7 @@ if (resourceCategories[item.Slug]) {
   loadAnnouncements(item.Slug,parentSlug);
 } else if (
   item.Slug === 'ai-smart-tools' ||
-  item.Slug === 'ai-tools' || item.Slug === 'ai-assistant' || item.Slug === 'smart-tools' || item.Slug === 'study-tools'
+  item.Slug === 'ai-tools' || item.Slug === 'smart-tools' || item.Slug === 'study-tools'
 ) {
   loadAITools(item.Slug);
 } else if (
