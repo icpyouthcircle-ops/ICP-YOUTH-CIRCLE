@@ -903,7 +903,7 @@ function doGet(e) {
       const category =
         e.parameter.category || '';
 
-      return cachedPublicJsonResponse_('resources-' + category,function(){return getPublicResources_(category);},60);
+      return cachedPublicJsonResponse_('resources-' + category,function(){return getPublicResources_(category);},300);
     }
     // ==========================================
 // MDCAT 2027 API ROUTES
