@@ -77,7 +77,7 @@ function qaField(labelText,control){const label=qaElement('label',null,'qa-field
 function qaOpenQuestionForm(){
   const list=document.getElementById('qaQuestionList');list.replaceChildren();
   const form=qaElement('form',null,'qa-form');const title=qaElement('input');title.required=true;title.minLength=10;title.maxLength=180;
-  const subject=qaElement('select');subject.required=true;subject.appendChild(new Option('Choose subject',''));PORTAL_QA_SUBJECTS.forEach(value=>subject.appendChild(new Option(value,value)));
+  const subject=qaElement('select');subject.required=true;subject.setAttribute('aria-label','Subject');subject.appendChild(new Option('Choose subject',''));PORTAL_QA_SUBJECTS.forEach(value=>subject.appendChild(new Option(value,value)));
   const details=qaElement('textarea');details.required=true;details.minLength=30;details.maxLength=3000;details.rows=7;
   const tags=qaElement('input');tags.maxLength=180;tags.placeholder='Example: vectors, chapter 2';
   const name=qaElement('input');name.maxLength=60;name.placeholder='Public display name';
