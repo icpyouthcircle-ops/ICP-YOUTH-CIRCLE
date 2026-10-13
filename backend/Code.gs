@@ -33,6 +33,11 @@ const CONFIG = {
     FAQS: 'FAQs',
     FEEDBACK: 'Feedback',
     COUNTDOWNS: 'Countdowns',
+    QNA_QUESTIONS: 'QNA_Questions',
+    QNA_ANSWERS: 'QNA_Answers',
+    QNA_VOTES: 'QNA_Votes',
+    QNA_REPORTS: 'QNA_Reports',
+    QNA_CONTRIBUTORS: 'QNA_Contributors',
     MDCAT_SUBJECTS: 'MDCAT_Subjects',
     MDCAT_UNITS: 'MDCAT_Units',
     MDCAT_CHAPTERS: 'MDCAT_Chapters',
@@ -896,6 +901,14 @@ function doGet(e) {
     if (action === 'entryTests') {
       return cachedPublicJsonResponse_('entryTests',getPublicEntryTests_,300);
     }
+    if (action === 'qaQuestions') {
+      return cachedPublicJsonResponse_('qaQuestions',getPublicQAQuestions_,60);
+    }
+    if (action === 'qaAnswers') {
+      const questionId=String(e.parameter.questionId || '').trim();
+      if (!/^QAQ-[A-Za-z0-9-]{1,100}$/.test(questionId)) mdcatError_('BAD_REQUEST','Choose a valid question.');
+      return cachedPublicJsonResponse_('qaAnswers-'+questionId,function(){return getPublicQAAnswers_(questionId);},60);
+    }
     if (action === 'testCatalog') {
       return cachedPublicJsonResponse_('testCatalog',getPublicTestCatalog_,300);
     }
@@ -1718,6 +1731,8 @@ const ADMIN_TABLES_ = [
   ['NAVIGATION','Navigation','NAV'],['HOMEPAGE','Homepage','HOME'],['SOCIAL_LINKS','Social links','SOC'],
   ['SETTINGS','Settings','SET'],['SUBMISSIONS','Resource submissions','SUBM'],['HELP_DESK','Help desk','HELP'],
   ['COUNTDOWNS','Public countdowns','COUNT'],
+  ['QNA_QUESTIONS','Q&A questions','QAQ'],['QNA_ANSWERS','Q&A answers','QAA'],
+  ['QNA_REPORTS','Q&A reports','QAR'],['QNA_CONTRIBUTORS','Q&A verified contributors','QAC'],
   ['FAQS','Frequently asked questions','FAQ'],['FEEDBACK','Anonymous feedback','FDBK'],
   ['TEST_CATALOG','Test catalog','TST'],['NOTIFICATIONS','Notifications','NTF'],
   ['MDCAT_SUBJECTS','MDCAT subjects','MDS'],['MDCAT_UNITS','MDCAT units','MDU'],
@@ -1756,7 +1771,7 @@ function adminAuthenticate_(token) {
 
 function adminManifest_(admin) {
   const spreadsheet=getSpreadsheet_();
-  const optional={TEST_CATALOG:true,NOTIFICATIONS:true,FAQS:true,FEEDBACK:true,COUNTDOWNS:true};
+  const optional={TEST_CATALOG:true,NOTIFICATIONS:true,FAQS:true,FEEDBACK:true,COUNTDOWNS:true,QNA_QUESTIONS:true,QNA_ANSWERS:true,QNA_REPORTS:true,QNA_CONTRIBUTORS:true};
   return {
     email:admin.email,
     role:admin.role,
@@ -1936,8 +1951,141 @@ function adminUploadPdf_(body,admin) {
 function adminClearPublicCache_() {
   try {
     const cache=CacheService.getScriptCache();
-    cache.removeAll(['icp-public-v1-portalData','icp-public-v1-portalBundle','icp-public-v1-searchIndex','icp-public-v1-mcqs','icp-public-v1-videos','icp-public-v1-admissions','icp-public-v1-scholarships','icp-public-v1-opportunities','icp-public-v1-announcements','icp-public-v1-publicNotifications','icp-public-v1-countdowns','icp-public-v1-faqs','icp-public-v1-aiTools','icp-public-v1-islamicContent','icp-public-v1-blog','icp-public-v1-entryTests','icp-public-v1-testCatalog','icp-public-v1-mdcatSubjects','icp-public-v1-mdcatTests','icp-public-v1-mdcatDailyPractice','icp-public-v1-mdcatUpdates']);
+    cache.removeAll(['icp-public-v1-portalData','icp-public-v1-portalBundle','icp-public-v1-searchIndex','icp-public-v1-mcqs','icp-public-v1-videos','icp-public-v1-admissions','icp-public-v1-scholarships','icp-public-v1-opportunities','icp-public-v1-announcements','icp-public-v1-publicNotifications','icp-public-v1-countdowns','icp-public-v1-faqs','icp-public-v1-aiTools','icp-public-v1-islamicContent','icp-public-v1-blog','icp-public-v1-entryTests','icp-public-v1-qaQuestions','icp-public-v1-testCatalog','icp-public-v1-mdcatSubjects','icp-public-v1-mdcatTests','icp-public-v1-mdcatDailyPractice','icp-public-v1-mdcatUpdates']);
   } catch (_) {}
+}
+
+const QNA_SUBJECTS_=['Biology','Chemistry','Physics','Mathematics','English','Computer Science','Islamic Studies','Pakistan Studies','MDCAT','NUMS','ETEA','Admissions','Scholarships','Career Guidance','Other'];
+
+function qnaText_(value,label,minimum,maximum) {
+  const text=String(value == null ? '' : value).replace(/\r\n?/g,'\n').replace(/[ \t]+/g,' ').replace(/\n{3,}/g,'\n\n').trim();
+  if(text.length<minimum) mdcatError_('BAD_REQUEST',label+' is too short.');
+  if(text.length>maximum) mdcatError_('BAD_REQUEST',label+' is too long.');
+  return text;
+}
+
+function qnaSubject_(value) {
+  const subject=String(value || '').trim();
+  if(!QNA_SUBJECTS_.includes(subject)) mdcatError_('BAD_REQUEST','Choose a valid subject.');
+  return subject;
+}
+
+function qnaNormalized_(value) {
+  return String(value || '').toLowerCase().replace(/https?:\/\/\S+/g,' ').replace(/[^a-z0-9\u0600-\u06ff]+/g,' ').replace(/\s+/g,' ').trim();
+}
+
+function qnaSimilarity_(left,right) {
+  const a=new Set(qnaNormalized_(left).split(' ').filter(word=>word.length>2));
+  const b=new Set(qnaNormalized_(right).split(' ').filter(word=>word.length>2));
+  if(!a.size || !b.size)return 0;
+  let overlap=0;a.forEach(word=>{if(b.has(word))overlap++;});
+  return overlap/(a.size+b.size-overlap);
+}
+
+function qnaContributor_(email) {
+  const sheet=getSpreadsheet_().getSheetByName(CONFIG.SHEETS.QNA_CONTRIBUTORS);
+  if(!sheet)return null;
+  return getSheetData_(CONFIG.SHEETS.QNA_CONTRIBUTORS).find(row=>String(row.Email || '').trim().toLowerCase()===String(email || '').trim().toLowerCase() && String(row.Status || 'Active').trim().toLowerCase()==='active') || null;
+}
+
+function qnaDisplayName_(value,email,contributor) {
+  const preferred=contributor && contributor.DisplayName;
+  const fallback=String(email || 'student').split('@')[0].replace(/[._-]+/g,' ');
+  return qnaText_(preferred || value || fallback,'Display name',2,60);
+}
+
+function qnaRateLimit_(sheetName,userId,maximum,label) {
+  const since=Date.now()-24*60*60*1000;
+  const count=getSheetData_(sheetName).filter(row=>String(row.UserID)===String(userId) && new Date(row.CreatedAt || 0).getTime()>=since && String(row.Status || '').toLowerCase()!=='archived').length;
+  if(count>=maximum) mdcatError_('RATE_LIMITED','Daily '+label+' limit reached. Please return tomorrow.');
+}
+
+function qnaPublicQuestion_(row,answers) {
+  const questionId=String(row.ID || '');
+  const activeAnswers=answers.filter(answer=>String(answer.QuestionID)===questionId && String(answer.Status || '').toLowerCase()==='active');
+  return {ID:questionId,Subject:String(row.Subject || ''),Title:String(row.Title || ''),Body:String(row.Body || ''),Tags:String(row.Tags || ''),DisplayName:String(row.DisplayName || 'Student'),AuthorVerified:/^yes$/i.test(String(row.AuthorVerified || '')),AuthorRole:String(row.AuthorRole || ''),CreatedAt:row.CreatedAt || '',UpdatedAt:row.UpdatedAt || '',AnswerCount:activeAnswers.length,VoteScore:activeAnswers.reduce((sum,answer)=>sum+Number(answer.VoteScore || 0),0),HasVerifiedAnswer:activeAnswers.some(answer=>/^yes$/i.test(String(answer.AuthorVerified || answer.IsVerified || '')))};
+}
+
+function getPublicQAQuestions_() {
+  const sheet=getSpreadsheet_().getSheetByName(CONFIG.SHEETS.QNA_QUESTIONS);
+  if(!sheet)return [];
+  const answersSheet=getSpreadsheet_().getSheetByName(CONFIG.SHEETS.QNA_ANSWERS);
+  const answers=answersSheet?getSheetData_(CONFIG.SHEETS.QNA_ANSWERS):[];
+  return getSheetData_(CONFIG.SHEETS.QNA_QUESTIONS).filter(row=>String(row.Status || '').trim().toLowerCase()==='active').map(row=>qnaPublicQuestion_(row,answers)).sort((a,b)=>new Date(b.CreatedAt)-new Date(a.CreatedAt)).slice(0,250);
+}
+
+function getPublicQAAnswers_(questionId) {
+  const sheet=getSpreadsheet_().getSheetByName(CONFIG.SHEETS.QNA_ANSWERS);
+  if(!sheet)return [];
+  return getSheetData_(CONFIG.SHEETS.QNA_ANSWERS).filter(row=>String(row.QuestionID)===questionId && String(row.Status || '').trim().toLowerCase()==='active').map(row=>({ID:String(row.ID || ''),QuestionID:questionId,Body:String(row.Body || ''),Sources:String(row.Sources || ''),DisplayName:String(row.DisplayName || 'Student'),AuthorVerified:/^yes$/i.test(String(row.AuthorVerified || row.IsVerified || '')),AuthorRole:String(row.AuthorRole || ''),IsAccepted:/^yes$/i.test(String(row.IsAccepted || '')),VoteScore:Number(row.VoteScore || 0),CreatedAt:row.CreatedAt || '',UpdatedAt:row.UpdatedAt || ''})).sort((a,b)=>Number(b.IsAccepted)-Number(a.IsAccepted) || Number(b.AuthorVerified)-Number(a.AuthorVerified) || b.VoteScore-a.VoteScore || new Date(a.CreatedAt)-new Date(b.CreatedAt));
+}
+
+function qnaCreateQuestion_(user,body) {
+  qnaRateLimit_(CONFIG.SHEETS.QNA_QUESTIONS,user.uid,5,'question');
+  const contributor=qnaContributor_(user.email);
+  const title=qnaText_(body.title,'Question title',10,180);
+  const text=qnaText_(body.body,'Question details',30,3000);
+  const normalized=qnaNormalized_(title+' '+text);
+  const duplicate=getSheetData_(CONFIG.SHEETS.QNA_QUESTIONS).some(row=>String(row.UserID)===user.uid && qnaNormalized_(String(row.Title || '')+' '+String(row.Body || ''))===normalized && String(row.Status || '').toLowerCase()!=='archived');
+  if(duplicate) mdcatError_('DUPLICATE','You already submitted this question.');
+  const now=new Date().toISOString();
+  const record={ID:'QAQ-'+Utilities.getUuid(),UserID:user.uid,DisplayName:qnaDisplayName_(body.displayName,user.email,contributor),Subject:qnaSubject_(body.subject),Title:title,Body:text,Tags:qnaText_(body.tags || 'General','Tags',0,180),AuthorVerified:contributor?'Yes':'No',AuthorRole:contributor?String(contributor.Role || 'Verified contributor'):'Student',Status:'Active',CreatedAt:now,UpdatedAt:now};
+  mdcatPut_(CONFIG.SHEETS.QNA_QUESTIONS,record);
+  return {id:record.ID,status:record.Status};
+}
+
+function qnaCreateAnswer_(user,body) {
+  qnaRateLimit_(CONFIG.SHEETS.QNA_ANSWERS,user.uid,20,'answer');
+  const questionId=String(body.questionId || '').trim();
+  const question=getSheetData_(CONFIG.SHEETS.QNA_QUESTIONS).find(row=>String(row.ID)===questionId && String(row.Status || '').toLowerCase()==='active');
+  if(!question)mdcatError_('CONTENT_UNAVAILABLE','This question is not available.');
+  const text=qnaText_(body.body,'Answer',40,5000);
+  const answers=getSheetData_(CONFIG.SHEETS.QNA_ANSWERS).filter(row=>String(row.QuestionID)===questionId && String(row.Status || '').toLowerCase()!=='archived');
+  if(answers.some(row=>qnaNormalized_(row.Body)===qnaNormalized_(text) || text.length>=80 && qnaSimilarity_(row.Body,text)>=0.9)) mdcatError_('DUPLICATE','This answer is too similar to an existing answer. Add your own explanation.');
+  const contributor=qnaContributor_(user.email);const now=new Date().toISOString();
+  const record={ID:'QAA-'+Utilities.getUuid(),QuestionID:questionId,UserID:user.uid,DisplayName:qnaDisplayName_(body.displayName,user.email,contributor),Body:text,Sources:qnaText_(body.sources || 'No external source supplied','Sources',0,1000),AuthorVerified:contributor?'Yes':'No',AuthorRole:contributor?String(contributor.Role || 'Verified contributor'):'Student',IsAccepted:'No',VoteScore:0,Status:contributor?'Active':'Pending Review',CreatedAt:now,UpdatedAt:now};
+  mdcatPut_(CONFIG.SHEETS.QNA_ANSWERS,record);
+  return {id:record.ID,status:record.Status};
+}
+
+function qnaVote_(user,body) {
+  const answerId=String(body.answerId || '').trim();const value=Number(body.value);
+  if(![-1,1].includes(value))mdcatError_('BAD_REQUEST','Choose an upvote or downvote.');
+  const answer=getSheetData_(CONFIG.SHEETS.QNA_ANSWERS).find(row=>String(row.ID)===answerId && String(row.Status || '').toLowerCase()==='active');
+  if(!answer)mdcatError_('CONTENT_UNAVAILABLE','This answer is not available.');
+  if(String(answer.UserID)===user.uid)mdcatError_('BAD_REQUEST','You cannot vote on your own answer.');
+  const id='QAV-'+notificationDigest_(user.uid+':'+answerId);const votes=getSheetData_(CONFIG.SHEETS.QNA_VOTES);const existing=votes.find(row=>String(row.ID)===id);
+  const active=existing && String(existing.Status || '').toLowerCase()==='active';const nextValue=active && Number(existing.Value)===value?0:value;const now=new Date().toISOString();
+  mdcatPut_(CONFIG.SHEETS.QNA_VOTES,{ID:id,UserID:user.uid,AnswerID:answerId,Value:nextValue,Status:nextValue?'Active':'Archived',CreatedAt:existing && existing.CreatedAt || now,UpdatedAt:now});
+  const score=getSheetData_(CONFIG.SHEETS.QNA_VOTES).filter(row=>String(row.AnswerID)===answerId && String(row.Status || '').toLowerCase()==='active').reduce((sum,row)=>sum+Number(row.Value || 0),0);
+  mdcatPut_(CONFIG.SHEETS.QNA_ANSWERS,Object.assign({},answer,{VoteScore:score,UpdatedAt:now}));
+  return {answerId:answerId,value:nextValue,score:score};
+}
+
+function qnaReport_(user,body) {
+  qnaRateLimit_(CONFIG.SHEETS.QNA_REPORTS,user.uid,10,'report');
+  const type=String(body.entityType || '').trim();const entityId=String(body.entityId || '').trim();
+  if(!['Question','Answer'].includes(type))mdcatError_('BAD_REQUEST','Choose valid content to report.');
+  const sheetName=type==='Question'?CONFIG.SHEETS.QNA_QUESTIONS:CONFIG.SHEETS.QNA_ANSWERS;
+  if(!getSheetData_(sheetName).some(row=>String(row.ID)===entityId && String(row.Status || '').toLowerCase()==='active'))mdcatError_('CONTENT_UNAVAILABLE','This content is not available.');
+  const id='QAR-'+notificationDigest_(user.uid+':'+type+':'+entityId);const existing=getSheetData_(CONFIG.SHEETS.QNA_REPORTS).find(row=>String(row.ID)===id);
+  if(existing) return {id:id,status:String(existing.Status || 'Pending Review')};
+  const now=new Date().toISOString();mdcatPut_(CONFIG.SHEETS.QNA_REPORTS,{ID:id,UserID:user.uid,EntityType:type,EntityID:entityId,Reason:qnaText_(body.reason,'Report reason',3,80),Details:qnaText_(body.details || 'No additional details','Report details',0,500),Status:'Pending Review',CreatedAt:now,UpdatedAt:now});
+  return {id:id,status:'Pending Review'};
+}
+
+// Run once from the Apps Script editor to create the Student Q&A sheets.
+function setupQASystem() {
+  const spreadsheet=getSpreadsheet_();
+  const definitions=[
+    [CONFIG.SHEETS.QNA_QUESTIONS,['ID','UserID','DisplayName','Subject','Title','Body','Tags','AuthorVerified','AuthorRole','Status','CreatedAt','UpdatedAt']],
+    [CONFIG.SHEETS.QNA_ANSWERS,['ID','QuestionID','UserID','DisplayName','Body','Sources','AuthorVerified','AuthorRole','IsAccepted','VoteScore','Status','CreatedAt','UpdatedAt']],
+    [CONFIG.SHEETS.QNA_VOTES,['ID','UserID','AnswerID','Value','Status','CreatedAt','UpdatedAt']],
+    [CONFIG.SHEETS.QNA_REPORTS,['ID','UserID','EntityType','EntityID','Reason','Details','Status','CreatedAt','UpdatedAt']],
+    [CONFIG.SHEETS.QNA_CONTRIBUTORS,['ID','Email','DisplayName','Role','Status','CreatedAt','UpdatedAt']]
+  ];
+  definitions.forEach(([name,headers])=>{let sheet=spreadsheet.getSheetByName(name);if(!sheet)sheet=spreadsheet.insertSheet(name);if(sheet.getLastRow()===0)sheet.getRange(1,1,1,headers.length).setValues([headers]);});
+  return 'Q&A sheets are ready. Add verified teachers or contributors in '+CONFIG.SHEETS.QNA_CONTRIBUTORS+'.';
 }
 
 function doPost(e) {
@@ -1954,6 +2102,20 @@ function doPost(e) {
       try {
         return jsonResponse_(body.action==='publicSubmitResource' ? publicSubmitResource_(body) : body.action==='publicHelpRequest' ? publicHelpRequest_(body) : publicFeedback_(body));
       } finally { publicLock.releaseLock(); }
+    }
+    if (['qaCreateQuestion','qaCreateAnswer','qaVote','qaReport'].includes(body.action)) {
+      const student=firebaseAuthenticate_(body.idToken);
+      const qnaLock=LockService.getScriptLock();
+      if(!qnaLock.tryLock(10000))mdcatError_('BUSY','The Q&A system is busy. Please retry.');
+      try {
+        let qnaData;
+        if(body.action==='qaCreateQuestion')qnaData=qnaCreateQuestion_(student,body);
+        if(body.action==='qaCreateAnswer')qnaData=qnaCreateAnswer_(student,body);
+        if(body.action==='qaVote')qnaData=qnaVote_(student,body);
+        if(body.action==='qaReport')qnaData=qnaReport_(student,body);
+        adminClearPublicCache_();
+        return jsonResponse_(qnaData);
+      } finally {qnaLock.releaseLock();}
     }
     if (['studentDashboard','studentMarkNotificationsRead','studentSaveNotificationPreferences'].includes(body.action)) {
       const student=firebaseAuthenticate_(body.idToken);
